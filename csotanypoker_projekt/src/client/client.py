@@ -3,21 +3,22 @@ import socket
 import json
 import time
 import pygame
-
+from collections import defaultdict
+import os
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
 BLUE = (0, 0, 255)
 
-
+# 
 
 class Client:
-    def __init__(self, host="127.0.0.1", port=55555):
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.connect((host, port))
+    def __init__(self): #host="127.0.0.1", port=55555
+        # self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.client.connect((host, port))
         self.rooms = []
-        self.allapot=0
+        self.allapot=5
         pygame.init()
         self.width, self.height = 1400, 800
         self.screen = pygame.display.set_mode((self.width, self.height))
@@ -25,8 +26,35 @@ class Client:
         self.font = pygame.font.Font(None, 50)
         self.font_kozepes = pygame.font.Font(None, 30)
         self.button_font = pygame.font.Font(None, 40)
-        threading.Thread(target=self.receive).start()
-        self.kezdo_oldal()
+        self.allat_kivalasztva = None
+        self.lenyiloablak_allapot = False
+        self.allatok = ["csotany", "denever", "poloska", "patkany", "légy", "varangy", "skorpió","pók"]   
+        self.lenyiloablak_pozicio = pygame.Rect(self.width//2 - 50, self.height//2+150, 100, 30)
+        self.elfogado_gomb_pozicio = pygame.Rect(self.width//2 + 60, self.height//2+150, 100, 30)
+
+
+        # threading.Thread(target=self.receive).start()
+        # self.kezdo_oldal()
+        message="Feri van soron"
+        kezben_levo_lapok=["csotany","csotany","csotany", "patkany","denever", "poloska", "patkany", "denever", "varangy","varangy","varangy","varangy", "skorpio","pok","pok","legy"]
+        elotte_levo_kartyak = {
+            "csotany": 2,
+            "denever": 5,
+            "patkany": 1,
+            }
+        jatekosok = {"feri":{"elotte_levo_kartyak":{"csotany":2,"varangy":1}, "kezben_levo_kartyak":{4}},
+                     "jozsi":{"elotte_levo_kartyak":{"denever":3,"poloska":1}, "kezben_levo_kartyak":{3}},
+                     "laci":{"elotte_levo_kartyak":{"denever":1,"poloska":4,"patkany":1,"csotany":2,"varangy":1, "legy": 2, "skorpio": 1, "pok": 3},"kezben_levo_kartyak":{3}},
+                     "sanyi":{"elotte_levo_kartyak":{},"kezben_levo_kartyak":{10}},
+                     "pisti":{"elotte_levo_kartyak":{},"kezben_levo_kartyak":{0}}}
+        
+        kozepso_lap="kerdojel"
+        # kozepso_lap="csotany"
+        # kozepso_lap=None
+        allitas="ez egy Béka"
+        allitas2="Szerintem ez egy béka"
+
+        self.game_started_screen(kezben_levo_lapok,elotte_levo_kartyak, jatekosok,message, kozepso_lap, allitas, allitas2)
 
     def receive(self):
         while True:
@@ -215,7 +243,7 @@ class Client:
                                     "max_players": max_jatekosok
                                 })
                         except ValueError:
-                            pass  # Hibás számbevitel 
+                            pass  
                 elif event.type == pygame.KEYDOWN:
                     if aktiv_bemenet == 'szoba_neve':
                         if event.key == pygame.K_BACKSPACE:
@@ -354,40 +382,244 @@ class Client:
                             self.send({"type": "join_room", "room_name": room, "password": password})
                         
         
-    def game_started_screen(self,kezben_levo_lapok):
+    def game_started_screen(self, kezben_levo_lapok, elotte_levo_kartyak, jatekosok, message, kozepso_lap,allitas, allitas2):
+        small_font = pygame.font.Font(None, 20)
+        info_font = pygame.font.Font(None, 36)
+        player_font = pygame.font.Font(None, 24)
+        count_font = pygame.font.Font(None, 24)
+        message_font = pygame.font.Font(None, 30)
+        kep_mappa = "client\kepek"  
+        
        
-        small_font = pygame.font.Font(None, 20)  
-        sor_hossz = 5  
-
+        kartya_csoportok = defaultdict(list)
+        for lap in kezben_levo_lapok:
+            kartya_csoportok[lap].append(lap)
+      
+        logo_images = {}
+        for player_data in jatekosok.values():
+            for lap_tipus in player_data["elotte_levo_kartyak"].keys():
+                if lap_tipus not in logo_images:
+                    logo_utvonal = os.path.join(kep_mappa, f"{lap_tipus}_logo.png")
+                    if os.path.exists(logo_utvonal):
+                        logo = pygame.image.load(logo_utvonal)
+                        logo = pygame.transform.scale(logo, (40, 40))
+                        logo_images[lap_tipus] = logo
+        player_panels = []
         while self.allapot == 5:
-            self.screen.fill(WHITE)
+            self.screen.fill((255, 255, 255))  
+
+            text = message_font.render(message, True, (0, 0, 0))
+            text_rect = text.get_rect()
+            text_rect = (self.width/1.2, 30)
+            self.screen.blit(text, text_rect)
+            
+            
+            player_panel_height = 200
+            player_panel_width = 120
+            player_spacing = 30
+            total_players_width = (player_panel_width * len(jatekosok)) + (player_spacing * (len(jatekosok) - 1))
+            start_x = (self.width - total_players_width) / 2
+            player_panels = []
+            for i, (player_name, player_data) in enumerate(jatekosok.items()):
+                player_panel_rect = pygame.Rect(
+                    start_x + i * (player_panel_width + player_spacing),
+                    60,
+                    player_panel_width,
+                    player_panel_height
+                )
+                
+                pygame.draw.rect(self.screen, GRAY, player_panel_rect, border_radius=5)
+                
+                player_name_text = player_font.render(f"nev: {player_name}", True, (0, 0, 0))
+                self.screen.blit(player_name_text, (player_panel_rect.x + 10, player_panel_rect.y + 10))
+                
+                card_count_text = count_font.render(f"lapszam: {sum(player_data['kezben_levo_kartyak'])}", True, (0, 0, 0))
+                self.screen.blit(card_count_text, (player_panel_rect.x+10 , player_panel_rect.y + 30))
+                
+                card_x = player_panel_rect.x + 10
+                card_y = player_panel_rect.y + 60
+                col_width = 60  
+
+                for j, (lap_tipus, count) in enumerate(player_data["elotte_levo_kartyak"].items()):
+                    column = j % 2
+                    row = j // 2    
+                    pos_x = player_panel_rect.x + 10 + (column * col_width)
+                    pos_y = player_panel_rect.y + 60 + (row * 30)
+                    
+                    if lap_tipus in logo_images:
+                        small_logo = pygame.transform.scale(logo_images[lap_tipus], (25, 25))
+                        self.screen.blit(small_logo, (pos_x, pos_y))
+                        count_text = small_font.render(str(count), True, (0, 0, 0))
+                        self.screen.blit(count_text, (pos_x + 30, pos_y + 5))
+                    else:
+                        card_text = small_font.render(f"{lap_tipus}: {count}", True, (0, 0, 0))
+                        self.screen.blit(card_text, (pos_x, pos_y))
+                player_panels.append((player_panel_rect, player_name))
+
+
+           
+        
+            info_panel_rect = pygame.Rect(self.width - 250, 150, 230, 400)
+            
+           
+            info_title = info_font.render("Állatok száma:", True, BLACK)
+            self.screen.blit(info_title, (info_panel_rect.x + 10, info_panel_rect.y + 10))
+            
+            
+            col_width = 110  
+            
+           
+            items_per_column = (len(elotte_levo_kartyak) + 1) // 2 
+            
+            for i, lap_tipus in enumerate(elotte_levo_kartyak.keys()):
+                
+                col = i // items_per_column
+                row = i % items_per_column
+                
+                
+                x_pos = info_panel_rect.x + 15 + (col * col_width)
+                y_pos = info_panel_rect.y + 60 + (row * 50) 
+                
+                
+                if lap_tipus in logo_images:
+                    logo = logo_images[lap_tipus]
+                    self.screen.blit(logo, (x_pos, y_pos))
+                   
+                    count_text = count_font.render(f"{elotte_levo_kartyak[lap_tipus]}", True, BLACK)
+                    self.screen.blit(count_text, (x_pos + 45, y_pos + 10))
+                else:
+                   
+                    lap_info = count_font.render(f"{lap_tipus}: {elotte_levo_kartyak[lap_tipus]}", True, BLACK)
+                    self.screen.blit(lap_info, (x_pos, y_pos + 10))
+            
+            
+            eltolasi_meret = 10
+            kartya_poziciok = []
+        
+            x_kep, y_kep = self.width/2, self.height/1.3
+            for lap, lap_lista in kartya_csoportok.items():
+                kep_utvonal = os.path.join(kep_mappa, f"{lap}.png")
+                
+                if os.path.exists(kep_utvonal):
+                    kep = pygame.image.load(kep_utvonal)
+                    eredeti_meret = kep.get_size()
+                    meret_arany = min(self.width / 1600, self.height/1600)
+                    kartya_meret = (int(eredeti_meret[0] * meret_arany), int(eredeti_meret[1] * meret_arany))
+
+                    kep = pygame.transform.scale(kep, kartya_meret)
+                    for i in range(len(lap_lista)):
+                        kartya_rect = pygame.Rect(
+                            x_kep - (len(kartya_csoportok) * kartya_meret[0] / 2), 
+                            y_kep - i * eltolasi_meret, 
+                            *kartya_meret
+                        )
+                        self.screen.blit(kep, (kartya_rect.x, kartya_rect.y))
+                        kartya_poziciok.append((kartya_rect, lap))
+                    x_kep += kartya_meret[0] + 10
+            
+            
+            if kozepso_lap!=None:
+                card_width, card_height = 100, 150  
+                card_x = (self.width - card_width) // 2
+                card_y = (self.height - card_height) // 2
+               
+                if kozepso_lap == "kerdojel":
+                    kozepso_lap_path = os.path.join("client","kepek", "kerdojel.png")
+                    
+                    pipa_path = os.path.join("client", "kepek", "pipa.png")
+                    if os.path.exists(pipa_path):
+                        pipa_img = pygame.image.load(pipa_path)
+                        pipa_img = pygame.transform.scale(pipa_img, (40, 40))
+                        self.screen.blit(pipa_img, (card_x - 50, card_y + (card_height // 2) - 20))
+                    
 
             
-            text = self.font.render("A játék elkezdődött!", True, BLACK)
-            self.screen.blit(text, (200, 50))
+                    x_path = os.path.join("client", "kepek", "x.png")
+                    if os.path.exists(x_path):
+                        x_img = pygame.image.load(x_path)
+                        x_img = pygame.transform.scale(x_img, (40, 40))
+                        self.screen.blit(x_img, (card_x + card_width + 10, card_y + (card_height // 2) - 20))
+                  
+                      
+                
+                
 
-            
-            x_start, y_start = 50, 100 
-            x, y = x_start, y_start
-            spacing = 100  
+                elif kozepso_lap in kartya_csoportok:
+                    kozepso_lap_path = os.path.join("client","kepek", f"{kozepso_lap}.png")
+                
 
-            for i, lap in enumerate(kezben_levo_lapok):
-                lap_text = small_font.render(str(lap), True, BLACK)
-                self.screen.blit(lap_text, (x, y))
 
-                x += spacing  
-                if (i + 1) % sor_hossz == 0:  
-                    x = x_start
-                    y += 40  
 
-            
+
+
+                kozepso_lap_image = pygame.image.load(kozepso_lap_path)
+                
+                kozepso_lap_image = pygame.transform.scale(kozepso_lap_image, (card_width, card_height))
+                
+                self.screen.blit(kozepso_lap_image, (card_x, card_y))
+
+
+             
+                description_text = small_font.render(allitas, True, (0, 0, 0)) # ellenfél állitása
+                self.screen.blit(description_text, (card_x + card_width + 50, card_y + 10))
+                
+                description_text = small_font.render(allitas2, True, (0, 0, 0)) # saját állitás
+                self.screen.blit(description_text, (card_x-100, card_y+card_height+ 20))
+
+                
+                # Állatok közötti választás
+                pygame.draw.rect(self.screen, (180, 180, 180), self.lenyiloablak_pozicio)
+                dropdown_text = small_font.render(self.allat_kivalasztva, True, (0, 0, 0))
+                self.screen.blit(dropdown_text, (self.lenyiloablak_pozicio.x + 5, self.lenyiloablak_pozicio.y + 5))
+                
+                if self.lenyiloablak_allapot:
+                    for i, option in enumerate(self.allatok):
+                        option_rect = pygame.Rect(self.lenyiloablak_pozicio.x, self.lenyiloablak_pozicio.y + (i+1) * 20, 100, 20)
+                        pygame.draw.rect(self.screen, GRAY, option_rect)
+                        option_text = small_font.render(option, True, (0, 0, 0))
+                        self.screen.blit(option_text, (option_rect.x + 5, option_rect.y + 5))
+                
+    
+                pygame.draw.rect(self.screen,GRAY , self.elfogado_gomb_pozicio, )
+                accept_text = small_font.render("Valasz", True, BLACK)
+                self.screen.blit(accept_text, (self.elfogado_gomb_pozicio.x + 10, self.elfogado_gomb_pozicio.y + 5))
+
+
+
+               
+
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.allapot = 10
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.allapot = 10
-
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    mx, my = event.pos
+                    for rect, lap in kartya_poziciok:
+                        if rect.collidepoint(mx, my):
+                            print(f"Rákattintottál: {lap}")
+                            break
+               
+                    mx, my = event.pos
+                    for rect, player_name in player_panels:
+                        if rect.collidepoint(mx, my):
+                            print(f"Rákattintottál {player_name}-ra")
+                            break
+                    if self.lenyiloablak_pozicio.collidepoint(mx, my):
+                        self.lenyiloablak_allapot = not self.lenyiloablak_allapot
+                    
+                    if self.lenyiloablak_allapot:
+                        for i, option in enumerate(self.allatok):
+                            option_rect = pygame.Rect(self.lenyiloablak_pozicio.x, self.lenyiloablak_pozicio.y + (i+1) * 20, 100, 20)
+                            if option_rect.collidepoint(mx, my):
+                                self.allat_kivalasztva = option
+                                self.lenyiloablak_allapot = False
+                    
+                    if self.elfogado_gomb_pozicio.collidepoint(mx, my) and self.allat_kivalasztva:
+                        print(f"Elfogadott állat: {self.allat_kivalasztva}")
+            
             pygame.display.flip()
 
 
