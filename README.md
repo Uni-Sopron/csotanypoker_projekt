@@ -5,6 +5,9 @@
     venv\Scripts\activate
     pip install -r requirements.txt
 
+## src mappába belépés:
+    cd src
+
 ## Futtatás:
 **1.  Szerver indítás:**   
     python -m csotanypoker.server.main  
