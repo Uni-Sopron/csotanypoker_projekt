@@ -4,7 +4,7 @@ import json
 import random
 import string
 import time
-from  game import jatek, jatekos
+from  csotanypoker.server.game import jatek, jatekos
 #TODO : Jelszó titkositás
 #TODO: JELSZÓ ellenörzése
 # TODO: Felhasználoi interakciók hibák kezelése
