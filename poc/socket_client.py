@@ -24,7 +24,7 @@ class ChatClient:
                 message = self.socket.recv(1024).decode()
                 if message:
                     print(message)
-            except:
+            except Exception:
                 break
 
     def send_loop(self):

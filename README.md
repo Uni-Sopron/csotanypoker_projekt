@@ -20,15 +20,23 @@
 
 
 **Terminálos verzio inditása:**  
-    python -m csotanypoker.terminalos_verzio
+    python -m csotanypoker.terminalos_verzio  
 
 
 
-**Kétirányú kommunikácio szemléltetése:**
-cd poc
-flask_socketio:
-    1. python flask_server.py
-    2. python flask_client.py
-socket:
-    1. python socket_server.py
-    2. python socket_client.py
+**Kétirányú kommunikácio szemléltetése:**  
+
+- flask_socketio:  
+    1. python poc\flask_server.py  
+    2. python  poc\flask_client.py  
+
+- socket:  
+    1. python  poc\socket_server.py  
+    2. python  poc\socket_client.py  
+
+- flask_socketio + Gui:  
+    1. python poc\flask_server.py  
+    2. python  poc\gui_client.py  
+
+
+
