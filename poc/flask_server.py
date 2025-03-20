@@ -16,17 +16,17 @@ def handle_connect():
 
 @socketio.on("register")
 def handle_register(username):
-    clients[request.sid] = username  #type: ignore
+    clients[getattr(request, "sid")] = username
     send(f"{username} csatlakozott a csevegéshez!", broadcast=True)
 
 @socketio.on("message")
 def handle_message(message):
-    username = clients.get(request.sid, "Ismeretlen")#type: ignore
+    username = clients.get(getattr(request, "sid"), "Ismeretlen")
     send(f"{username}: {message}", broadcast=True)
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    username = clients.pop(request.sid, "Ismeretlen") #type: ignore
+    username = clients.pop(getattr(request, "sid"), "Ismeretlen")
     send(f"{username} kilépett a csevegésből.", broadcast=True)
     print(f"{username} kilépett.")
 
