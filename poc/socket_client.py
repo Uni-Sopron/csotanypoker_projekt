@@ -9,14 +9,10 @@ class ChatClient:
         self.running = False
 
     def connect(self):
-        try:
-            self.socket.connect((self.host, self.port))
-            self.running = True
-            threading.Thread(target=self.receive_messages, daemon=True).start()
-            self.send_loop()
-
-        except Exception as e:
-            print(f"Hiba a kapcsolódásnál: {e}")
+        self.socket.connect((self.host, self.port))
+        self.running = True
+        threading.Thread(target=self.receive_messages, daemon=True).start()
+        self.send_loop()
 
     def receive_messages(self):
         while self.running:
@@ -24,7 +20,7 @@ class ChatClient:
                 message = self.socket.recv(1024).decode()
                 if message:
                     print(message)
-            except Exception:
+            except InterruptedError:
                 break
 
     def send_loop(self):
