@@ -206,13 +206,7 @@ class GameClient:
         self.draw_text(f"Name:{self.username}", self.BLACK, 600, 50, True)
         status = "Waiting for players."
 
-        # if (
-        #     len(self.players) == self.rooms[self.selected_room]["max_players"]
-        # ):  # If the room is full, the game starts.
-        #     status = "Game is starting!"
-        # self.draw_text(status, self.BLACK, 400, 100, True)
-
-        if self.selected_room is not None :
+        if self.selected_room is not None:
             max_players = self.rooms[self.selected_room]["max_players"]
             if len(self.players) == max_players:  # Ha a szoba tele van, a játék indul
                 status = "Game is starting!"

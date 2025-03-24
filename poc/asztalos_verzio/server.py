@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 
 
+
 from adatbazis import User, Room, get_db_session
 
 
@@ -49,7 +50,7 @@ def handle_get_rooms():
 
     for room in rooms:
         print(room.game_started)
-        if room.game_started == False:
+        if not room.game_started:
             room_list.append(
                 {
                     "id": room.room_id,
@@ -91,7 +92,7 @@ def handle_join_room(data):  # If the user enters a room.
         db.commit()
 
     join_room(room_id)  # We let the user into the room.
-    # Ellenőrizzük, hogy a szoba létezik-e
+
     if not room:
         emit("error", {"message": "A szoba nem található"})
         db.close()

@@ -1,3 +1,4 @@
+import logging
 import socket
 import select
 
@@ -51,16 +52,19 @@ class ChatServer:
                 self.broadcast(f"{username}: {message}", client_socket)
                 print(f"{username}: {message}")
 
-        except:
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
             self.remove_client(client_socket)
+            logging.error(f"Hiba: {e}")
 
     def broadcast(self, message, sender_socket):
         for client_socket in self.clients.keys():
             if client_socket != sender_socket:
                 try:
                     client_socket.send(message.encode())
-                except:
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
+          
                     self.remove_client(client_socket)
+                    logging.error(f"Hiba: {e}")
 
     def remove_client(self, client_socket):
         if client_socket in self.clients:
