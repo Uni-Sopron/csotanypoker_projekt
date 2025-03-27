@@ -38,5 +38,7 @@
     1. python poc\flask_server.py  
     2. python  poc\gui_client.py  
 
-
+- Asztalok_kezelése:
+    1. python poc\asztalos_verzio\server.py  
+    2. python poc\asztalos_verzio\main.py
 
