@@ -1,6 +1,5 @@
 import pygame
 import socketio
-import threading
 from typing import Optional, List, Tuple
 
 pygame.init()  # Initializing Pygame
@@ -20,7 +19,7 @@ pygame.display.set_caption("Chat")  # Window title
 font: pygame.font.Font = pygame.font.Font(None, 30)
 
 # SocketIO client configuration
-sio: socketio.Client = socketio.Client()
+sio: socketio.Client = socketio.Client(logger=False, engineio_logger=False)
 connected: bool = False
 username: str = ""
 messages: List[str] = []  # List of messages
@@ -28,8 +27,9 @@ message_surface: pygame.Surface = pygame.Surface(
     (int(WIDTH), int(MESSAGE_HEIGHT))
 )  # Surface for displaying messages
 input_text: str = ""
-connection_event: threading.Event = threading.Event()
 username_accepted: Optional[bool] = None
+
+error_display_time: int = 0
 
 
 # SocketIO event handlers
@@ -40,7 +40,6 @@ def connect() -> None:
     """
     global connected
     connected = True
-    connection_event.set()
 
 
 @sio.event
@@ -61,7 +60,6 @@ def disconnect() -> None:
     """
     global connected
     connected = False
-    connection_event.clear()
 
 
 @sio.event
@@ -72,8 +70,10 @@ def register_response(success: bool) -> None:
     Args:
         success (bool): Username acceptance status.
     """
-    global username_accepted
+    global username_accepted, error_display_time
     username_accepted = success
+    if not success:
+        error_display_time = 300
 
 
 # Displaying messages on the screen
@@ -99,7 +99,7 @@ def update_message_display() -> None:
             text_y_position += font.size(line)[1] + 10
 
 
-def connect_to_server() -> None:
+def connect_to_server():
     """
     Establishes the SocketIO connection with the server at the specified address.
     """
@@ -111,9 +111,9 @@ def login_screen() -> bool:
     Displays the login screen where it prompts for the username and sends it to the server.
     If the name is already taken, it asks for a new name.
     """
-    global username, username_accepted
+    global username, username_accepted, error_display_time
     input_box: pygame.Rect = pygame.Rect(WIDTH // 4, HEIGHT // 2, WIDTH // 2, 50)
-    username: str = ""
+
     while not username_accepted:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -131,13 +131,14 @@ def login_screen() -> bool:
         pygame.draw.rect(screen, GRAY, input_box)
         username_text: pygame.Surface = font.render(username, True, BLACK)
         screen.blit(username_text, (input_box.x + 5, input_box.y + 15))
-        if username_accepted is False:
+        if username_accepted is False and error_display_time > 0:
+            error_display_time -= 1
             error_message: pygame.Surface = font.render(
                 "Ez a név foglalt, próbálj másikat!", True, RED
             )
             screen.blit(
                 error_message,
-                (WIDTH // 2 - error_message.get_width() // 2, HEIGHT // 2 + 40),
+                (WIDTH // 2 - error_message.get_width() // 2, HEIGHT // 2 + 60),
             )
         pygame.display.flip()
     return True
@@ -147,7 +148,7 @@ def waiting_screen() -> bool:
     """
     Displays the waiting message until the connection to the server is established.
     """
-    while not connection_event.is_set():
+    while not connected:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -155,19 +156,15 @@ def waiting_screen() -> bool:
         text: pygame.Surface = font.render("Kapcsolódás a szerverhez...", True, BLACK)
         screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
         pygame.display.flip()
+        connect_to_server()
     return True
 
 
 def main() -> None:
     """The main program where the game runs"""
     global input_text
-
-    threading.Thread(
-        target=connect_to_server, daemon=True
-    ).start()  # Server connection on a separate thread
     if not waiting_screen():
         return
-    connection_event.wait()  # Waiting for connection
     if not login_screen():
         return
 
