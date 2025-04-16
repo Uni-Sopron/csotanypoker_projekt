@@ -32,6 +32,7 @@ class GameClient:
         self.pipa_rect = None  # Rectangle for the checkmark image
         self.x_rect = None
         self.Passzolas = False
+        self.atadta = False
         # Handling players and messages
         self.players: List[str] = []  # List of players in the room
         self.message: str = ""  # Message to be displayed
@@ -43,6 +44,7 @@ class GameClient:
         self.input_active: bool = (
             False  # Whether the user has clicked on the input field
         )
+        self.volt_ennel_mar = []
         self.room_input: str = ""
         self.room_active: bool = False
         self.selected_room: Optional[int] = (
@@ -351,18 +353,18 @@ class GameClient:
         #     kartya_csoportok[lap].append(lap)
         # print("kezben_levo_lapok:", kartya_csoportok)
         logo_images = {}
-        for player_data in self.jatekosadatok.values():
-            egyedi_lapok = set(
-                player_data["elotte_levo_kartyak"]
-            )  # csak egyszer nézzük
-            for lap_tipus in egyedi_lapok:
-                if lap_tipus not in logo_images:
-                    logo_utvonal = os.path.join(kep_mappa, f"{lap_tipus}_logo.png")
-                    if os.path.exists(logo_utvonal):
-                        logo = pygame.image.load(logo_utvonal)
-                        logo = pygame.transform.scale(logo, (40, 40))
-                        logo_images[lap_tipus] = logo
-        player_panels = []
+        for allat in self.allatok:  # használjuk a már ismert állatok listáját
+            logo_utvonal = os.path.join(kep_mappa, f"{allat}_logo.png")
+            if os.path.exists(logo_utvonal):
+                print(f"Betöltés: {logo_utvonal}")
+                logo = pygame.image.load(logo_utvonal)
+                logo = pygame.transform.scale(logo, (40, 40))
+                logo_images[allat] = logo
+            else:
+                print(f"Nem található: {logo_utvonal}")
+
+        # player_panels = []
+        # print(f"ez van benne {logo_images}")
         while True:
             self.window.fill(self.WHITE)
             self.draw_text(f"Szoba: {self.room_name}", self.BLACK, 10, 10, False)
@@ -421,14 +423,6 @@ class GameClient:
                     card_x = player_panel_rect.x + 10
                     card_y = player_panel_rect.y + 60
                     col_width = 60
-                    # print(f"Ezt kell figyelned: {adat['elotte_levo_kartyak']}")
-                    # elottelevolaptipusszam = {}
-
-                    # for lap_tipus in adat["elotte_levo_kartyak"]:
-                    #     if lap_tipus in elottelevolaptipusszam:
-                    #         elottelevolaptipusszam[lap_tipus] += 1
-                    #     else:
-                    #         elottelevolaptipusszam[lap_tipus] = 1
 
                     for j, (lap_tipus, count) in enumerate(
                         adat["elotte_levo_kartyak"].items()
@@ -462,7 +456,7 @@ class GameClient:
             col_width = 110
 
             items_per_column = (len(self.elotte_levo_kartyak or {}) + 1) // 2
-            # print(f"ITTTTVAN A KARTYA? VEDD ÉSZREEEEEEEEEEE{self.elotte_levo_kartyak}")
+
             for i, lap_tipus in enumerate(self.elotte_levo_kartyak or {}):
                 col = i // items_per_column
                 row = i % items_per_column
@@ -631,7 +625,7 @@ class GameClient:
                     self.GRAY,
                     self.elfogado_gomb_pozicio,
                 )
-                accept_text = small_font.render("Valasz", True, self.BLACK)
+                accept_text = small_font.render("Valaszt", True, self.BLACK)
                 self.window.blit(
                     accept_text,
                     (
@@ -654,6 +648,9 @@ class GameClient:
                         if (
                             rect.collidepoint(mx, my)
                             and self.aktiv_jatekos == self.username
+                            and not self.lenyiloablak_allapot
+                            and not self.atadta
+                            and not self.Passzolas
                         ):
                             self.kozepso_lap = None
                             print(f"Rákattintottál: {lap}")
@@ -664,10 +661,14 @@ class GameClient:
                         if (
                             rect.collidepoint(mx, my)
                             and self.aktiv_jatekos == self.username
+                            and not self.atadta
                         ):
-                            self.kozepso_lap = None
-                            print(f"Rákattintottál {player_name}-ra")
-                            self.kivalasztott_jatekos = player_name
+                            if player_name not in self.volt_ennel_mar:
+                                self.kozepso_lap = None
+                                print(f"Rákattintottál {player_name}-ra")
+                                self.kivalasztott_jatekos = player_name
+                            else:
+                                self.message = "Nála már volt"
 
                     if self.lenyiloablak_pozicio.collidepoint(mx, my):
                         self.lenyiloablak_allapot = not self.lenyiloablak_allapot
@@ -701,6 +702,8 @@ class GameClient:
                             self.kivalasztott_jatekos = None
                             self.kivalasztott_lap = None
                             self.Passzolas = False
+                            self.atadta = True
+                            # self.aktiv_jatekos = None
 
                         # print("HEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
                     if self.pipa_rect is not None and self.pipa_rect.collidepoint(

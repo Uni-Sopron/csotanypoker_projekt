@@ -153,21 +153,42 @@ def handle_oke_click(data: dict) -> None:
     print(f"kivalasztott_lap: {data['kivalasztott_lap']}")
     print(f"kivalasztott_jatekos: {data['kivalasztott_jatekos']}")
     print(f"allitas: {data['lapot_ado_allitasa']}")
+
     if not data["pass"]:
         jatek_instance.kartya_valasztas(valasztott_kartya_nev=data["kivalasztott_lap"])
 
     jatek_instance.celzott_jatekos_valasztas(data["kivalasztott_jatekos"])
+
     if jatek_instance.volt_e_nala():
-        emit("hiba", {"message": "Nála már volt"}, to=sid)
+        emit("hiba", {"message": "Ennél a játékosnál már volt ez a lap!"}, to=sid)
     else:
-        jatek_instance.kerdeses_kartya = kartya(data["kivalasztott_lap"])
+        if not data["pass"]:
+            jatek_instance.kerdeses_kartya = jatek_instance.kerdeses_kartya
+        else:
+            jatek_instance.kerdeses_kartya = kartya(data["kivalasztott_lap"])
+
+        # Csak akkor adjuk hozzá a játékost, ha még nincs a listában
+        # aktiv_jatekos_nev = jatek_instance.aktiv_jatekos.nev
+        # volt_mar_nevek = [j.nev for j in jatek_instance.kerdeses_kartya.volt_ennel_mar]
+
+        jatek_instance.kerdeses_kartya.volt_ennel_mar.append(
+            jatek_instance.aktiv_jatekos
+        )
+
         jatek_instance.allitas(allitas=data["lapot_ado_allitasa"])
+
+        nev_lista = list(
+            set([j.nev for j in jatek_instance.kerdeses_kartya.volt_ennel_mar])
+        )
+        print(f"Náluk volt: {nev_lista}")
+
         emit(
             "kartya_kapas",
             {
                 "jatekos_allitasa": data["lapot_ado_allitasa"],
                 "lapot_ado": user.username,
                 "celzott_jatekos": celzott_jatekos.username,
+                "volt_ennel_mar": nev_lista,
             },
             room=room.room_id,
         )
@@ -212,14 +233,36 @@ def handle_pass(data: dict) -> None:
     user: Optional[User] = db.query(User).filter(User.socket_id == sid).first()
 
     print(f"{user.username} passzolt!")
+
+    # Ellenőrizzük, hogy a kártya már volt-e a játékosnál
+    if jatek_instance.volt_e_nala():
+        emit("hiba", {"message": "Ennél a játékosnál már volt ez a lap!"}, to=sid)
+        return
+
+    # Csak akkor adjuk hozzá a játékost, ha még nincs a listában
+    # aktiv_jatekos_nev = jatek_instance.aktiv_jatekos.nev
+    # volt_mar_nevek = [j.nev for j in jatek_instance.kerdeses_kartya.volt_ennel_mar]
+
+    # if aktiv_jatekos_nev not in volt_mar_nevek:
+    #     jatek_instance.kerdeses_kartya.volt_ennel_mar.append(
+    #         jatek_instance.aktiv_jatekos
+    #     )
+    jatek_instance.kerdeses_kartya.volt_ennel_mar.append(jatek_instance.aktiv_jatekos)
+
     jatek_instance.aktiv_jatekos = jatek_instance.celzott_jatekos
     jatek_instance.celzott_jatekos = None
+
+    nev_lista = list(
+        set([j.nev for j in jatek_instance.kerdeses_kartya.volt_ennel_mar])
+    )
+    print(f"Náluk volt: {nev_lista}")
 
     emit(
         "passzolt",
         {
             "message": f"{user.username} passzolt!",
             "aktiv_jatekos": jatek_instance.aktiv_jatekos.nev,
+            "volt_ennel_mar": nev_lista,
         },
         room=room.room_id,
     )

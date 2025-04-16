@@ -118,6 +118,7 @@ class NetworkManager:
             # kezdo_jatekos = data.get("kezdo_jatekos", "ismeretlen")
             # self.username = data.get("nev", "ismeretlen")
             self.game_client.aktiv_jatekos = data.get("kezdo_jatekos", "ismeretlen")
+            self.game_client.atadta = False
             # self.game_client.jatekosok_elotti_lapok = data.get(
             #     "jatekosok_elotti_lapok", {}
             # )
@@ -149,8 +150,9 @@ class NetworkManager:
                 f"Ez az állat egy: {data.get('jatekos_allitasa', '')}"
             )
             self.game_client.kozepso_lap = "kerdojel"
-            # self.game_client.lapot_ado = data.get("lapot_ado", "")
             self.game_client.celzott_jatekos = data.get("celzott_jatekos", "")
+            self.game_client.volt_ennel_mar = data.get("volt_ennel_mar", [])
+
             if self.game_client.username == data.get("celzott_jatekos", ""):
                 self.game_client.message = (
                     f"Kártyát kaptál: {data.get('lapot_ado', '')}"
@@ -176,8 +178,9 @@ class NetworkManager:
         @self.sio.on("passzolt")
         def passzolt(data) -> None:
             self.game_client.aktiv_jatekos = data["aktiv_jatekos"]
-
+            self.game_client.atadta = False
             self.game_client.message = data["message"]
+            self.game_client.volt_ennel_mar = data.get("volt_ennel_mar", [])
 
     def connect(self, server_url: str = "http://localhost:5000") -> None:
         """

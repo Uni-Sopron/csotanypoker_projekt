@@ -27,8 +27,8 @@ class jatek:
         # self.jatek_ciklus()
 
     def pakli_generalo(self):
-        for i in TIPUS:
-            self.pakli.extend([kartya(i) for _ in range(8)])
+        for i, tipus in enumerate(TIPUS):
+            self.pakli.extend([kartya(i, tipus) for _ in range(8)])
 
     def pakli_keveres(self):
         shuffle(self.pakli)
@@ -210,7 +210,8 @@ class jatekos:
 
 
 class kartya:
-    def __init__(self, nev):
+    def __init__(self, id, nev):
+        self.id = id
         self.nev = nev
         self.volt_ennel_mar = []  # [ jatekos.nev, jatekos.nev.. ]
 
