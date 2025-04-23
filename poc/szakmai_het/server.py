@@ -149,28 +149,51 @@ def handle_oke_click(data: dict) -> None:
     celzott_jatekos = (
         db.query(User).filter(User.username == data["kivalasztott_jatekos"]).first()
     )
+
     print(f"{user.username} megnyomta az OK gombot")
     print(f"kivalasztott_lap: {data['kivalasztott_lap']}")
     print(f"kivalasztott_jatekos: {data['kivalasztott_jatekos']}")
     print(f"allitas: {data['lapot_ado_allitasa']}")
     if not data["pass"]:
-        jatek_instance.kartya_valasztas(valasztott_kartya_nev=data["kivalasztott_lap"])
+        if jatek_instance.van_lap_a_kezeben():
+            jatek_vege()
+            return
+        jatek_instance.kartya_valasztas(valasztott_kartya_id=data["kivalasztott_lap"])
 
     jatek_instance.celzott_jatekos_valasztas(data["kivalasztott_jatekos"])
-    if jatek_instance.volt_e_nala():
-        emit("hiba", {"message": "Nála már volt"}, to=sid)
-    else:
-        jatek_instance.kerdeses_kartya = kartya(data["kivalasztott_lap"])
-        jatek_instance.allitas(allitas=data["lapot_ado_allitasa"])
-        emit(
-            "kartya_kapas",
-            {
-                "jatekos_allitasa": data["lapot_ado_allitasa"],
-                "lapot_ado": user.username,
-                "celzott_jatekos": celzott_jatekos.username,
-            },
-            room=room.room_id,
+    # print(f"voltnála: {jatek_instance.volt_e_nala()}")
+    print(f"celzott_jatekos: {jatek_instance.celzott_jatekos.nev}")
+    print(jatek_instance.kerdeses_kartya.nev)
+    print(jatek_instance.kerdeses_kartya.volt_ennel_mar)
+    # if jatek_instance.volt_e_nala():
+    #     print("volt már nála")
+    #     emit("hiba", {"message": "Nála már volt"}, to=sid)
+    # else:
+
+    for lap in jatek_instance.pakli:
+        if lap.nev == data["kivalasztott_lap"]:
+            jatek_instance.kerdeses_kartya = lap
+            break
+    if (
+        data["kivalasztott_jatekos"]
+        not in jatek_instance.kerdeses_kartya.volt_ennel_mar
+    ):
+        jatek_instance.kerdeses_kartya.volt_ennel_mar.append(
+            data["kivalasztott_jatekos"]
         )
+    if celzott_jatekos.username not in jatek_instance.kerdeses_kartya.volt_ennel_mar:
+        jatek_instance.kerdeses_kartya.volt_ennel_mar.append(celzott_jatekos.username)
+    jatek_instance.allitas(allitas=data["lapot_ado_allitasa"])
+    emit(
+        "kartya_kapas",
+        {
+            "jatekos_allitasa": data["lapot_ado_allitasa"],
+            "lapot_ado": user.username,
+            "celzott_jatekos": celzott_jatekos.username,
+            "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
+        },
+        room=room.room_id,
+    )
     print("Játékosok kártyáinak kiírása")
     for j in jatek_instance.jatekosok:
         print(f"{j.nev} kezében lévő kártyák: {[k.nev for k in j.kezbenlevo_kartyak]}")
@@ -183,7 +206,10 @@ def kartya_tartalma():
     room = db.query(Room).filter(Room.name == "jatek").first()
     emit(
         "kartya_tartalma",
-        {"lap": jatek_instance.kerdeses_kartya.nev},
+        {
+            "lap": jatek_instance.kerdeses_kartya.nev,
+            "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
+        },
         room=room.room_id,
     )
 
@@ -212,28 +238,58 @@ def handle_pass(data: dict) -> None:
     user: Optional[User] = db.query(User).filter(User.socket_id == sid).first()
 
     print(f"{user.username} passzolt!")
-    jatek_instance.aktiv_jatekos = jatek_instance.celzott_jatekos
-    jatek_instance.celzott_jatekos = None
 
-    emit(
-        "passzolt",
-        {
-            "message": f"{user.username} passzolt!",
-            "aktiv_jatekos": jatek_instance.aktiv_jatekos.nev,
-        },
-        room=room.room_id,
-    )
-    emit(
-        "kivalasztott_kartya_tartalma",
-        {"lap": jatek_instance.kerdeses_kartya.nev},
-        room=user.socket_id,
-    )
+    # Ellenőrizzük, hogy a célzott játékos nem None
+    if jatek_instance.celzott_jatekos is not None:
+        jatek_instance.aktiv_jatekos = jatek_instance.celzott_jatekos
+        jatek_instance.celzott_jatekos = None
 
-    print("PASSSSSSSSSSSSSSSSSSSSS")
+        # Ellenőrizzük, hogy van-e aktív játékos és neve
+        aktiv_jatekos_nev = (
+            jatek_instance.aktiv_jatekos.nev
+            if jatek_instance.aktiv_jatekos
+            else "Ismeretlen"
+        )
+
+        emit(
+            "passzolt",
+            {
+                "message": f"{user.username} passzolt!",
+                "aktiv_jatekos": aktiv_jatekos_nev,
+            },
+            room=room.room_id,
+        )
+
+        # Ellenőrizzük, hogy a kérdéses kártya létezik-e
+        if jatek_instance.kerdeses_kartya:
+            print(f"kedeses kártya: {jatek_instance.kerdeses_kartya.nev}")
+            print(f"volt_ennel_mar: {jatek_instance.kerdeses_kartya.volt_ennel_mar}")
+
+            emit(
+                "kivalasztott_kartya_tartalma",
+                {
+                    "lap": jatek_instance.kerdeses_kartya.nev,
+                    "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
+                },
+                room=user.socket_id,
+            )
+        else:
+            emit(
+                "hiba",
+                {"message": "Nincs kérdéses kártya!"},
+                room=user.socket_id,
+            )
+    else:
+        emit(
+            "hiba",
+            {"message": "Nincs célzott játékos!"},
+            room=user.socket_id,
+        )
 
 
 def kartya_lerakas() -> None:
     db = get_db_session()
+    room = db.query(Room).filter(Room.name == "jatek").first()
     jatekos_adatok = {}
     for j in jatek_instance.jatekosok:
         print(j.elotte_levo_kartyak)
@@ -242,29 +298,51 @@ def kartya_lerakas() -> None:
             "jatekos_kartyaszam": len(j.kezbenlevo_kartyak),
         }
 
+    # Körüzenet küldése a lehelyezett kártyáról
+    emit(
+        "kartya_lehelyezve",
+        {
+            "jatekos": jatek_instance.aktiv_jatekos.nev,
+            "kartya_tipus": jatek_instance.kerdeses_kartya.allat_tipus
+            if jatek_instance.kerdeses_kartya
+            else "ismeretlen",
+            "aktiv_jatekos": jatek_instance.aktiv_jatekos.nev,
+        },
+        room=room.room_id,
+    )
+
+    # A kérdéses kártya nullázása
+    jatek_instance.kerdeses_kartya = None
+
     for j in jatek_instance.jatekosok:
         user = db.query(User).filter(User.username == j.nev).first()
         if user and user.socket_id:
-            kezbenlevo_kartyak = {}
-            for k in j.kezbenlevo_kartyak:
-                if k.nev in kezbenlevo_kartyak:
-                    kezbenlevo_kartyak[k.nev] += 1
-                else:
-                    kezbenlevo_kartyak[k.nev] = 1
-            # kezbenlevo_kartyak = [k.nev for k in j.kezbenlevo_kartyak]
-            # elotte_levo_kartyak = [k.nev for k in j.elotte_levo_kartyak]
+            kezbenlevo_kartyak = [k.nev for k in j.kezbenlevo_kartyak]
 
             emit(
                 "jatekos_adatok",
                 {
                     "nev": j.nev,
                     "kezbenlevo_kartyak": kezbenlevo_kartyak,
-                    # "elotte_levo_kartyak": elotte_levo_kartyak,
                     "kezdo_jatekos": jatek_instance.aktiv_jatekos.nev,
                     "jatekos_adatok": jatekos_adatok,
                 },
                 to=user.socket_id,
             )
+    if jatek_instance.van_4_lap_elotte():
+        jatek_vege()
+
+
+def jatek_vege() -> None:
+    db = get_db_session()
+    room = db.query(Room).filter(Room.name == "jatek").first()
+    emit(
+        "jatek_vege",
+        {
+            "vesztett_jatekos": jatek_instance.aktiv_jatekos.nev,
+        },
+        room=room.room_id,
+    )
 
 
 def jatekinditas(jatekosok: list) -> None:
@@ -295,13 +373,13 @@ def jatekinditas(jatekosok: list) -> None:
     for j in jatek_instance.jatekosok:
         user = db.query(User).filter(User.username == j.nev).first()
         if user and user.socket_id:
-            kezbenlevo_kartyak = {}
-            for k in j.kezbenlevo_kartyak:
-                if k.nev in kezbenlevo_kartyak:
-                    kezbenlevo_kartyak[k.nev] += 1
-                else:
-                    kezbenlevo_kartyak[k.nev] = 1
-
+            # kezbenlevo_kartyak = {}
+            # for k in j.kezbenlevo_kartyak:
+            #     if k.nev in kezbenlevo_kartyak:
+            #         kezbenlevo_kartyak[k.nev] += 1
+            #     else:
+            #         kezbenlevo_kartyak[k.nev] = 1
+            kezbenlevo_kartyak = [k.nev for k in j.kezbenlevo_kartyak]
             emit(
                 "jatekos_adatok",
                 {

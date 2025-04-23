@@ -104,6 +104,25 @@ class NetworkManager:
             self.game_client.message = data["message"]
             self.game_client.message_display_time = 3.0
 
+        @self.sio.on("kartya_lehelyezve")
+        def on_kartya_lehelyezve(data: Dict[str, Any]) -> None:
+            """
+            Handle card placement event.
+
+            Args:
+                data: A dictionary containing placement information
+            """
+            print(f"Kártya lehelyezve: {data}")
+            self.game_client.kozepso_lap = None  # Újra kérdőjelre állítjuk
+            self.game_client.volt_ennel_mar = []  # Töröljük a volt_ennel_mar listát
+            self.game_client.kivalasztott_lap = None  # Töröljük a kiválasztott lapot
+            # self.game_client.aktiv_jatekos = data["aktiv_jatekos"]
+            self.game_client.message = f"{data['jatekos']} elé lehelyezésre került egy {data['kartya_tipus']} kártya."
+            # self.game_client.message_display_time = 3.0
+            # self.game_client.ellenfel_allitasa = None
+            self.game_client.atadta = False
+            self.game_client.lenyiloablak_allapot = False
+
         @self.sio.on("jatekos_adatok")
         def jatekos_adatok(data: Dict[str, Any]) -> None:
             """
@@ -142,6 +161,7 @@ class NetworkManager:
                     print(f"Előtte lévő lapok: {self.game_client.elotte_levo_kartyak}")
 
             self.game_client.kezben_levo_lapok = data.get("kezbenlevo_kartyak", [])
+            print(data.get("kezbenlevo_kartyak", []))
 
         @self.sio.on("kartya_kapas")
         def kartya_kapas(data) -> None:
@@ -152,6 +172,7 @@ class NetworkManager:
             self.game_client.kozepso_lap = "kerdojel"
             # self.game_client.lapot_ado = data.get("lapot_ado", "")
             self.game_client.celzott_jatekos = data.get("celzott_jatekos", "")
+            self.game_client.volt_ennel_mar = data["naluk_volt"]
             if self.game_client.username == data.get("celzott_jatekos", ""):
                 self.game_client.message = (
                     f"Kártyát kaptál: {data.get('lapot_ado', '')}"
@@ -167,18 +188,43 @@ class NetworkManager:
         def kartya_tartalma(data) -> None:
             print(f"adatok kiirasa: {data['lap']}")
             self.game_client.kozepso_lap = data["lap"]
+            self.game_client.kivalasztott_lap = data["lap"]
+            self.game_client.volt_ennel_mar = data["naluk_volt"]
 
         @self.sio.on("kivalasztott_kartya_tartalma")
         def kivalasztott_kartya_tartalma(data) -> None:
             print(f"adatok kiirasa: {data['lap']}")
+            print(
+                "BELEPEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEt"
+            )
             self.game_client.kozepso_lap = data["lap"]
             self.game_client.kivalasztott_lap = data["lap"]
+            self.game_client.volt_ennel_mar = data["naluk_volt"]
+            print(f"volt_ennel_mar: {self.game_client.volt_ennel_mar}")
 
         @self.sio.on("passzolt")
         def passzolt(data) -> None:
             self.game_client.aktiv_jatekos = data["aktiv_jatekos"]
-            self.game_client.atadta = False
+
+            # self.game_client.atadta = False
             self.game_client.message = data["message"]
+            self.game_client.lenyiloablak_allapot = True
+
+        @self.sio.on("hiba")
+        def hiba(data) -> None:
+            self.game_client.message = data["message"]
+            self.game_client.atadta = False
+            # self.game_client.lenyiloablak_allapot = True
+            # print(game_client.lenyiloablak_allapot)
+            # self.game_client.message_display_time = 3.0
+
+        @self.sio.on("jatek_vege")
+        def jatek_vege(data) -> None:
+            if self.game_client.username == data["vesztett_jatekos"]:
+                self.game_client.message = "Vesztettél!"
+            else:
+                self.game_client.message = "Gratulálok! Nyertél!"
+            self.game_client.screen = "Jatek_vege"
 
     def connect(self, server_url: str = "http://localhost:5000") -> None:
         """

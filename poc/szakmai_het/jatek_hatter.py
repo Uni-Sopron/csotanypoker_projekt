@@ -27,8 +27,9 @@ class jatek:
         # self.jatek_ciklus()
 
     def pakli_generalo(self):
-        for i in TIPUS:
-            self.pakli.extend([kartya(i) for _ in range(8)])
+        for tipus in TIPUS:
+            for i in range(1, 9):  # 9
+                self.pakli.append(kartya(tipus, i))
 
     def pakli_keveres(self):
         shuffle(self.pakli)
@@ -48,7 +49,7 @@ class jatek:
         return choice(self.jatekosok)
 
     def van_lap_a_kezeben(self):
-        return self.aktiv_jatekos.kezbenlevo_kartyak != []
+        return self.aktiv_jatekos.kezbenlevo_kartyak == []
 
     def van_4_lap_elotte(self):
         for kartya, db in self.aktiv_jatekos.elotte_levo_kartyak.items():
@@ -63,7 +64,7 @@ class jatek:
                 self.celzott_jatekos = i
                 break
 
-    def kartya_valasztas(self, valasztott_kartya_nev=None):
+    def kartya_valasztas(self, valasztott_kartya_id=None):
         # print("Válassz egy kártyát az alábbiak közül:")
         # print([kartya.nev for kartya in self.aktiv_jatekos.kezbenlevo_kartyak])
 
@@ -71,11 +72,13 @@ class jatek:
 
         # Megkeressük a játékos kezében lévő megfelelő kártyát
         for kartya in self.aktiv_jatekos.kezbenlevo_kartyak:
-            if kartya.nev == valasztott_kartya_nev:
+            if kartya.nev == valasztott_kartya_id:
                 self.kerdeses_kartya = kartya
                 self.aktiv_jatekos.kezbenlevo_kartyak.remove(
                     kartya
                 )  # Eltávolítjuk a kártyát
+                if self.aktiv_jatekos.nev not in self.kerdeses_kartya.volt_ennel_mar:
+                    self.kerdeses_kartya.volt_ennel_mar.append(self.aktiv_jatekos.nev)
                 return
 
         # print("Hibás választás! Nincs ilyen kártya a kezedben.")
@@ -97,7 +100,7 @@ class jatek:
 
     def igaz_vagy_hamis(self, valasz):
         if valasz is True:
-            if self.jatekos_allitasa == self.kerdeses_kartya.nev:
+            if self.jatekos_allitasa == self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
                 # self.kartya_lerakas(self.aktiv_jatekos)
@@ -106,7 +109,7 @@ class jatek:
                 return False
                 # self.kartya_lerakas(self.celzott_jatekos)
         elif valasz is False:
-            if self.jatekos_allitasa != self.kerdeses_kartya.nev:
+            if self.jatekos_allitasa != self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
                 # self.kartya_lerakas(self.aktiv_jatekos)
@@ -116,10 +119,10 @@ class jatek:
                 # self.kartya_lerakas(self.celzott_jatekos)
 
     def kartya_lerakas(self, jatekos):
-        if self.kerdeses_kartya.nev not in jatekos.elotte_levo_kartyak:
-            jatekos.elotte_levo_kartyak[self.kerdeses_kartya.nev] = 1
+        if self.kerdeses_kartya.allat_tipus not in jatekos.elotte_levo_kartyak:
+            jatekos.elotte_levo_kartyak[self.kerdeses_kartya.allat_tipus] = 1
         else:
-            jatekos.elotte_levo_kartyak[self.kerdeses_kartya.nev] += 1
+            jatekos.elotte_levo_kartyak[self.kerdeses_kartya.allat_tipus] += 1
         self.aktiv_jatekos = jatekos
         print("lerakás")
         # print("jatekos_elotte_kartyak", jatekos.elotte_levo_kartyak)
@@ -146,7 +149,7 @@ class jatek:
         print(f" VESZTES: {self.aktiv_jatekos.nev}")
 
     def ciklus(self):
-        self.kerdeses_kartya.volt_ennel_mar.append(self.aktiv_jatekos)
+        # self.kerdeses_kartya.volt_ennel_mar.append(self.aktiv_jatekos.nev)
         self.celzott_jatekos_valasztas()
         print(f"AKTIV JÁTÉKOS: {self.aktiv_jatekos.nev}")
         while self.volt_e_nala() or self.celzott_jatekos == self.aktiv_jatekos:
@@ -179,14 +182,14 @@ class jatek:
             self.aktiv_jatekos = self.celzott_jatekos
             return self.ciklus()
         elif valasz == "igaz":
-            if self.jatekos_allitasa == self.kerdeses_kartya.nev:
+            if self.jatekos_allitasa == self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 self.kartya_lerakas(self.aktiv_jatekos)
             else:
                 print("rossz válasz")
                 self.kartya_lerakas(self.celzott_jatekos)
         elif valasz == "hamis":
-            if self.jatekos_allitasa != self.kerdeses_kartya.nev:
+            if self.jatekos_allitasa != self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 self.kartya_lerakas(self.aktiv_jatekos)
             else:
@@ -210,9 +213,14 @@ class jatekos:
 
 
 class kartya:
-    def __init__(self, nev):
-        self.nev = nev
-        self.volt_ennel_mar = []  # [ jatekos.nev, jatekos.nev.. ]
+    def __init__(self, tipus, sorszam):
+        self.nev = f"{tipus}_{sorszam}"  # pl. "csotany_1"
+        self.volt_ennel_mar = []
+
+    @property
+    def allat_tipus(self):
+        # Ha szükséged van csak a típusra, ezt használhatod
+        return self.nev.split("_")[0]  # Visszaadja: "csotany"
 
 
 # proba_jatek=jatek([jatekos("sanyi"),jatekos("pisti"),jatekos("jani")])

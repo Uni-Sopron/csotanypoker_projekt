@@ -116,6 +116,10 @@ class GameClient:
             "pók",
         ]
 
+    def allat_tipus(self, nev):
+        # Ha szükséged van csak a típusra, ezt használhatod
+        return nev.split("_")[0]
+
     def run(self) -> None:
         """
         Handles events, updates game state, and screen rendering.
@@ -242,6 +246,20 @@ class GameClient:
             self.draw_game()
         elif self.screen == "rejoin_prompt":
             self.draw_rejoin_prompt()
+        elif self.screen == "Jatek_vege":
+            self.draw_game_over()
+
+    def draw_game_over(self) -> None:
+        """
+        Draw the game over screen.
+        """
+        print("Játék vége")
+        self.window.fill(self.WHITE)
+        self.draw_text("Játék vége", self.BLACK, 400, 150, True)
+        if self.aktiv_jatekos == self.username:
+            self.draw_text("Vesztettél!", self.BLACK, 400, 250, True)
+        else:
+            self.draw_text("Nyertél!", self.BLACK, 400, 250, True)
 
     def draw_text(
         self,
@@ -275,13 +293,7 @@ class GameClient:
         self.window.blit(text_obj, text_rect)
         return text_rect
 
-    # def draw_button(self, text: str,color, tcolor, x: int, y: int) -> None:
-    #     """
-    #     Draws a button on the screen.
-    #     """
-    #     pygame.draw.rect(self.window, tcolor, self.refresh_button)
-    #     self.draw_text(text, self.WHITE, 600, 525, True)
-
+    #
     def draw_login(self) -> None:
         """
         Bejelentkező képernyő rajzolása.
@@ -356,7 +368,7 @@ class GameClient:
         for allat in self.allatok:  # használjuk a már ismert állatok listáját
             logo_utvonal = os.path.join(kep_mappa, f"{allat}_logo.png")
             if os.path.exists(logo_utvonal):
-                print(f"Betöltés: {logo_utvonal}")
+                # print(f"Betöltés: {logo_utvonal}")
                 logo = pygame.image.load(logo_utvonal)
                 logo = pygame.transform.scale(logo, (40, 40))
                 logo_images[allat] = logo
@@ -365,7 +377,7 @@ class GameClient:
 
         # player_panels = []
         # print(f"ez van benne {logo_images}")
-        while True:
+        while self.screen != "Jatek_vege":
             self.window.fill(self.WHITE)
             self.draw_text(f"Szoba: {self.room_name}", self.BLACK, 10, 10, False)
             self.draw_text(
@@ -480,13 +492,30 @@ class GameClient:
                     )
                     self.window.blit(lap_info, (x_pos, y_pos + 10))
 
-            eltolasi_meret = 10
             kartya_poziciok = []
 
-            x_kep, y_kep = self.width / 2, self.height / 1.3
-            for lap, db in self.kezben_levo_lapok.items():
-                kep_utvonal = os.path.join(kep_mappa, f"{lap}.png")
+            # x_kep = self.width // 2 - 50  # kiindulási x pozíció, középre igazítva
+            y_kep = self.height - 150  # kiindulási y pozíció
+            eltolasi_meret = 10  # egymás feletti kártyák eltolása
 
+            # Csoportosítjuk a lapokat típus szerint
+            lap_csoportok = {}
+            for lap in self.kezben_levo_lapok:
+                tipus = self.allat_tipus(lap)
+                if tipus not in lap_csoportok:
+                    lap_csoportok[tipus] = []
+                lap_csoportok[tipus].append(lap)
+
+            # Számoljuk meg a különböző típusokat az x pozíció kalkulálásához
+            tipus_szam = len(lap_csoportok)
+
+            # Kezdő x-pozíció számítása, hogy középre legyen igazítva
+            x_kep = ((self.width // 2) + 10) - (tipus_szam * 100) // 2
+
+            # Végigmegyünk a csoportosított lapokon
+            for tipus, lapok in lap_csoportok.items():
+                kep_utvonal = os.path.join(kep_mappa, f"{tipus}.png")
+                # print(f"Betöltés kartya: {kep_utvonal}")
                 if os.path.exists(kep_utvonal):
                     kep = pygame.image.load(kep_utvonal)
                     eredeti_meret = kep.get_size()
@@ -497,16 +526,21 @@ class GameClient:
                     )
 
                     kep = pygame.transform.scale(kep, kartya_meret)
-                    for i in range(db):  # itt a db a darabszám
+
+                    # Az adott típushoz tartozó összes lapot egymás fölé helyezzük
+                    for i, lap in enumerate(lapok):
                         kartya_rect = pygame.Rect(
-                            x_kep - (len(self.kezben_levo_lapok) * kartya_meret[0] / 2),
+                            x_kep,
                             y_kep - i * eltolasi_meret,
                             *kartya_meret,
                         )
                         self.window.blit(kep, (kartya_rect.x, kartya_rect.y))
                         kartya_poziciok.append((kartya_rect, lap))
 
-                    x_kep += kartya_meret[0] + 10
+                    # Léptetjük az x pozíciót a következő típusú lapcsoporthoz
+                    x_kep += (
+                        kartya_meret[0] + 10
+                    )  # 10 pixel távolság a következő csoporthoz
 
             if self.kozepso_lap != None:
                 card_width, card_height = 100, 150
@@ -547,26 +581,29 @@ class GameClient:
                                 ),
                                 (40, 40),  # vagy bármilyen méret, amit szeretnél
                             )
-                        pass_width, pass_height = 80, 40
-                        pass_x = card_x + (card_width // 2) - (pass_width // 2)
-                        pass_y = card_y + card_height + 10
+                        if len(self.volt_ennel_mar) < len(self.players):
+                            pass_width, pass_height = 80, 40
+                            pass_x = card_x + (card_width // 2) - (pass_width // 2)
+                            pass_y = card_y + card_height + 10
 
-                        self.pass_rect = pygame.Rect(
-                            (pass_x, pass_y), (pass_width, pass_height)
-                        )
-                        pygame.draw.rect(
-                            self.window, (200, 200, 200), self.pass_rect
-                        )  # világos szürke háttér
+                            self.pass_rect = pygame.Rect(
+                                (pass_x, pass_y), (pass_width, pass_height)
+                            )
+                            pygame.draw.rect(
+                                self.window, (200, 200, 200), self.pass_rect
+                            )  # világos szürke háttér
 
-                        font = pygame.font.SysFont(None, 24)
-                        pass_text = font.render(
-                            "PASS", True, (0, 0, 0)
-                        )  # fekete szöveg
-                        text_rect = pass_text.get_rect(center=self.pass_rect.center)
-                        self.window.blit(pass_text, text_rect)
+                            font = pygame.font.SysFont(None, 24)
+                            pass_text = font.render(
+                                "PASS", True, (0, 0, 0)
+                            )  # fekete szöveg
+                            text_rect = pass_text.get_rect(center=self.pass_rect.center)
+                            self.window.blit(pass_text, text_rect)
 
                 elif self.kozepso_lap:
-                    kozepso_lap_path = os.path.join("kepek", f"{self.kozepso_lap}.png")
+                    kozepso_lap_path = os.path.join(
+                        "kepek", f"{self.allat_tipus(self.kozepso_lap)}.png"
+                    )
                     if os.path.exists(kozepso_lap_path):
                         lap_img = pygame.image.load(kozepso_lap_path)
                         lap_img = pygame.transform.scale(
@@ -594,7 +631,8 @@ class GameClient:
                 self.window.blit(
                     description_text, (card_x - 100, card_y + card_height + 20)
                 )
-
+            # print(f"kivalasztott jatekos: {self.kivalasztott_jatekos}")
+            # print(f"kivalasztott lap {self.kivalasztott_lap}")
             if self.kivalasztott_jatekos != None and self.kivalasztott_lap != None:
                 # Állatok közötti választás
                 pygame.draw.rect(
@@ -644,17 +682,35 @@ class GameClient:
                         pygame.quit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mx, my = event.pos
-                    for rect, lap in kartya_poziciok:
+                    talalt = False
+                    # Fordított sorrendben iterálunk, hogy a felül lévő kártyákat detektáljuk előbb
+                    for rect, lap in reversed(kartya_poziciok):
+                        if self.aktiv_jatekos != self.username:
+                            print(
+                                f"Nem te vagy az aktív játékos. Aktív: {self.aktiv_jatekos}, Te: {self.username}"
+                            )
+                        if self.lenyiloablak_allapot:
+                            print("A lenyíló ablak nyitva van.")
+                        if self.atadta:
+                            print("Már átadta a kört.")
+                        if self.Passzolas:
+                            print("Passzoltál ebben a körben.")
+                        if talalt:
+                            print("Már kiválasztottál egy kártyát.")
+
                         if (
                             rect.collidepoint(mx, my)
                             and self.aktiv_jatekos == self.username
                             and not self.lenyiloablak_allapot
                             and not self.atadta
                             and not self.Passzolas
+                            and not talalt  # Ha már találtunk egy kártyát, ne válasszunk többet
                         ):
                             self.kozepso_lap = None
                             print(f"Rákattintottál: {lap}")
                             self.kivalasztott_lap = lap
+                            talalt = True
+                            break  # Kilépünk a ciklusból, miután találtunk egy kártyát
 
                     mx, my = event.pos
                     for rect, player_name in player_panels:
@@ -668,11 +724,11 @@ class GameClient:
                                 print(f"Rákattintottál {player_name}-ra")
                                 self.kivalasztott_jatekos = player_name
                             else:
-                                self.message = "Nála már volt"
+                                self.message = "már volt már ennél a játékosnál"
 
                     if self.lenyiloablak_pozicio.collidepoint(mx, my):
                         self.lenyiloablak_allapot = not self.lenyiloablak_allapot
-
+                    print(self.lenyiloablak_allapot)
                     if self.lenyiloablak_allapot:
                         for i, option in enumerate(self.allatok):
                             option_rect = pygame.Rect(
