@@ -87,24 +87,15 @@ class GameClient:
             self.width // 2 + 60, self.height // 2 + 150, 100, 30
         )
 
-        # kozepso_lap="csotany"
         self.kozepso_lap = None
         self.ellenfel_allitasa = None
         self.sajat_allitas = None
         self.kezben_levo_lapok = None
         self.elotte_levo_kartyak = None
-        # self.jatekosok_elotti_lapok = None
+
         self.jatekosadatok = None
         self.aktiv_jatekos = None
-        # self.game_started_screen(
-        #     kezben_levo_lapok,
-        #     elotte_levo_kartyak,
-        #     jatekosok,
-        #     message,
-        #     kozepso_lap,
-        #     allitas,
-        #     allitas2,
-        # )
+
         self.allatok = [
             "csotany",
             "denever",
@@ -360,10 +351,6 @@ class GameClient:
         message_font = pygame.font.Font(None, 20)
         kep_mappa = os.path.join("kepek")
 
-        # kartya_csoportok = defaultdict(list)
-        # for lap in self.kezben_levo_lapok:
-        #     kartya_csoportok[lap].append(lap)
-        # print("kezben_levo_lapok:", kartya_csoportok)
         logo_images = {}
         for allat in self.allatok:  # használjuk a már ismert állatok listáját
             logo_utvonal = os.path.join(kep_mappa, f"{allat}_logo.png")
@@ -494,11 +481,9 @@ class GameClient:
 
             kartya_poziciok = []
 
-            # x_kep = self.width // 2 - 50  # kiindulási x pozíció, középre igazítva
-            y_kep = self.height - 150  # kiindulási y pozíció
+            y_kep = self.height - 150
             eltolasi_meret = 10  # egymás feletti kártyák eltolása
 
-            # Csoportosítjuk a lapokat típus szerint
             lap_csoportok = {}
             for lap in self.kezben_levo_lapok:
                 tipus = self.allat_tipus(lap)
@@ -506,16 +491,13 @@ class GameClient:
                     lap_csoportok[tipus] = []
                 lap_csoportok[tipus].append(lap)
 
-            # Számoljuk meg a különböző típusokat az x pozíció kalkulálásához
             tipus_szam = len(lap_csoportok)
 
-            # Kezdő x-pozíció számítása, hogy középre legyen igazítva
-            x_kep = ((self.width // 2) + 10) - (tipus_szam * 100) // 2
+            x_kep = self.width // 2
 
-            # Végigmegyünk a csoportosított lapokon
             for tipus, lapok in lap_csoportok.items():
                 kep_utvonal = os.path.join(kep_mappa, f"{tipus}.png")
-                # print(f"Betöltés kartya: {kep_utvonal}")
+
                 if os.path.exists(kep_utvonal):
                     kep = pygame.image.load(kep_utvonal)
                     eredeti_meret = kep.get_size()
@@ -527,20 +509,17 @@ class GameClient:
 
                     kep = pygame.transform.scale(kep, kartya_meret)
 
-                    # Az adott típushoz tartozó összes lapot egymás fölé helyezzük
                     for i, lap in enumerate(lapok):
                         kartya_rect = pygame.Rect(
-                            x_kep,
+                            x_kep
+                            - (tipus_szam * (int(eredeti_meret[0] * meret_arany)) // 2),
                             y_kep - i * eltolasi_meret,
                             *kartya_meret,
                         )
                         self.window.blit(kep, (kartya_rect.x, kartya_rect.y))
                         kartya_poziciok.append((kartya_rect, lap))
 
-                    # Léptetjük az x pozíciót a következő típusú lapcsoporthoz
-                    x_kep += (
-                        kartya_meret[0] + 10
-                    )  # 10 pixel távolság a következő csoporthoz
+                    x_kep += kartya_meret[0] + 5
 
             if self.kozepso_lap != None:
                 card_width, card_height = 100, 150
