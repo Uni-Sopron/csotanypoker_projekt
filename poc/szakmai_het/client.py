@@ -123,6 +123,14 @@ class NetworkManager:
             self.game_client.atadta = False
             self.game_client.lenyiloablak_allapot = False
 
+        @self.sio.on("kezbenlevo_kartyak")
+        def kezbenlevo_kartyak(data) -> None:
+        
+            print(f"Kezben lévő kártyák: {data}")
+            self.game_client.kezben_levo_lapok = data[ "kezbenlevo_kartyak"]
+
+        
+        
         @self.sio.on("jatekos_adatok")
         def jatekos_adatok(data: Dict[str, Any]) -> None:
             """

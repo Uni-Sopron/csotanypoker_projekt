@@ -624,6 +624,7 @@ class GameClient:
                 )
 
                 if self.lenyiloablak_allapot:
+                    self.kozepso_lap = self.kivalasztott_lap
                     for i, option in enumerate(self.allatok):
                         option_rect = pygame.Rect(
                             self.lenyiloablak_pozicio.x,

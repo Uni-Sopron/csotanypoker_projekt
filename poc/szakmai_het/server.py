@@ -159,8 +159,19 @@ def handle_oke_click(data: dict) -> None:
             jatek_vege()
             return
         jatek_instance.kartya_valasztas(valasztott_kartya_id=data["kivalasztott_lap"])
+        kezbenlevo_kartyak = [
+            k.nev for k in jatek_instance.aktiv_jatekos.kezbenlevo_kartyak
+        ]
+        emit(
+            "kezbenlevo_kartyak",
+            {
+                "kezbenlevo_kartyak": kezbenlevo_kartyak,
+            },
+            to=user.socket_id,
+        )
 
     jatek_instance.celzott_jatekos_valasztas(data["kivalasztott_jatekos"])
+
     # print(f"voltnála: {jatek_instance.volt_e_nala()}")
     print(f"celzott_jatekos: {jatek_instance.celzott_jatekos.nev}")
     print(jatek_instance.kerdeses_kartya.nev)
@@ -194,6 +205,23 @@ def handle_oke_click(data: dict) -> None:
         },
         room=room.room_id,
     )
+
+    for j in jatek_instance.jatekosok:
+        user = db.query(User).filter(User.username == j.nev).first()
+
+        if (
+            j.nev in jatek_instance.kerdeses_kartya.volt_ennel_mar
+            and j.nev != data["kivalasztott_jatekos"]
+        ):
+            emit(
+                "kartya_tartalma",
+                {
+                    "lap": jatek_instance.kerdeses_kartya.nev,
+                    "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
+                },
+                to=user.socket_id,
+            )
+
     print("Játékosok kártyáinak kiírása")
     for j in jatek_instance.jatekosok:
         print(f"{j.nev} kezében lévő kártyák: {[k.nev for k in j.kezbenlevo_kartyak]}")
