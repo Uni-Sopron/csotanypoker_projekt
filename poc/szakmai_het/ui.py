@@ -352,18 +352,15 @@ class GameClient:
         kep_mappa = os.path.join("kepek")
 
         logo_images = {}
-        for allat in self.allatok:  # használjuk a már ismert állatok listáját
+        for allat in self.allatok:
             logo_utvonal = os.path.join(kep_mappa, f"{allat}_logo.png")
             if os.path.exists(logo_utvonal):
-                # print(f"Betöltés: {logo_utvonal}")
                 logo = pygame.image.load(logo_utvonal)
                 logo = pygame.transform.scale(logo, (40, 40))
                 logo_images[allat] = logo
             else:
                 print(f"Nem található: {logo_utvonal}")
 
-        # player_panels = []
-        # print(f"ez van benne {logo_images}")
         while self.screen != "Jatek_vege":
             self.window.fill(self.WHITE)
             self.draw_text(f"Szoba: {self.room_name}", self.BLACK, 10, 10, False)
@@ -558,7 +555,7 @@ class GameClient:
                                     card_x + card_width + 10,
                                     card_y + (card_height // 2) - 20,
                                 ),
-                                (40, 40),  # vagy bármilyen méret, amit szeretnél
+                                (40, 40),
                             )
                         if len(self.volt_ennel_mar) < len(self.players):
                             pass_width, pass_height = 80, 40
@@ -573,9 +570,7 @@ class GameClient:
                             )  # világos szürke háttér
 
                             font = pygame.font.SysFont(None, 24)
-                            pass_text = font.render(
-                                "PASS", True, (0, 0, 0)
-                            )  # fekete szöveg
+                            pass_text = font.render("PASS", True, self.BLACK)
                             text_rect = pass_text.get_rect(center=self.pass_rect.center)
                             self.window.blit(pass_text, text_rect)
 
@@ -610,8 +605,7 @@ class GameClient:
                 self.window.blit(
                     description_text, (card_x - 100, card_y + card_height + 20)
                 )
-            # print(f"kivalasztott jatekos: {self.kivalasztott_jatekos}")
-            # print(f"kivalasztott lap {self.kivalasztott_lap}")
+
             if self.kivalasztott_jatekos != None and self.kivalasztott_lap != None:
                 # Állatok közötti választás
                 pygame.draw.rect(
@@ -654,16 +648,14 @@ class GameClient:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    # self.allapot = 10
                     pygame.quit()
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        # self.allapot = 10
                         pygame.quit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mx, my = event.pos
                     talalt = False
-                    # Fordított sorrendben iterálunk, hogy a felül lévő kártyákat detektáljuk előbb
+
                     for rect, lap in reversed(kartya_poziciok):
                         if self.aktiv_jatekos != self.username:
                             print(
@@ -684,13 +676,13 @@ class GameClient:
                             and not self.lenyiloablak_allapot
                             and not self.atadta
                             and not self.Passzolas
-                            and not talalt  # Ha már találtunk egy kártyát, ne válasszunk többet
+                            and not talalt
                         ):
                             self.kozepso_lap = None
                             print(f"Rákattintottál: {lap}")
                             self.kivalasztott_lap = lap
                             talalt = True
-                            break  # Kilépünk a ciklusból, miután találtunk egy kártyát
+                            break
 
                     mx, my = event.pos
                     for rect, player_name in player_panels:
@@ -739,9 +731,7 @@ class GameClient:
                             self.kivalasztott_lap = None
                             self.Passzolas = False
                             self.atadta = True
-                            # self.aktiv_jatekos = None
 
-                        # print("HEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
                     if self.pipa_rect is not None and self.pipa_rect.collidepoint(
                         mx, my
                     ):
@@ -760,7 +750,6 @@ class GameClient:
                         print("PASS gombra kattintva!")
                         self.network.passzolas(self.room_id)
                         self.Passzolas = True
-                        # ha van ilyen attribútum, jelenítheted is a képernyőn
 
             pygame.display.flip()
 

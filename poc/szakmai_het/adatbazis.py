@@ -1,3 +1,4 @@
+from flask_socketio import rooms
 from sqlalchemy import create_engine, Column, String, ForeignKey, Boolean, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -19,6 +20,8 @@ class User(Base):
 
     # Define relationship with the Room class
     current_room = relationship("Room", back_populates="players")
+    # kezbenlevo_kartyak = []
+    # elotte_levo_kartyak = {}
 
     def set_current_room_id(self, room_id: Optional[str]) -> None:
         """
@@ -64,6 +67,21 @@ class Room(Base):
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
+
+
+# tervezett felépítés:
+# class Card(Base):
+
+#     nev = ""
+#     volt_ennel_mar = []
+
+# class Game(Base):
+#     pakli = []
+#     aktiv_jatekos = User
+#     celzott_jatekos = User
+#     kerdeses_kartya = Card
+#     jatekos_allitasa = ""
+#     room_id=""
 
 
 def get_db_session() -> Session:

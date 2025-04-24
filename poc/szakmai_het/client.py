@@ -11,7 +11,7 @@ class NetworkManager:
         self.sio: socketio.Client = socketio.Client()
         self.game_client = game_client
 
-        # Regisztráljuk az eseménykezelőket
+       
         @self.sio.event
         def connect() -> None:
             """Connection event handler."""
@@ -32,7 +32,7 @@ class NetworkManager:
             """
             print(f"Login successful: {data}")
             self.game_client.username = data["username"]
-            # A szerver már kezeli a szobához csatlakozást, így egyből várakozás állapotba kerülünk
+           
             self.game_client.screen = "waiting"
 
         @self.sio.on("login_error")
@@ -59,8 +59,7 @@ class NetworkManager:
             self.game_client.room_id = data["room_id"]
             self.game_client.room_name = data["name"]
             self.game_client.players = data["players"]
-            # Már a "waiting" képernyőn vagyunk a login_success esemény miatt
-            # A játék automatikusan indul, ha elég játékos csatlakozott
+           
 
         @self.sio.on("player_joined")
         def on_player_joined(data: Dict[str, Any]) -> None:
@@ -87,7 +86,7 @@ class NetworkManager:
             """
             print("Game started")
             self.game_client.players = data["players"]
-            # Itt váltunk a játék képernyőre, mivel a szerver jelezte, hogy elég játékos van
+          
             self.game_client.screen = "game"
             self.game_client.message = "A játék elkezdődött!"
             self.game_client.message_display_time = 3.0
@@ -116,10 +115,9 @@ class NetworkManager:
             self.game_client.kozepso_lap = None  # Újra kérdőjelre állítjuk
             self.game_client.volt_ennel_mar = []  # Töröljük a volt_ennel_mar listát
             self.game_client.kivalasztott_lap = None  # Töröljük a kiválasztott lapot
-            # self.game_client.aktiv_jatekos = data["aktiv_jatekos"]
+            
             self.game_client.message = f"{data['jatekos']} elé lehelyezésre került egy {data['kartya_tipus']} kártya."
-            # self.game_client.message_display_time = 3.0
-            # self.game_client.ellenfel_allitasa = None
+           
             self.game_client.atadta = False
             self.game_client.lenyiloablak_allapot = False
 
@@ -139,16 +137,10 @@ class NetworkManager:
             Args:
                 data: A dictionary containing player data
             """
-            print(f"Player data: {data}")
-            # kezbenlevolapok = data.get("kezbenlevo_kartyak", [])
-            # elottevolapok = data.get("elotte_levo_kartyak", [])
-            # kezdo_jatekos = data.get("kezdo_jatekos", "ismeretlen")
-            # self.username = data.get("nev", "ismeretlen")
+            
             self.game_client.aktiv_jatekos = data.get("kezdo_jatekos", "ismeretlen")
             self.game_client.atadta = False
-            # self.game_client.jatekosok_elotti_lapok = data.get(
-            #     "jatekosok_elotti_lapok", {}
-            # )
+           
             self.game_client.jatekosadatok = {
                 nev: jatekos
                 for nev, jatekos in data.get("jatekos_adatok", {}).items()
@@ -160,12 +152,7 @@ class NetworkManager:
                     self.game_client.elotte_levo_kartyak = jatekos.get(
                         "elotte_levo_kartyak", []
                     )
-                    # for lap in self.game_client.elotte_levo_lapok:
-                    #     if lap in self.game_client.elotte_levo_kartyak:
-                    #         self.game_client.elotte_levo_kartyak[lap] += 1
-                    #     else:
-                    #         self.game_client.elotte_levo_kartyak[lap] = 1
-                    # break
+                  
                     print(f"Előtte lévő lapok: {self.game_client.elotte_levo_kartyak}")
 
             self.game_client.kezben_levo_lapok = data.get("kezbenlevo_kartyak", [])
@@ -201,20 +188,15 @@ class NetworkManager:
 
         @self.sio.on("kivalasztott_kartya_tartalma")
         def kivalasztott_kartya_tartalma(data) -> None:
-            print(f"adatok kiirasa: {data['lap']}")
-            print(
-                "BELEPEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEt"
-            )
+          
             self.game_client.kozepso_lap = data["lap"]
             self.game_client.kivalasztott_lap = data["lap"]
             self.game_client.volt_ennel_mar = data["naluk_volt"]
-            print(f"volt_ennel_mar: {self.game_client.volt_ennel_mar}")
 
         @self.sio.on("passzolt")
         def passzolt(data) -> None:
             self.game_client.aktiv_jatekos = data["aktiv_jatekos"]
 
-            # self.game_client.atadta = False
             self.game_client.message = data["message"]
             self.game_client.lenyiloablak_allapot = True
 
@@ -222,9 +204,7 @@ class NetworkManager:
         def hiba(data) -> None:
             self.game_client.message = data["message"]
             self.game_client.atadta = False
-            # self.game_client.lenyiloablak_allapot = True
-            # print(game_client.lenyiloablak_allapot)
-            # self.game_client.message_display_time = 3.0
+
 
         @self.sio.on("jatek_vege")
         def jatek_vege(data) -> None:
@@ -263,10 +243,6 @@ class NetworkManager:
         """
         self.sio.emit("login", {"username": username})
 
-        # self.game_client.message = f"{data['joined_player']} csatlakozott a szobához."
-
-        # self.game_client.message_display_time = 3.0
-
     def tipp(self, room_id: str, tipp: str) -> None:
         self.sio.emit("tipp", {"room_id": room_id, "tipp": tipp})
 
@@ -293,12 +269,4 @@ class NetworkManager:
     def passzolas(self, room_id: str) -> None:
         self.sio.emit("pass", {"room_id": room_id})
 
-    # def player_click(self, room_id: str, player: str) -> None:
-    #     """
-    #     Send a player click event.
-
-    #     Args:
-    #         room_id (str): The ID of the current room
-    #         player (str): The player that was clicked
-    #     """
-    #     self.sio.emit("player_click", {"room_id": room_id, "player": player})
+   

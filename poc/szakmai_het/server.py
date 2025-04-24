@@ -8,10 +8,10 @@ from adatbazis import User, Room, get_db_session
 from jatek_hatter import jatek, kartya, jatekos
 from adatbazis import Base, engine
 
-app = Flask(__name__)  # Create Flask application
+app = Flask(__name__)  
 socketio = SocketIO(
     app, cors_allowed_origins="*"
-)  # Create SocketIO server, allowing CORS from all origins
+)  
 
 
 def reset_database():
@@ -67,16 +67,7 @@ def handle_login(data: dict) -> None:
         user.socket_id = getattr(request, "sid")
         user.set_active(True)  # Mark user as active
 
-        # Check if the user was in an ongoing game
-        # if user.current_room_id:
-        #     room = db.query(Room).filter(Room.room_id == user.current_room_id).first()
-        #     if room and room.game_started:
-        #         emit("rejoin_prompt", {"room_id": room.room_id, "room_name": room.name})
-        #         db.commit()
-        #         db.close()
-        #         return
-
-    # Keresünk egy "jatek" nevű szobát, ha nincs, létrehozzuk
+        
     room = db.query(Room).filter(Room.name == "jatek").first()
     if not room:
         # Ha nincs még ilyen szoba, létrehozzuk
@@ -85,7 +76,7 @@ def handle_login(data: dict) -> None:
         db.add(room)
         db.commit()
 
-    # A felhasználót hozzáadjuk a szobához
+   
     if user:
         user = db.query(User).filter(User.username == username).first()
     else:
@@ -94,7 +85,7 @@ def handle_login(data: dict) -> None:
     user.current_room_id = room.room_id
     db.commit()
 
-    # Csatlakozás a szobához
+    
     join_room(room.room_id)
 
     # Játékosok lekérdezése
@@ -104,9 +95,7 @@ def handle_login(data: dict) -> None:
 
     emit(
         "login_success", {"username": username, "screen_state": "waiting"}
-    )  # Send the username back to the client
-
-    # Értesítés a többi játékosnak, hogy új játékos csatlakozott
+    )  
     emit(
         "player_joined",
         {
@@ -116,7 +105,7 @@ def handle_login(data: dict) -> None:
         room=room.room_id,
     )
 
-    # Értesítés a csatlakozó játékosnak
+    
     emit(
         "joined_room",
         {
@@ -150,10 +139,7 @@ def handle_oke_click(data: dict) -> None:
         db.query(User).filter(User.username == data["kivalasztott_jatekos"]).first()
     )
 
-    print(f"{user.username} megnyomta az OK gombot")
-    print(f"kivalasztott_lap: {data['kivalasztott_lap']}")
-    print(f"kivalasztott_jatekos: {data['kivalasztott_jatekos']}")
-    print(f"allitas: {data['lapot_ado_allitasa']}")
+    
     if not data["pass"]:
         if jatek_instance.van_lap_a_kezeben():
             jatek_vege()
@@ -172,14 +158,7 @@ def handle_oke_click(data: dict) -> None:
 
     jatek_instance.celzott_jatekos_valasztas(data["kivalasztott_jatekos"])
 
-    # print(f"voltnála: {jatek_instance.volt_e_nala()}")
-    print(f"celzott_jatekos: {jatek_instance.celzott_jatekos.nev}")
-    print(jatek_instance.kerdeses_kartya.nev)
-    print(jatek_instance.kerdeses_kartya.volt_ennel_mar)
-    # if jatek_instance.volt_e_nala():
-    #     print("volt már nála")
-    #     emit("hiba", {"message": "Nála már volt"}, to=sid)
-    # else:
+   
 
     for lap in jatek_instance.pakli:
         if lap.nev == data["kivalasztott_lap"]:
