@@ -1,4 +1,4 @@
-from collections import defaultdict
+# from collections import defaultdict
 import os
 import pygame
 from client import NetworkManager
@@ -130,13 +130,6 @@ class GameClient:
             # Render the current screen
             self.draw_screen()
 
-            # if self.message_display_time > 0:
-            #     self.message_display_time -= 1 / 30
-
-            # if self.error_display_time > 0:
-            #     self.error_display_time -= 1 / 30
-
-            # Update screen
             pygame.display.update()
             self.clock.tick(30)  # 30 frames per second
 
@@ -716,9 +709,6 @@ class GameClient:
                     if self.elfogado_gomb_pozicio.collidepoint(mx, my) and self.Allitas:
                         print(f"Elfogadott állat: {self.Allitas}")
                         if self.kivalasztott_jatekos and self.kivalasztott_lap:
-                            # print(
-                            # f"PIPA KATT: {self.kivalasztott_jatekos}, {self.kivalasztott_lap}"
-                            # )
                             self.network.oke_click(
                                 self.room_id,
                                 self.kivalasztott_jatekos,
@@ -726,7 +716,7 @@ class GameClient:
                                 self.Allitas,
                                 self.Passzolas,
                             )
-                            # Reset after sending
+
                             self.kivalasztott_jatekos = None
                             self.kivalasztott_lap = None
                             self.Passzolas = False
@@ -752,6 +742,10 @@ class GameClient:
                         self.Passzolas = True
 
             pygame.display.flip()
+
+    def kattintas_recten(pos, rect):
+        """Visszatér True-val, ha az egér pozíciója benne van a rect-ben"""
+        return rect.collidepoint(pos)
 
     def szoveg_felrajzolas(self, text, position, font, color=None):
         if color is None:

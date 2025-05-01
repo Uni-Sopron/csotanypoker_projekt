@@ -1,5 +1,9 @@
 from random import shuffle, choice
-import os
+from sqlalchemy.orm import Session
+
+# from sqlalchemy import create_engine
+from adatbazis import Card, Player, get_db_session
+
 
 TIPUS = [
     "csotany",
@@ -14,17 +18,17 @@ TIPUS = [
 
 
 class jatek:
-    def __init__(self, jatekosok):
+    def __init__(self, jatekosok, from_db=False):
         self.jatekosok = jatekosok
         self.pakli = []
+        self.aktiv_jatekos = None
+        self.celzott_jatekos = None
+        self.kerdeses_kartya = None
+
         self.aktiv_jatekos = self.kezdo_jatekos_sorsolasa()
-        self.celzott_jatekos = jatekos
-        self.kerdeses_kartya = kartya
-        self.jatekos_allitasa = ""
         self.pakli_generalo()
         self.pakli_keveres()
         self.pakli_kiosztas()
-        # self.jatek_ciklus()
 
     def pakli_generalo(self):
         for tipus in TIPUS:
@@ -35,6 +39,7 @@ class jatek:
         shuffle(self.pakli)
         if len(self.jatekosok) == 2:
             self.pakli = self.pakli[:-10]
+        # self.kartyak_mentese()
 
     def pakli_kiosztas(self):
         jatekos_szam = len(self.jatekosok)
@@ -58,49 +63,44 @@ class jatek:
         return False
 
     def celzott_jatekos_valasztas(self, nev):
-        # nev=input("valasz egy jatekos nevet ")
         for i in self.jatekosok:
             if nev == i.nev:
                 self.celzott_jatekos = i
                 break
 
     def kartya_valasztas(self, valasztott_kartya_id=None):
-        # print("Válassz egy kártyát az alábbiak közül:")
-        # print([kartya.nev for kartya in self.aktiv_jatekos.kezbenlevo_kartyak])
+        db: Session = get_db_session()
+        # Kártya keresése az adatbázisból
+        jatekos_db = (
+            db.query(Player).filter(Player.name == self.aktiv_jatekos.nev).first()
+        )
 
-        # valasztott_kartya_nev = input("Kártya neve: ")
-
-        # Megkeressük a játékos kezében lévő megfelelő kártyát
         for kartya in self.aktiv_jatekos.kezbenlevo_kartyak:
             if kartya.nev == valasztott_kartya_id:
                 self.kerdeses_kartya = kartya
+                kivalasztott_kartya = (
+                    db.query(Card).filter(Card.name == self.kerdeses_kartya.nev).first()
+                )
                 self.aktiv_jatekos.kezbenlevo_kartyak.remove(
                     kartya
                 )  # Eltávolítjuk a kártyát
                 if self.aktiv_jatekos.nev not in self.kerdeses_kartya.volt_ennel_mar:
                     self.kerdeses_kartya.volt_ennel_mar.append(self.aktiv_jatekos.nev)
+                    kivalasztott_kartya.volt_ennel_mar.append(jatekos_db)
+                    db.commit()
                 return
 
-        # print("Hibás választás! Nincs ilyen kártya a kezedben.")
-        # self.kartya_valasztas()  # Újraválasztás
-
-    def volt_e_nala(self):
-        return self.celzott_jatekos in self.kerdeses_kartya.volt_ennel_mar
-
     def allitas(self, allitas=None):
-        # print("csotany", "denever", "poloska","varangy", "patkány","pók","legy","skorpio")
-        # allitas = input("Milyen állat? ")
-        self.jatekos_allitasa = allitas
-        if self.jatekos_allitasa == self.kerdeses_kartya.nev:
-            # print("nem hazudsz")
-            return "nem hazudsz"
-        else:
-            # print("hazudsz")
-            return "hazudsz"
+        db: Session = get_db_session()
+        player = db.query(Player).filter(Player.name == self.aktiv_jatekos.nev).first()
+        player.allitas = allitas
+        db.commit()
+        self.aktiv_jatekos.allitas = allitas  # Az aktuális játékos állítása
 
     def igaz_vagy_hamis(self, valasz):
-        if valasz is True:
-            if self.jatekos_allitasa == self.kerdeses_kartya.allat_tipus:
+        self.celzott_jatekos.igaz_e = valasz  # Az aktuális játékos válasza
+        if self.celzott_jatekos.igaz_e is True:
+            if self.aktiv_jatekos.allitas == self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
                 # self.kartya_lerakas(self.aktiv_jatekos)
@@ -108,8 +108,8 @@ class jatek:
                 print("rossz válasz")
                 return False
                 # self.kartya_lerakas(self.celzott_jatekos)
-        elif valasz is False:
-            if self.jatekos_allitasa != self.kerdeses_kartya.allat_tipus:
+        elif self.celzott_jatekos.igaz_e is False:
+            if self.aktiv_jatekos.allitas != self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
                 # self.kartya_lerakas(self.aktiv_jatekos)
@@ -119,88 +119,25 @@ class jatek:
                 # self.kartya_lerakas(self.celzott_jatekos)
 
     def kartya_lerakas(self, jatekos):
+        db: Session = get_db_session()
+        # Kártya keresése az adatbázisból
+        kivalasztott_kartya = (
+            db.query(Card).filter(Card.name == self.kerdeses_kartya.nev).first()
+        )
+        jatekos_db = db.query(Player).filter(Player.name == jatekos.nev).first()
+        jatekos_db.elotte_levo_kartyak.append(kivalasztott_kartya)
+        # kivalasztott_kartya.volt_ennel_mar.append(jatekos_db)
+        db.commit()
+
         if self.kerdeses_kartya.allat_tipus not in jatekos.elotte_levo_kartyak:
             jatekos.elotte_levo_kartyak[self.kerdeses_kartya.allat_tipus] = 1
+
         else:
             jatekos.elotte_levo_kartyak[self.kerdeses_kartya.allat_tipus] += 1
+
         self.aktiv_jatekos = jatekos
-        print("lerakás")
+
         # print("jatekos_elotte_kartyak", jatekos.elotte_levo_kartyak)
-
-    def jatek_ciklus(self):
-        while not self.van_4_lap_elotte() and self.van_lap_a_kezeben():
-            # van a kezében kártya  ,és nincs elötte 4 ugyan olyan lap
-
-            os.system("cls" if os.name == "nt" else "clear")  # Terminál törlése
-            print(f"AKTIV JÁTÉKOS: {self.aktiv_jatekos.nev} ")
-            print(f"Előtte lévő kártyák: {self.aktiv_jatekos.elotte_levo_kartyak}")
-            # többi játékos
-            print("TÖBBI JÁTÉKOSOK:")
-            print(
-                [
-                    f"{jatekos.nev}"
-                    for jatekos in self.jatekosok
-                    if jatekos != self.aktiv_jatekos
-                ]
-            )
-            self.kartya_valasztas()
-            self.ciklus()
-
-        print(f" VESZTES: {self.aktiv_jatekos.nev}")
-
-    def ciklus(self):
-        # self.kerdeses_kartya.volt_ennel_mar.append(self.aktiv_jatekos.nev)
-        self.celzott_jatekos_valasztas()
-        print(f"AKTIV JÁTÉKOS: {self.aktiv_jatekos.nev}")
-        while self.volt_e_nala() or self.celzott_jatekos == self.aktiv_jatekos:
-            print("volt már nala")
-            self.celzott_jatekos_valasztas()
-        self.allitas()
-
-        print(
-            "--------------------------------------------------------------------------------------------"
-        )
-        print("CÉLZOTT JÁTÉKOS:")
-        print(self.celzott_jatekos.nev)
-        print(f" Ez a kártya egy: {self.jatekos_allitasa}")
-
-        print(
-            f" ez a kártya kiknél volt: {[jatekos.nev for jatekos in self.kerdeses_kartya.volt_ennel_mar]}"
-        )
-
-        if (
-            len(self.kerdeses_kartya.volt_ennel_mar) == len(self.jatekosok) - 1
-            or len(self.jatekosok) == 2
-        ):
-            print("IGAZ , HAMIS")
-        else:
-            print("IGAZ , HAMIS, PASS")
-
-        valasz = input("Valasz: ")
-        if valasz == "pass":
-            print(self.kerdeses_kartya.nev)
-            self.aktiv_jatekos = self.celzott_jatekos
-            return self.ciklus()
-        elif valasz == "igaz":
-            if self.jatekos_allitasa == self.kerdeses_kartya.allat_tipus:
-                print("jó válasz")
-                self.kartya_lerakas(self.aktiv_jatekos)
-            else:
-                print("rossz válasz")
-                self.kartya_lerakas(self.celzott_jatekos)
-        elif valasz == "hamis":
-            if self.jatekos_allitasa != self.kerdeses_kartya.allat_tipus:
-                print("jó válasz")
-                self.kartya_lerakas(self.aktiv_jatekos)
-            else:
-                print("rossz válasz")
-                self.kartya_lerakas(self.celzott_jatekos)
-
-        # input()
-
-        # self.celzott_jatekos_valasztas()
-
-        # self.kartya_valasztas()
 
 
 class jatekos:
@@ -208,8 +145,8 @@ class jatekos:
         self.nev = nev
         self.kezbenlevo_kartyak = []
         self.elotte_levo_kartyak = {}
-
-    pass
+        self.allitas = None  # Kezdetben nincs állítás
+        self.igaz_e = None  # Kezdetben nincs tipp
 
 
 class kartya:
@@ -220,19 +157,4 @@ class kartya:
     @property
     def allat_tipus(self):
         # Ha szükséged van csak a típusra, ezt használhatod
-        return self.nev.split("_")[0]  # Visszaadja: "csotany"
-
-
-# proba_jatek=jatek([jatekos("sanyi"),jatekos("pisti"),jatekos("jani")])
-
-# Kiíratás listaként
-# print([kartya.nev for kartya in proba_jatek.pakli])
-
-# # Pakli méretének kiírása
-# print(f"A pakliban {len(proba_jatek.pakli)} kártya van.")
-# print([kartya.nev for kartya in proba_jatek.jatekosok[0].kezbenlevo_kartyak])
-# print(len(proba_jatek.jatekosok[0].kezbenlevo_kartyak))
-# print([kartya.nev for kartya in proba_jatek.jatekosok[1].kezbenlevo_kartyak])
-# print(len(proba_jatek.jatekosok[1].kezbenlevo_kartyak))
-# print([kartya.nev for kartya in proba_jatek.jatekosok[2].kezbenlevo_kartyak])
-# print(len(proba_jatek.jatekosok[2].kezbenlevo_kartyak))
+        return self.nev.split("_")[0]
