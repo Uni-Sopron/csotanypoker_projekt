@@ -1,5 +1,5 @@
 import socketio
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 
 class NetworkManager:
@@ -11,10 +11,10 @@ class NetworkManager:
         self.sio: socketio.Client = socketio.Client()
         self.game_client = game_client
 
-       
         @self.sio.event
         def connect() -> None:
             """Connection event handler."""
+            self.game_client.screen = "login"
             print("Connected to server")
 
         @self.sio.event
@@ -32,7 +32,7 @@ class NetworkManager:
             """
             print(f"Login successful: {data}")
             self.game_client.username = data["username"]
-           
+
             self.game_client.screen = "waiting"
 
         @self.sio.on("login_error")
@@ -59,7 +59,6 @@ class NetworkManager:
             self.game_client.room_id = data["room_id"]
             self.game_client.room_name = data["name"]
             self.game_client.players = data["players"]
-           
 
         @self.sio.on("player_joined")
         def on_player_joined(data: Dict[str, Any]) -> None:
@@ -86,7 +85,7 @@ class NetworkManager:
             """
             print("Game started")
             self.game_client.players = data["players"]
-          
+
             self.game_client.screen = "game"
             self.game_client.message = "A játék elkezdődött!"
             self.game_client.message_display_time = 3.0
@@ -112,23 +111,20 @@ class NetworkManager:
                 data: A dictionary containing placement information
             """
             print(f"Kártya lehelyezve: {data}")
-            self.game_client.kozepso_lap = None  # Újra kérdőjelre állítjuk
-            self.game_client.volt_ennel_mar = []  # Töröljük a volt_ennel_mar listát
-            self.game_client.kivalasztott_lap = None  # Töröljük a kiválasztott lapot
-            
+            self.game_client.kozepso_lap = None
+            self.game_client.volt_ennel_mar = []
+            self.game_client.kivalasztott_lap = None
+
             self.game_client.message = f"{data['jatekos']} elé lehelyezésre került egy {data['kartya_tipus']} kártya."
-           
+
             self.game_client.atadta = False
             self.game_client.lenyiloablak_allapot = False
 
         @self.sio.on("kezbenlevo_kartyak")
         def kezbenlevo_kartyak(data) -> None:
-        
             print(f"Kezben lévő kártyák: {data}")
-            self.game_client.kezben_levo_lapok = data[ "kezbenlevo_kartyak"]
+            self.game_client.kezben_levo_lapok = data["kezbenlevo_kartyak"]
 
-        
-        
         @self.sio.on("jatekos_adatok")
         def jatekos_adatok(data: Dict[str, Any]) -> None:
             """
@@ -137,10 +133,10 @@ class NetworkManager:
             Args:
                 data: A dictionary containing player data
             """
-            
+
             self.game_client.aktiv_jatekos = data.get("kezdo_jatekos", "ismeretlen")
             self.game_client.atadta = False
-           
+
             self.game_client.jatekosadatok = {
                 nev: jatekos
                 for nev, jatekos in data.get("jatekos_adatok", {}).items()
@@ -152,7 +148,7 @@ class NetworkManager:
                     self.game_client.elotte_levo_kartyak = jatekos.get(
                         "elotte_levo_kartyak", []
                     )
-                  
+
                     print(f"Előtte lévő lapok: {self.game_client.elotte_levo_kartyak}")
 
             self.game_client.kezben_levo_lapok = data.get("kezbenlevo_kartyak", [])
@@ -165,7 +161,7 @@ class NetworkManager:
                 f"Ez az állat egy: {data.get('jatekos_allitasa', '')}"
             )
             self.game_client.kozepso_lap = "kerdojel"
-            # self.game_client.lapot_ado = data.get("lapot_ado", "")
+
             self.game_client.celzott_jatekos = data.get("celzott_jatekos", "")
             self.game_client.volt_ennel_mar = data["naluk_volt"]
             if self.game_client.username == data.get("celzott_jatekos", ""):
@@ -188,7 +184,6 @@ class NetworkManager:
 
         @self.sio.on("kivalasztott_kartya_tartalma")
         def kivalasztott_kartya_tartalma(data) -> None:
-          
             self.game_client.kozepso_lap = data["lap"]
             self.game_client.kivalasztott_lap = data["lap"]
             self.game_client.volt_ennel_mar = data["naluk_volt"]
@@ -204,7 +199,6 @@ class NetworkManager:
         def hiba(data) -> None:
             self.game_client.message = data["message"]
             self.game_client.atadta = False
-
 
         @self.sio.on("jatek_vege")
         def jatek_vege(data) -> None:
@@ -268,5 +262,3 @@ class NetworkManager:
 
     def passzolas(self, room_id: str) -> None:
         self.sio.emit("pass", {"room_id": room_id})
-
-   

@@ -1,7 +1,5 @@
 from random import shuffle, choice
 from sqlalchemy.orm import Session
-
-# from sqlalchemy import create_engine
 from adatbazis import Card, Player, get_db_session
 
 
@@ -32,14 +30,13 @@ class jatek:
 
     def pakli_generalo(self):
         for tipus in TIPUS:
-            for i in range(1, 9):  # 9
+            for i in range(1, 9):
                 self.pakli.append(kartya(tipus, i))
 
     def pakli_keveres(self):
         shuffle(self.pakli)
         if len(self.jatekosok) == 2:
             self.pakli = self.pakli[:-10]
-        # self.kartyak_mentese()
 
     def pakli_kiosztas(self):
         jatekos_szam = len(self.jatekosok)
@@ -70,7 +67,6 @@ class jatek:
 
     def kartya_valasztas(self, valasztott_kartya_id=None):
         db: Session = get_db_session()
-        # Kártya keresése az adatbázisból
         jatekos_db = (
             db.query(Player).filter(Player.name == self.aktiv_jatekos.nev).first()
         )
@@ -103,30 +99,28 @@ class jatek:
             if self.aktiv_jatekos.allitas == self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
-                # self.kartya_lerakas(self.aktiv_jatekos)
+
             else:
                 print("rossz válasz")
                 return False
-                # self.kartya_lerakas(self.celzott_jatekos)
+
         elif self.celzott_jatekos.igaz_e is False:
             if self.aktiv_jatekos.allitas != self.kerdeses_kartya.allat_tipus:
                 print("jó válasz")
                 return True
-                # self.kartya_lerakas(self.aktiv_jatekos)
+
             else:
                 print("rossz válasz")
                 return False
-                # self.kartya_lerakas(self.celzott_jatekos)
 
     def kartya_lerakas(self, jatekos):
         db: Session = get_db_session()
-        # Kártya keresése az adatbázisból
         kivalasztott_kartya = (
             db.query(Card).filter(Card.name == self.kerdeses_kartya.nev).first()
         )
         jatekos_db = db.query(Player).filter(Player.name == jatekos.nev).first()
         jatekos_db.elotte_levo_kartyak.append(kivalasztott_kartya)
-        # kivalasztott_kartya.volt_ennel_mar.append(jatekos_db)
+
         db.commit()
 
         if self.kerdeses_kartya.allat_tipus not in jatekos.elotte_levo_kartyak:
@@ -136,8 +130,6 @@ class jatek:
             jatekos.elotte_levo_kartyak[self.kerdeses_kartya.allat_tipus] += 1
 
         self.aktiv_jatekos = jatekos
-
-        # print("jatekos_elotte_kartyak", jatekos.elotte_levo_kartyak)
 
 
 class jatekos:
@@ -151,10 +143,9 @@ class jatekos:
 
 class kartya:
     def __init__(self, tipus, sorszam):
-        self.nev = f"{tipus}_{sorszam}"  # pl. "csotany_1"
+        self.nev = f"{tipus}_{sorszam}"
         self.volt_ennel_mar = []
 
     @property
     def allat_tipus(self):
-        # Ha szükséged van csak a típusra, ezt használhatod
         return self.nev.split("_")[0]

@@ -1,6 +1,5 @@
-# from calendar import c
 from flask import json
-# from flask_socketio import rooms
+
 from sqlalchemy import (
     create_engine,
     Column,
@@ -16,7 +15,7 @@ from typing import Optional
 
 
 engine = create_engine("sqlite:///game.db")
-Base = declarative_base()  # ORM modellek alaposztálya
+Base = declarative_base()
 
 
 # Asszociációs tábla Player és Card között (kézben lévő lapokhoz)
@@ -50,10 +49,7 @@ class User(Base):
     username = Column(
         String(50), primary_key=True
     )  # Felhasználónév mint elsődleges kulcs
-    password = Column(
-        String(100), nullable=True
-    )  # Módosítva nullable=True-ra, hogy ne legyen kötelező
-    socket_id = Column(String(100))
+    password = Column(String(100), nullable=True)
     current_room_id = Column(
         String(36), ForeignKey("rooms.room_id"), nullable=True
     )  # Aktuális szoba ID, külső kulcs a rooms táblához
@@ -112,15 +108,13 @@ class Room(Base):
 
 class Card(Base):
     __tablename__ = "cards"
-    # room_id = Column(String(36), ForeignKey("rooms.room_id"), nullable=False)
 
     name = Column(String(100), primary_key=True)
 
     volt_ennel_mar = relationship(
         "Player", secondary=cardholders, backref="volt_nala_mar"
     )
-    # games = relationship("Game", secondary=game_deck_cards, back_populates="pakli")
-    # Kapcsolatok a Player osztállyal asszociációs táblákon keresztül
+
     players_hand = relationship(
         "Player", secondary=player_hand_cards, back_populates="kezben_levo_lapok"
     )
@@ -128,10 +122,6 @@ class Card(Base):
         "Player", secondary=player_front_cards, back_populates="elotte_levo_kartyak"
     )
 
-    # Kapcsolat a Game osztállyal a paklihoz
-    # games = relationship("Game", secondary=game_deck_cards, back_populates="pakli")
-
-    # Kapcsolat a Game osztállyal a kérdéses kártyához
     questioned_in_games = relationship(
         "Game",
         foreign_keys="[Game.kerdeses_kartya_name]",
@@ -164,9 +154,6 @@ class Player(Base):
 
     # Kapcsolat a User osztállyal
     user = relationship("User", back_populates="player")
-
-    # Kapcsolatok a Game osztállyal
-    # games = relationship("Game", secondary=game_players, back_populates="jatekosok")
     active_in_games = relationship(
         "Game", foreign_keys="[Game.aktiv_jatekos_name]", back_populates="aktiv_jatekos"
     )
@@ -186,8 +173,7 @@ class Game(Base):
     celzott_jatekos_name = Column(String(50), ForeignKey("players.name"), nullable=True)
     kerdeses_kartya_name = Column(String(100), ForeignKey("cards.name"), nullable=True)
     nyertes = Column(String(50), ForeignKey("players.name"), nullable=True)
-    # Játék állapota (pl. "running", "finished")
-    # Kapcsolat a Room osztállyal
+
     room = relationship("Room", back_populates="game")
 
     aktiv_jatekos = relationship(

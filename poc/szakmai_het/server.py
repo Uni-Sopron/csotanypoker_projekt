@@ -1,21 +1,23 @@
-# from calendar import c
-# import json
 from flask import Flask, request, session
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room
 import uuid
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
 
-from jatek_hatter import jatek,  jatekos
+
+from jatek_hatter import jatek, jatekos
 from adatbazis import Game, User, Room, Card, Player, get_db_session, Base, engine
 
 
 app = Flask(__name__)
+app.secret_key = "titkos_kulcs_ide"  # Session kezeléshez szükséges titkos kulcs
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 
-def reset_database():
+socketek = {}
+
+
+def reset_database():  # ez csak teszteléshez kell
     Base.metadata.drop_all(bind=engine)  # törli az összes táblát
     Base.metadata.create_all(bind=engine)
 
@@ -44,29 +46,23 @@ def handle_login(data: dict) -> None:
         db.query(User).filter(User.username == data["username"]).first()
     )
     username: str = data["username"]
-    # Check if the username is already in use
-    if (
-        user
-        and user.is_active
-        and user.socket_id
-        and user.socket_id != getattr(request, "sid")
-    ):
+
+    if user and user.is_active:
         emit(
             "login_error",
             {"message": "Ez a felhasználónév már foglalt."},
         )
+
         db.close()
         return
 
-    session["username"] = username  # Store username in session
-
-    if not user:  # If the user does not exist, create a new one
-        db.add(
-            User(username=username, socket_id=getattr(request, "sid"), is_active=True)
-        )
+    session["socket_id"] = request.sid
+    socketek[username] = session["socket_id"]
+    session["username"] = username
+    if not user:
+        db.add(User(username=username, is_active=True))
     else:
-        user.socket_id = getattr(request, "sid")
-        user.set_active(True)  # Mark user as active
+        user.set_active(True)
 
     room = db.query(Room).filter(Room.name == "jatek").first()
     if not room:
@@ -76,10 +72,7 @@ def handle_login(data: dict) -> None:
         db.add(room)
         db.commit()
 
-    if user:
-        user = db.query(User).filter(User.username == username).first()
-    else:
-        user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.username == username).first()
 
     user.current_room_id = room.room_id
     db.commit()
@@ -110,9 +103,7 @@ def handle_login(data: dict) -> None:
     )
 
     # Ha elég játékos van, el lehet indítani a játékot
-    if (
-        len(player_names) >= room.player_count
-    ):  # Feltételezve, hogy legalább 2 játékos kell
+    if len(player_names) >= room.player_count:
         room.game_started = True
         db.commit()
         emit("start_game", {"players": player_names}, room=room.room_id)
@@ -125,7 +116,7 @@ def handle_login(data: dict) -> None:
 @socketio.on("oke_click")
 def handle_oke_click(data: dict) -> None:
     db: Session = get_db_session()
-    sid = getattr(request, "sid")
+    sid = request.sid
     room = db.query(Room).filter(Room.name == "jatek").first()
     game = db.query(Game).filter(Game.room_id == room.room_id).first()
     for lap in jatek_instance.pakli:
@@ -154,7 +145,6 @@ def handle_oke_click(data: dict) -> None:
             .first()
         )
 
-        # Remove card from player's hand in database if both exist
         if player_db and card_db and card_db in player_db.kezben_levo_lapok:
             player_db.kezben_levo_lapok.remove(card_db)
             db.commit()
@@ -199,10 +189,10 @@ def handle_oke_click(data: dict) -> None:
     )
 
     for j in jatek_instance.jatekosok:
-        user = db.query(User).filter(User.username == j.nev).first()
-
+        player_sid = socketek[j.nev]
         if (
-            j.nev in jatek_instance.kerdeses_kartya.volt_ennel_mar
+            player_sid
+            and j.nev in jatek_instance.kerdeses_kartya.volt_ennel_mar
             and j.nev != jatek_instance.celzott_jatekos.nev
         ):
             emit(
@@ -211,7 +201,7 @@ def handle_oke_click(data: dict) -> None:
                     "lap": jatek_instance.kerdeses_kartya.nev,
                     "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
                 },
-                to=user.socket_id,
+                to=player_sid,
             )
 
     game.aktiv_jatekos_name = (
@@ -228,7 +218,6 @@ def handle_oke_click(data: dict) -> None:
 
 def kartya_tartalma():
     db: Session = get_db_session()
-
     room = db.query(Room).filter(Room.name == "jatek").first()
     emit(
         "kartya_tartalma",
@@ -242,10 +231,7 @@ def kartya_tartalma():
 
 @socketio.on("tipp")
 def handle_tipp(data: dict) -> None:
-    # db: Session = get_db_session()
-    # sid = getattr(request, "sid")
     valasz = data["tipp"]
-    # user: Optional[User] = db.query(User).filter(User.socket_id == sid).first()
     eredmeny = jatek_instance.igaz_vagy_hamis(valasz)
     kartya_tartalma()
     if eredmeny:
@@ -259,16 +245,14 @@ def handle_tipp(data: dict) -> None:
 @socketio.on("pass")
 def handle_pass(data: dict) -> None:
     db: Session = get_db_session()
-    sid = getattr(request, "sid")
+    sid = request.sid
+
     room: Room = db.query(Room).filter(Room.name == "jatek").first()
-    user: Optional[User] = db.query(User).filter(User.socket_id == sid).first()
 
     # Ellenőrizzük, hogy a célzott játékos nem None
     if jatek_instance.celzott_jatekos is not None:
         jatek_instance.aktiv_jatekos = jatek_instance.celzott_jatekos
         jatek_instance.celzott_jatekos = None
-
-        # Ellenőrizzük, hogy van-e aktív játékos és neve
 
         emit(
             "passzolt",
@@ -279,30 +263,26 @@ def handle_pass(data: dict) -> None:
             room=room.room_id,
         )
 
-        # Ellenőrizzük, hogy a kérdéses kártya létezik-e
         if jatek_instance.kerdeses_kartya:
-            print(f"kedeses kártya: {jatek_instance.kerdeses_kartya.nev}")
-            print(f"volt_ennel_mar: {jatek_instance.kerdeses_kartya.volt_ennel_mar}")
-
             emit(
                 "kivalasztott_kartya_tartalma",
                 {
                     "lap": jatek_instance.kerdeses_kartya.nev,
                     "naluk_volt": jatek_instance.kerdeses_kartya.volt_ennel_mar,
                 },
-                room=user.socket_id,
+                to=sid,
             )
         else:
             emit(
                 "hiba",
                 {"message": "Nincs kérdéses kártya!"},
-                room=user.socket_id,
+                to=sid,
             )
     else:
         emit(
             "hiba",
             {"message": "Nincs célzott játékos!"},
-            room=user.socket_id,
+            to=sid,
         )
 
 
@@ -334,10 +314,9 @@ def kartya_lerakas() -> None:
     jatek_instance.kerdeses_kartya = None
 
     for j in jatek_instance.jatekosok:
-        user = db.query(User).filter(User.username == j.nev).first()
-        if user and user.socket_id:
+        player_sid = socketek[j.nev]
+        if player_sid:
             kezbenlevo_kartyak = [k.nev for k in j.kezbenlevo_kartyak]
-
             emit(
                 "jatekos_adatok",
                 {
@@ -346,8 +325,9 @@ def kartya_lerakas() -> None:
                     "kezdo_jatekos": jatek_instance.aktiv_jatekos.nev,
                     "jatekos_adatok": jatekos_adatok,
                 },
-                to=user.socket_id,
+                to=player_sid,
             )
+
     if jatek_instance.van_4_lap_elotte():
         jatek_vege()
 
@@ -378,14 +358,13 @@ def jatekinditas(jatekosok: list) -> None:
     jatek_instance = jatek([jatekos(felhasznalo) for felhasznalo in jatekosok])
 
     db = get_db_session()
-    user: Optional[User] = (
-        db.query(User).filter(User.username == session["username"]).first()
-    )
+    username = session.get("username")
+    user: Optional[User] = db.query(User).filter(User.username == username).first()
 
     game = Game(room_id=user.current_room_id)
     db.add(game)
     db.commit()
-   
+
     for kartya in jatek_instance.pakli:
         existing_card = db.query(Card).filter_by(name=kartya.nev).first()
 
@@ -393,7 +372,6 @@ def jatekinditas(jatekosok: list) -> None:
             card = Card(name=kartya.nev)
             db.add(card)
 
-    
     for j in jatek_instance.jatekosok:
         player = Player(name=j.nev, allitas=j.allitas)
         db.add(player)
@@ -405,15 +383,8 @@ def jatekinditas(jatekosok: list) -> None:
 
     db.commit()
 
-
     aktiv_nev = jatek_instance.aktiv_jatekos.nev
 
-    # Pakli kiírása
-    print("\n🎴 Pakli lapjai:")
-    for idx, kartya_obj in enumerate(jatek_instance.pakli, 1):
-        print(f"  {idx}. {kartya_obj.nev}")
-
-    db = get_db_session()
     jatekos_adatok = {}
     for j in jatek_instance.jatekosok:
         print(j.elotte_levo_kartyak)
@@ -423,20 +394,18 @@ def jatekinditas(jatekosok: list) -> None:
         }
 
     for j in jatek_instance.jatekosok:
-        user = db.query(User).filter(User.username == j.nev).first()
-        if user and user.socket_id:
-           
+        player_sid = socketek[j.nev]
+        if player_sid:
             kezbenlevo_kartyak = [k.nev for k in j.kezbenlevo_kartyak]
             emit(
                 "jatekos_adatok",
                 {
                     "nev": j.nev,
                     "kezbenlevo_kartyak": kezbenlevo_kartyak,
-                    
                     "kezdo_jatekos": aktiv_nev,
                     "jatekos_adatok": jatekos_adatok,
                 },
-                to=user.socket_id,
+                to=player_sid,
             )
 
 
