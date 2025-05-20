@@ -1,7 +1,7 @@
 import pygame
 from base_screen import BaseScreen
 from colors_and_sizes import BLACK, FONT_SMALL, GRAY, RED, WHITE
-
+from drawing_helpers import draw_text
 
 class LoginScreen(BaseScreen):
     def __init__(self, client):
@@ -11,7 +11,7 @@ class LoginScreen(BaseScreen):
     def draw(self):
         """Draw the login screen"""
         self.client.window.fill(WHITE)
-        self.draw_text("Add meg a felhasználóneved", BLACK, 400, 150, True)
+        draw_text(self.client.window,"Add meg a felhasználóneved", BLACK, 400, 150, True)
 
         pygame.draw.rect(self.client.window, GRAY, self.input_box, 2)
         font: pygame.font.Font = pygame.font.Font(None, FONT_SMALL)
@@ -24,7 +24,7 @@ class LoginScreen(BaseScreen):
 
         # Display error message if any
         if self.client.login_error and self.client.error_display_time > 0:
-            self.draw_text(self.client.login_error, RED, 400, 320, True)
+            draw_text(self.client.window,self.client.login_error, RED, 400, 320, True)
 
     def handle_mouse_click(self, pos):
         """Handle mouse clicks on login screen"""
