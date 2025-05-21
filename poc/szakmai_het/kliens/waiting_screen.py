@@ -28,7 +28,7 @@ class WaitingScreen(BaseScreen):
 
         if self.client.selected_room is not None:
             max_players = self.client.rooms[self.client.selected_room]["max_players"]
-            if len(self.client.game_state.jatekosok) == max_players:
+            if len(self.client.game_state.players) == max_players:
                 status = "Játék indul!"
 
         draw_text(self.client.window, status, BLACK, 400, 100, True)
@@ -36,8 +36,8 @@ class WaitingScreen(BaseScreen):
         # Display the list of players
         draw_text(self.client.window, "Játékosok:", BLACK, 50, 150)
         y = 200
-        for player in self.client.game_state.jatekosok:
-            draw_text(self.client.window, player.nev, BLACK, 60, y)
+        for player in self.client.game_state.players:
+            draw_text(self.client.window, player.name, BLACK, 60, y)
             y += 40
 
         # Leave button

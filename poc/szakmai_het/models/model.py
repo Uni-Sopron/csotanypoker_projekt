@@ -1,159 +1,159 @@
 from typing import Optional, List, Dict, Any
 
 
-class Kartya:
-    def __init__(self, tipus, sorszam):
-        self._nev = f"{tipus}_{sorszam}"
-        self._tipus = tipus
-        self._sorszam = sorszam
-        self._volt_ennel_mar = []
+class Card:
+    def __init__(self, type, index):
+        self._name = f"{type}_{index}"
+        self._type = type
+        self._index = index
+        self._visited_already = []
 
     @property
-    def nev(self) -> str:
-        return self._nev
+    def name(self) -> str:
+        return self._name
 
-    @nev.setter
-    def nev(self, ertek: str) -> None:
-        self._nev = ertek
-
-    @property
-    def tipus(self) -> str:
-        return self._tipus
-
-    @tipus.setter
-    def tipus(self, ertek: str) -> None:
-        self._tipus = ertek
-        self._nev = f"{self._tipus}_{self._sorszam}"
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
 
     @property
-    def sorszam(self) -> int:
-        return self._sorszam
+    def type(self) -> str:
+        return self._type
 
-    @sorszam.setter
-    def sorszam(self, ertek: int) -> None:
-        self._sorszam = ertek
-        self._nev = f"{self._tipus}_{self._sorszam}"
-
-    @property
-    def volt_ennel_mar(self) -> List:
-        return self._volt_ennel_mar
-
-    @volt_ennel_mar.setter
-    def volt_ennel_mar(self, ertek: List) -> None:
-        self._volt_ennel_mar = ertek
+    @type.setter
+    def type(self, value: str) -> None:
+        self._type = value
+        self._name = f"{self._type}_{self._index}"
 
     @property
-    def allat_tipus(self) -> str:
-        return self._nev.split("_")[0]
+    def index(self) -> int:
+        return self._index
 
-    @allat_tipus.setter
-    def allat_tipus(self, ertek: str) -> None:
-        self._tipus = ertek
-        self._nev = f"{ertek}_{self._sorszam}"
+    @index.setter
+    def index(self, value: int) -> None:
+        self._index = value
+        self._name = f"{self._type}_{self._index}"
+
+    @property
+    def visited_already(self) -> List:
+        return self._visited_already
+
+    @visited_already.setter
+    def visited_already(self, value: List) -> None:
+        self._visited_already = value
+
+    @property
+    def type(self) -> str:
+        return self._name.split("_")[0]
+
+    @type.setter
+    def type(self, value: str) -> None:
+        self._type = value
+        self._name = f"{value}_{self._index}"
 
 
-class Jatekos:
+class Player:
     def __init__(self, nev):
-        self._nev = nev
-        self._kezbenlevo_kartyak = []
-        self._elotte_levo_kartyak = {}
-        self._lapszam = 0
-        self._allitas = None
-        self._igaz_e = None
+        self._name = nev
+        self._cards_in_hand = []
+        self._cards_in_front = {}
+        self._card_count = 0
+        self._statement = None
+        self._is_true = None
 
     @property
-    def nev(self) -> str:
-        return self._nev
+    def name(self) -> str:
+        return self._name
 
-    @nev.setter
-    def nev(self, ertek: str) -> None:
-        self._nev = ertek
-
-    @property
-    def kezbenlevo_kartyak(self) -> List:
-        return self._kezbenlevo_kartyak
-
-    @kezbenlevo_kartyak.setter
-    def kezbenlevo_kartyak(self, ertek: List) -> None:
-        self._kezbenlevo_kartyak = ertek
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
 
     @property
-    def elotte_levo_kartyak(self) -> Dict:
-        return self._elotte_levo_kartyak
+    def cards_in_hand(self) -> List:
+        return self._cards_in_hand
 
-    @elotte_levo_kartyak.setter
-    def elotte_levo_kartyak(self, ertek: Dict) -> None:
-        self._elotte_levo_kartyak = ertek
-
-    @property
-    def lapszam(self) -> int:
-        return self._lapszam
-
-    @lapszam.setter
-    def lapszam(self, ertek: int) -> None:
-        self._lapszam = ertek
+    @cards_in_hand.setter
+    def cards_in_hand(self, value: List) -> None:
+        self._cards_in_hand = value
 
     @property
-    def allitas(self) -> Any:
-        return self._allitas
+    def cards_in_front(self) -> Dict:
+        return self._cards_in_front
 
-    @allitas.setter
-    def allitas(self, ertek: Any) -> None:
-        self._allitas = ertek
+    @cards_in_front.setter
+    def cards_in_front(self, value: Dict) -> None:
+        self._cards_in_front = value
 
     @property
-    def igaz_e(self) -> bool:
-        return self._igaz_e
+    def card_count(self) -> int:
+        return self._card_count
 
-    @igaz_e.setter
-    def igaz_e(self, ertek: bool) -> None:
-        self._igaz_e = ertek
+    @card_count.setter
+    def card_count(self, value: int) -> None:
+        self._card_count = value
+
+    @property
+    def statement(self) -> Any:
+        return self._statement
+
+    @statement.setter
+    def statement(self, value: Any) -> None:
+        self._statement = value
+
+    @property
+    def is_true(self) -> bool:
+        return self._is_true
+
+    @is_true.setter
+    def is_true(self, value: bool) -> None:
+        self._is_true = value
 
 
 class GameState:
     def __init__(self):
-        self._jatekosok = []
-        self._pakli = []
-        self._aktiv_jatekos = None
-        self._celzott_jatekos = None
-        self._kerdeses_kartya: Optional[Kartya] = None
+        self._players = []
+        self._deck = []
+        self._active_player = None
+        self._targeted_player = None
+        self._question_card: Optional[Card] = None
 
     @property
-    def jatekosok(self) -> List[Jatekos]:
-        return self._jatekosok
+    def players(self) -> List[Player]:
+        return self._players
 
-    @jatekosok.setter
-    def jatekosok(self, ertek: List[Jatekos]) -> None:
-        self._jatekosok = ertek
-
-    @property
-    def pakli(self) -> List[Kartya]:
-        return self._pakli
-
-    @pakli.setter
-    def pakli(self, ertek: List[Kartya]) -> None:
-        self._pakli = ertek
+    @players.setter
+    def players(self, value: List[Player]) -> None:
+        self._players = value
 
     @property
-    def aktiv_jatekos(self) -> Optional[Jatekos]:
-        return self._aktiv_jatekos
+    def deck(self) -> List[Card]:
+        return self._deck
 
-    @aktiv_jatekos.setter
-    def aktiv_jatekos(self, ertek: Optional[Jatekos]) -> None:
-        self._aktiv_jatekos = ertek
-
-    @property
-    def celzott_jatekos(self) -> Optional[Jatekos]:
-        return self._celzott_jatekos
-
-    @celzott_jatekos.setter
-    def celzott_jatekos(self, ertek: Optional[Jatekos]) -> None:
-        self._celzott_jatekos = ertek
+    @deck.setter
+    def deck(self, value: List[Card]) -> None:
+        self._deck = value
 
     @property
-    def kerdeses_kartya(self) -> Optional[Kartya]:
-        return self._kerdeses_kartya
+    def active_player(self) -> Optional[Player]:
+        return self._active_player
 
-    @kerdeses_kartya.setter
-    def kerdeses_kartya(self, ertek: Optional[Kartya]) -> None:
-        self._kerdeses_kartya = ertek
+    @active_player.setter
+    def active_player(self, value: Optional[Player]) -> None:
+        self._active_player = value
+
+    @property
+    def targeted_player(self) -> Optional[Player]:
+        return self._targeted_player
+
+    @targeted_player.setter
+    def targeted_player(self, value: Optional[Player]) -> None:
+        self._targeted_player = value
+
+    @property
+    def question_card(self) -> Optional[Card]:
+        return self._question_card
+
+    @question_card.setter
+    def question_card(self, value: Optional[Card]) -> None:
+        self._question_card = value

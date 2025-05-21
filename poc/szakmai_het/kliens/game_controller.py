@@ -25,15 +25,15 @@ class GameController:
        
         self.pipa_rect = None  # Rectangle for the checkmark image
         self.x_rect = None
-        self.Passzolas = False
-        self.atadta = False
+        self.IsPassed = False
+        self.is_given = False
 
         self.message: str = ""  # Message to be displayed
         self.message_display_time: float = 0  # Message display duration
 
         self.input_text: str = ""
         self.input_active: bool = False
-        self.volt_ennel_mar = []
+        self.visited_players = []
         self.room_input: str = ""
         self.room_active: bool = False
         self.selected_room: Optional[int] = (
@@ -54,8 +54,8 @@ class GameController:
 
      
 
-        self.Allitas = None
-        self.lenyiloablak_allapot = False
+        self.statement = None
+        self.dropdown_state = False
         self.login = None
         # self.keret_szin = RED  # Piros keret a kiválasztott elemhez
 
@@ -130,19 +130,19 @@ class GameController:
 
     
     @property
-    def Passzolas(self) -> bool:
+    def IsPassed(self) -> bool:
         return self._Passzolas
     
-    @Passzolas.setter
-    def Passzolas(self, value: bool) -> None:
+    @IsPassed.setter
+    def IsPassed(self, value: bool) -> None:
         self._Passzolas = value
 
     @property
-    def atadta(self) -> bool:
+    def is_given(self) -> bool:
         return self._atadta
     
-    @atadta.setter
-    def atadta(self, value: bool) -> None:
+    @is_given.setter
+    def is_given(self, value: bool) -> None:
         self._atadta = value
 
     @property
@@ -182,12 +182,12 @@ class GameController:
 
    
     @property
-    def volt_ennel_mar(self) -> List:
-        return self._volt_ennel_mar
+    def visited_players(self) -> List:
+        return self._visited_players
     
-    @volt_ennel_mar.setter
-    def volt_ennel_mar(self, value: List) -> None:
-        self._volt_ennel_mar = value
+    @visited_players.setter
+    def visited_players(self, value: List) -> None:
+        self._visited_players = value
 
     
     @property
@@ -279,21 +279,21 @@ class GameController:
 
 
     @property
-    def Allitas(self) -> Any:
-        return self._Allitas
+    def statement(self) -> Any:
+        return self._statement
     
-    @Allitas.setter
-    def Allitas(self, value: Any) -> None:
-        self._Allitas = value
+    @statement.setter
+    def statement(self, value: Any) -> None:
+        self._statement = value
 
   
     @property
-    def lenyiloablak_allapot(self) -> bool:
-        return self._lenyiloablak_allapot
+    def dropdown_state(self) -> bool:
+        return self._dropdown_state
     
-    @lenyiloablak_allapot.setter
-    def lenyiloablak_allapot(self, value: bool) -> None:
-        self._lenyiloablak_allapot = value
+    @dropdown_state.setter
+    def dropdown_state(self, value: bool) -> None:
+        self._dropdown_state = value
 
     
     @property
@@ -476,6 +476,6 @@ class GameController:
             self.game.draw()
         elif self.screen == "rejoin_prompt":
             self.draw_rejoin_prompt()
-        elif self.screen == "Jatek_vege":
+        elif self.screen == "game_over":
             self.game_over = EndScreen(self)
             self.game_over.draw()

@@ -19,24 +19,24 @@ class GameScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
 
-        self.client.kivalasztott_lap = None
-        self.kivalasztott_jatekos = None
-        self.kivalasztott_jatekos_keret = None
-        self.kivalasztott_kartya_keret = None
+        self.client.selected_card = None
+        self.selected_player = None
+        self.selected_player_frame = None
+        self.selected_card_frame = None
 
-        self.keret_szin = RED
-        self.Allitas = None
-        self.lenyiloablak_pozicio = pygame.Rect(
+        self.frame_color = RED
+        self.statement = None
+        self.dropdown_position = pygame.Rect(
             SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 150, 100, 30
         )
-        self.elfogado_gomb_pozicio = pygame.Rect(
+        self.accept_button_position = pygame.Rect(
             SCREEN_WIDTH // 2 + 60, SCREEN_HEIGHT // 2 + 150, 100, 30
         )
 
-        self.pipa_rect = None
-        self.x_rect = None
-        self.Passzolas = False
-        self.client.atadta = False
+        self.checkmark_rect = None
+        self.cross_rect = None
+        self.passing = False
+        self.client.passed = False
 
     def draw(self) -> None:
         """
@@ -51,7 +51,7 @@ class GameScreen(BaseScreen):
         for allat in ANIMALS:
             logo_images[allat] = load_image(allat, size=(40, 40), logo=True)
 
-        while self.client.screen != "Jatek_vege":
+        while self.client.screen != "game_over":
             self.client.window.fill(WHITE)
             draw_text(
                 self.client.window,
@@ -63,7 +63,7 @@ class GameScreen(BaseScreen):
             )
             draw_text(
                 self.client.window,
-                f"Felhasználónév: {self.client.user.nev}",
+                f"Felhasználónév: {self.client.user.name}",
                 BLACK,
                 10,
                 40,
@@ -72,7 +72,7 @@ class GameScreen(BaseScreen):
 
             draw_text(
                 self.client.window,
-                f"aktiv jatekos: {self.client.game_state.aktiv_jatekos.nev}",
+                f"aktiv player: {self.client.game_state.active_player.name}",
                 BLACK,
                 10,
                 70,
@@ -92,14 +92,14 @@ class GameScreen(BaseScreen):
             player_panel_width = 120
             player_spacing = 30
             total_players_width = (
-                player_panel_width * (len(self.client.game_state.jatekosok) - 1)
-            ) + (player_spacing * (len(self.client.game_state.jatekosok) - 1))
+                player_panel_width * (len(self.client.game_state.players) - 1)
+            ) + (player_spacing * (len(self.client.game_state.players) - 1))
             start_x = (SCREEN_WIDTH - total_players_width) / 2
             player_panels = []
-            for i, jatekos in enumerate(
+            for i, player in enumerate(
                 j
-                for j in self.client.game_state.jatekosok
-                if j.nev != self.client.user.nev
+                for j in self.client.game_state.players
+                if j.name != self.client.user.name
             ):
                 player_panel_rect = pygame.Rect(
                     start_x + i * (player_panel_width + player_spacing),
@@ -113,17 +113,17 @@ class GameScreen(BaseScreen):
                 )
                 draw_text(
                     self.client.window,
-                    jatekos.nev,
+                    player.name,
                     BLACK,
                     player_panel_rect.x + 10,
                     player_panel_rect.y + 10,
                     False,
                     medium_font,
                 )
-
+                print(f"megejelenitö {player.card_count}")
                 draw_text(
                     self.client.window,
-                    f"lapszam: {jatekos.lapszam}",
+                    f"lapszam: {player.card_count}",
                     BLACK,
                     player_panel_rect.x + 10,
                     player_panel_rect.y + 30,
@@ -135,18 +135,16 @@ class GameScreen(BaseScreen):
                 card_y = player_panel_rect.y + 60
                 col_width = 60
 
-                for j, (lap_tipus, count) in enumerate(
-                    jatekos.elotte_levo_kartyak.items()
-                ):
+                for j, (card_type, count) in enumerate(player.cards_in_front.items()):
                     column = j % 2
                     row = j // 2
                     pos_x = player_panel_rect.x + 10 + (column * col_width)
                     pos_y = player_panel_rect.y + 60 + (row * 30)
 
-                    if lap_tipus in logo_images:
+                    if card_type in logo_images:
                         draw_image(
                             self.client.window,
-                            logo_images[lap_tipus],
+                            logo_images[card_type],
                             pos_x,
                             pos_y,
                             size=(25, 25),
@@ -166,7 +164,7 @@ class GameScreen(BaseScreen):
                     else:
                         draw_text(
                             self.client.window,
-                            f"{lap_tipus}: {count}",
+                            f"{card_type}: {count}",
                             BLACK,
                             pos_x,
                             pos_y,
@@ -174,12 +172,12 @@ class GameScreen(BaseScreen):
                             medium_font,
                         )
 
-                player_panels.append((player_panel_rect, jatekos.nev))
-            if self.kivalasztott_jatekos_keret:
+                player_panels.append((player_panel_rect, player.name))
+            if self.selected_player_frame:
                 pygame.draw.rect(
                     self.client.window,
-                    self.keret_szin,
-                    self.kivalasztott_jatekos_keret,
+                    self.frame_color,
+                    self.selected_player_frame,
                     3,
                 )
 
@@ -195,25 +193,23 @@ class GameScreen(BaseScreen):
             )
             col_width = 110
 
-            items_per_column = (
-                len(self.client.user.elotte_levo_kartyak or {}) + 1
-            ) // 2
+            items_per_column = (len(self.client.user.cards_in_front or {}) + 1) // 2
 
-            for i, lap_tipus in enumerate(self.client.user.elotte_levo_kartyak or {}):
+            for i, card_type in enumerate(self.client.user.cards_in_front or {}):
                 col = i // items_per_column
                 row = i % items_per_column
 
                 x_pos = info_panel_rect.x + 15 + (col * col_width)
                 y_pos = info_panel_rect.y + 60 + (row * 50)
 
-                if lap_tipus in logo_images:
-                    logo = logo_images[lap_tipus]
+                if card_type in logo_images:
+                    logo = logo_images[card_type]
 
                     draw_image(self.client.window, logo, x_pos, y_pos, centered=False)
 
                     draw_text(
                         self.client.window,
-                        f"{self.client.user.elotte_levo_kartyak[lap_tipus]}",
+                        f"{self.client.user.cards_in_front[card_type]}",
                         BLACK,
                         x_pos + 45,
                         y_pos + 10,
@@ -223,7 +219,7 @@ class GameScreen(BaseScreen):
                 else:
                     draw_text(
                         self.client.window,
-                        f"{lap_tipus}: {self.client.user.elotte_levo_kartyak[lap_tipus]}",
+                        f"{card_type}: {self.client.user.cards_in_front[card_type]}",
                         BLACK,
                         x_pos,
                         y_pos + 10,
@@ -237,19 +233,18 @@ class GameScreen(BaseScreen):
             eltolasi_meret = 10  # egymás feletti kártyák eltolása
 
             lap_csoportok = {}
-            for lap in self.client.user.kezbenlevo_kartyak:
-              
-                if lap.tipus not in lap_csoportok:
-                    lap_csoportok[lap.tipus] = []
-                lap_csoportok[lap.tipus].append(lap)
+            for lap in self.client.user.cards_in_hand:
+                if lap.type not in lap_csoportok:
+                    lap_csoportok[lap.type] = []
+                lap_csoportok[lap.type].append(lap)
 
             tipus_szam = len(lap_csoportok)
 
             x_kep = SCREEN_WIDTH // 2
 
-            for tipus, lapok in lap_csoportok.items():
+            for type, lapok in lap_csoportok.items():
                 meret_arany = min(SCREEN_WIDTH / 1600, SCREEN_HEIGHT / 1600)
-                kep = load_image(tipus, scale_ratio=meret_arany)
+                kep = load_image(type, scale_ratio=meret_arany)
                 kartya_meret = kep.get_size()
 
                 for i, lap in enumerate(lapok):
@@ -270,20 +265,20 @@ class GameScreen(BaseScreen):
                     kartya_poziciok.append((kartya_rect, lap))
 
                 x_kep += kartya_meret[0] + 5
-            if self.kivalasztott_kartya_keret:
+            if self.selected_card_frame:
                 pygame.draw.rect(
                     self.client.window,
-                    self.keret_szin,
-                    self.kivalasztott_kartya_keret,
+                    self.frame_color,
+                    self.selected_card_frame,
                     3,
                 )
-            if self.client.game_state.kerdeses_kartya != None:
+            if self.client.game_state.question_card != None:
                 card_width, card_height = 100, 150
                 card_x = (SCREEN_WIDTH - card_width) // 2
                 card_y = (SCREEN_HEIGHT - card_height) // 2
-                if self.client.game_state.kerdeses_kartya.tipus == "kerdojel":
+                if self.client.game_state.question_card.type == "kerdojel":
                     kozepso_lap_image = load_image(
-                        self.client.game_state.kerdeses_kartya.tipus,
+                        self.client.game_state.question_card.type,
                         size=(card_width, card_height),
                     )
                     draw_image(
@@ -296,25 +291,25 @@ class GameScreen(BaseScreen):
                     )
 
                     if (
-                        self.client.game_state.celzott_jatekos.nev
-                        == self.client.user.nev
+                        self.client.game_state.targeted_player.name
+                        == self.client.user.name
                     ):
                         pipa_img = load_image("pipa", size=(40, 40))
-                        self.pipa_rect = pygame.Rect(
+                        self.checkmark_rect = pygame.Rect(
                             (card_x - 50, card_y + (card_height // 2) - 20),
                             (40, 40),
                         )
                         draw_image(
                             self.client.window,
                             pipa_img,
-                            self.pipa_rect.x,
-                            self.pipa_rect.y,
+                            self.checkmark_rect.x,
+                            self.checkmark_rect.y,
                             size=(40, 40),
                             centered=False,
                         )
 
                         x_img = load_image("x", size=(40, 40))
-                        self.x_rect = pygame.Rect(
+                        self.cross_rect = pygame.Rect(
                             (
                                 card_x + card_width + 10,
                                 card_y + (card_height // 2) - 20,
@@ -324,15 +319,15 @@ class GameScreen(BaseScreen):
                         draw_image(
                             self.client.window,
                             x_img,
-                            self.x_rect.x,
-                            self.x_rect.y,
+                            self.cross_rect.x,
+                            self.cross_rect.y,
                             size=(40, 40),
                             centered=False,
                         )
 
                         if len(
-                            self.client.game_state.kerdeses_kartya.volt_ennel_mar
-                        ) < len(self.client.game_state.jatekosok):
+                            self.client.game_state.question_card.visited_already
+                        ) < len(self.client.game_state.players):
                             pass_width, pass_height = 80, 40
                             pass_x = card_x + (card_width // 2) - (pass_width // 2)
                             pass_y = card_y + card_height + 10
@@ -352,9 +347,9 @@ class GameScreen(BaseScreen):
                                 medium_font,
                             )
 
-                elif self.client.game_state.kerdeses_kartya:
+                elif self.client.game_state.question_card:
                     lap_img = load_image(
-                        self.client.game_state.kerdeses_kartya.tipus,
+                        self.client.game_state.question_card.type,
                         size=(card_width, card_height),
                     )
                     draw_image(
@@ -368,7 +363,7 @@ class GameScreen(BaseScreen):
 
                 draw_text(
                     self.client.window,
-                    self.client.game_state.aktiv_jatekos.allitas,
+                    self.client.game_state.active_player.statement,
                     BLACK,
                     card_x + card_width + 50,
                     card_y + 10,
@@ -376,33 +371,27 @@ class GameScreen(BaseScreen):
                     small_font,
                 )
 
-            if (
-                self.kivalasztott_jatekos != None
-                and self.client.kivalasztott_lap != None
-            ):
-               
+            if self.selected_player != None and self.client.selected_card != None:
                 pygame.draw.rect(
-                    self.client.window, (180, 180, 180), self.lenyiloablak_pozicio
+                    self.client.window, (180, 180, 180), self.dropdown_position
                 )
                 draw_text(
                     self.client.window,
-                    self.Allitas,
+                    self.statement,
                     BLACK,
-                    self.lenyiloablak_pozicio.x + 5,
-                    self.lenyiloablak_pozicio.y + 5,
+                    self.dropdown_position.x + 5,
+                    self.dropdown_position.y + 5,
                     False,
                     small_font,
                 )
 
-                if self.client.lenyiloablak_allapot:
-                    self.client.game_state.kerdeses_kartya = (
-                        self.client.kivalasztott_lap
-                    )
+                if self.client.dropdown_state:
+                    self.client.game_state.question_card = self.client.selected_card
 
                     for i, option in enumerate(ANIMALS):
                         option_rect = pygame.Rect(
-                            self.lenyiloablak_pozicio.x,
-                            self.lenyiloablak_pozicio.y + (i + 1) * 20,
+                            self.dropdown_position.x,
+                            self.dropdown_position.y + (i + 1) * 20,
                             100,
                             20,
                         )
@@ -420,14 +409,14 @@ class GameScreen(BaseScreen):
                 pygame.draw.rect(
                     self.client.window,
                     GRAY,
-                    self.elfogado_gomb_pozicio,
+                    self.accept_button_position,
                 )
                 draw_text(
                     self.client.window,
                     "Valaszt",
                     BLACK,
-                    self.elfogado_gomb_pozicio.x + 10,
-                    self.elfogado_gomb_pozicio.y + 5,
+                    self.accept_button_position.x + 10,
+                    self.accept_button_position.y + 5,
                     False,
                     small_font,
                 )
@@ -444,35 +433,35 @@ class GameScreen(BaseScreen):
 
                     for rect, lap in reversed(kartya_poziciok):
                         if (
-                            self.client.game_state.aktiv_jatekos.nev
-                            != self.client.user.nev
+                            self.client.game_state.active_player.name
+                            != self.client.user.name
                         ):
                             print(
-                                f"Nem te vagy az aktív játékos. Aktív: {self.client.game_state.aktiv_jatekos.nev}, Te: {self.client.user.nev}"
+                                f"Nem te vagy az aktív játékos. Aktív: {self.client.game_state.active_player.name}, Te: {self.client.user.name}"
                             )
-                        if self.client.lenyiloablak_allapot:
+                        if self.client.dropdown_state:
                             print("A lenyíló ablak nyitva van.")
-                        if self.client.atadta:
+                        if self.client.passed:
                             print("Már átadta a kört.")
-                        if self.Passzolas:
+                        if self.passing:
                             print("Passzoltál ebben a körben.")
                         if talalt:
                             print("Már kiválasztottál egy kártyát.")
 
                         if (
                             rect.collidepoint(mx, my)
-                            and self.client.game_state.aktiv_jatekos.nev
-                            == self.client.user.nev
-                            and not self.client.lenyiloablak_allapot
-                            and not self.client.atadta
-                            and not self.Passzolas
+                            and self.client.game_state.active_player.name
+                            == self.client.user.name
+                            and not self.client.dropdown_state
+                            and not self.client.passed
+                            and not self.passing
                             and not talalt
                         ):
-                            self.client.game_state.kerdeses_kartya = None
+                            self.client.game_state.question_card = None
                             print(f"Rákattintottál: {lap}")
                             if lap != None:
-                                self.client.kivalasztott_lap = lap
-                            self.kivalasztott_kartya_keret = rect
+                                self.client.selected_card = lap
+                            self.selected_card_frame = rect
                             talalt = True
                             break
 
@@ -480,77 +469,79 @@ class GameScreen(BaseScreen):
                     for rect, player_name in player_panels:
                         if (
                             rect.collidepoint(mx, my)
-                            and self.client.game_state.aktiv_jatekos.nev
-                            == self.client.user.nev
-                            and not self.client.atadta
+                            and self.client.game_state.active_player.name
+                            == self.client.user.name
+                            and not self.client.passed
                         ):
                             if (
-                                self.client.game_state.kerdeses_kartya == None
+                                self.client.game_state.question_card == None
                                 or player_name
-                                not in self.client.game_state.kerdeses_kartya.volt_ennel_mar
+                                not in self.client.game_state.question_card.visited_already
                             ):
-                                self.client.game_state.kerdeses_kartya = None
+                                self.client.game_state.question_card = None
                                 print(f"Rákattintottál {player_name}-ra")
-                                self.kivalasztott_jatekos = player_name
-                                self.kivalasztott_jatekos_keret = rect
+                                self.selected_player = player_name
+                                self.selected_player_frame = rect
                             else:
                                 self.client.message = "már volt már ennél a játékosnál"
 
-                    if self.lenyiloablak_pozicio.collidepoint(mx, my):
-                        self.client.lenyiloablak_allapot = (
-                            not self.client.lenyiloablak_allapot
-                        )
-                    if self.client.lenyiloablak_allapot:
+                    if self.dropdown_position.collidepoint(mx, my):
+                        self.client.dropdown_state = not self.client.dropdown_state
+                    if self.client.dropdown_state:
                         for i, option in enumerate(ANIMALS):
                             option_rect = pygame.Rect(
-                                self.lenyiloablak_pozicio.x,
-                                self.lenyiloablak_pozicio.y + (i + 1) * 20,
+                                self.dropdown_position.x,
+                                self.dropdown_position.y + (i + 1) * 20,
                                 100,
                                 20,
                             )
                             if option_rect.collidepoint(mx, my):
-                                self.Allitas = option
-                                self.client.lenyiloablak_allapot = False
+                                self.statement = option
+                                self.client.dropdown_state = False
 
-                    if self.elfogado_gomb_pozicio.collidepoint(mx, my) and self.Allitas:
-                        print(f"Elfogadott állat: {self.Allitas}")
-                        if self.kivalasztott_jatekos and self.client.kivalasztott_lap:
+                    if (
+                        self.accept_button_position.collidepoint(mx, my)
+                        and self.statement
+                    ):
+                        print(f"Elfogadott állat: {self.statement}")
+                        if self.selected_player and self.client.selected_card:
                             self.client.network.oke_click(
                                 self.client.room_id,
-                                self.kivalasztott_jatekos,
-                                self.client.kivalasztott_lap,
-                                self.Allitas,
-                                self.Passzolas,
+                                self.selected_player,
+                                self.client.selected_card,
+                                self.statement,
+                                self.passing,
                             )
 
-                            self.kivalasztott_jatekos = None
-                            self.client.kivalasztott_lap = None
-                            self.Passzolas = False
-                            self.client.atadta = True
-                            self.kivalasztott_jatekos_keret = None
-                            self.kivalasztott_kartya_keret = None
-                    if self.pipa_rect is not None and self.pipa_rect.collidepoint(
-                        mx, my
+                            self.selected_player = None
+                            self.client.selected_card = None
+                            self.passing = False
+                            self.client.passed = True
+                            self.selected_player_frame = None
+                            self.selected_card_frame = None
+                    if (
+                        self.checkmark_rect is not None
+                        and self.checkmark_rect.collidepoint(mx, my)
                     ):
                         print("Igazat mondott")
-                        self.client.game_state.kerdeses_kartya = None
-                        self.client.network.tipp(self.client.room_id, True)
-                    if self.x_rect is not None and self.x_rect.collidepoint(mx, my):
+                        self.client.game_state.question_card = None
+                        self.client.network.guess(self.client.room_id, True)
+                    if self.cross_rect is not None and self.cross_rect.collidepoint(
+                        mx, my
+                    ):
                         print("Hazudott")
-                        self.client.game_state.kerdeses_kartya = None
+                        self.client.game_state.question_card = None
 
-                        self.client.network.tipp(self.client.room_id, False)
+                        self.client.network.guess(self.client.room_id, False)
 
                     if hasattr(self, "pass_rect") and self.pass_rect.collidepoint(
                         mx, my
                     ):
                         print("PASS gombra kattintva!")
-                        self.client.network.passzolas(self.client.room_id)
-                        self.Passzolas = True
+                        self.client.network.passing(self.client.room_id)
+                        self.passing = True
 
             pygame.display.flip()
-
-  
 
     def handle_key_press(self, event):
         pass

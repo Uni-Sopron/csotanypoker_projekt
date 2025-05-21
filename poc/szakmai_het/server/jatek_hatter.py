@@ -1,13 +1,14 @@
 from random import shuffle, choice
 from sqlalchemy.orm import Session
-from adatbazis import Card, Player, get_db_session
+from adatbazis import DBCard, DBPlayer, get_db_session
 import sys
 import os
-sys.path.append(os.path.abspath('..')) 
-from models.model import Kartya,  GameState
+
+sys.path.append(os.path.abspath(".."))
+from models.model import Card, GameState
 
 
-TIPUS = [
+TYPES = [
     "csotany",
     "denever",
     "poloska",
@@ -19,130 +20,128 @@ TIPUS = [
 ]
 
 
-class jatek:
-    def __init__(self, jatekosok, from_db=False):
+class GameLogic:
+    def __init__(self, players, from_db=False):
         self.state = GameState()
 
-        self.state.jatekosok = jatekosok
-        self.state.aktiv_jatekos = self.kezdo_jatekos_sorsolasa()
-        self.pakli_generalo()
-        self.pakli_keveres()
-        self.pakli_kiosztas()
+        self.state.players = players
+        self.state.active_player = self.choose_starting_player()
+        self.generate_deck()
+        self.shuffle_deck()
+        self.deal_cards()
 
-    def pakli_generalo(self):
-        for tipus in TIPUS:
+    def generate_deck(self):
+        for type in TYPES:
             for i in range(1, 9):
-                self.state.pakli.append(Kartya(tipus, i))
+                self.state.deck.append(Card(type, i))
 
-    def pakli_keveres(self):
-        shuffle(self.state.pakli)
-        if len(self.state.jatekosok) == 2:
-            self.state.pakli = self.state.pakli[:-10]
+    def shuffle_deck(self):
+        shuffle(self.state.deck)
+        if len(self.state.players) == 2:
+            self.state.deck = self.state.deck[:-10]
 
-    def pakli_kiosztas(self):
-        jatekos_szam = len(self.state.jatekosok)
-        pakli_meret = len(self.state.pakli)
-        reszek = pakli_meret // jatekos_szam
-        for i in range(jatekos_szam):
-            self.state.jatekosok[i].kezbenlevo_kartyak = self.state.pakli[
-                i * reszek : (i + 1) * reszek
+    def deal_cards(self):
+        player_count = len(self.state.players)
+        deck_size = len(self.state.deck)
+        portions = deck_size // player_count
+        for i in range(player_count):
+            self.state.players[i].cards_in_hand = self.state.deck[
+                i * portions : (i + 1) * portions
             ]
 
-    def kezdo_jatekos_sorsolasa(self):
-        return choice(self.state.jatekosok)
+    def choose_starting_player(self):
+        return choice(self.state.players)
 
-    def van_lap_a_kezeben(self):
-        return self.state.aktiv_jatekos.kezbenlevo_kartyak == []
+    def has_cards_in_hand(self):
+        return self.state.active_player.cards_in_hand == []
 
-    def van_4_lap_elotte(self):
-        for kartya, db in self.state.aktiv_jatekos.elotte_levo_kartyak.items():
+    def has_4_cards_in_front(self):
+        for kartya, db in self.state.active_player.cards_in_front.items():
             if db == 4:
                 return True
         return False
 
-    def celzott_jatekos_valasztas(self, nev):
-        for i in self.state.jatekosok:
-            if nev == i.nev:
-                self.state.celzott_jatekos = i
+    def select_target_player(self, name):
+        for i in self.state.players:
+            if name == i.name:
+                self.state.targeted_player = i
                 break
 
-    def kartya_valasztas(self, valasztott_kartya_id=None):
+    def select_card(self, selected_card_id=None):
         db: Session = get_db_session()
-        jatekos_db = (
-            db.query(Player).filter(Player.name == self.state.aktiv_jatekos.nev).first()
+        player_db = (
+            db.query(DBPlayer)
+            .filter(DBPlayer.name == self.state.active_player.name)
+            .first()
         )
 
-        for kartya in self.state.aktiv_jatekos.kezbenlevo_kartyak:
-            if kartya.nev == valasztott_kartya_id:
-                self.state.kerdeses_kartya = kartya
-                kivalasztott_kartya = (
-                    db.query(Card)
-                    .filter(Card.name == self.state.kerdeses_kartya.nev)
+        for card in self.state.active_player.cards_in_hand:
+            if card.name == selected_card_id:
+                self.state.question_card = card
+                selected_card = (
+                    db.query(DBCard)
+                    .filter(DBCard.name == self.state.question_card.name)
                     .first()
                 )
-                self.state.aktiv_jatekos.kezbenlevo_kartyak.remove(
-                    kartya
-                )  # Eltávolítjuk a kártyát
+                self.state.active_player.cards_in_hand.remove(card)  # Remove the card
                 if (
-                    self.state.aktiv_jatekos.nev
-                    not in self.state.kerdeses_kartya.volt_ennel_mar
+                    self.state.active_player.name
+                    not in self.state.question_card.visited_already
                 ):
-                    self.state.kerdeses_kartya.volt_ennel_mar.append(
-                        self.state.aktiv_jatekos.nev
+                    self.state.question_card.visited_already.append(
+                        self.state.active_player.name
                     )
-                    kivalasztott_kartya.volt_ennel_mar.append(jatekos_db)
+                    selected_card.previous_holders.append(player_db)
                     db.commit()
                 return
 
-    def allitas(self, allitas=None):
+    def make_statement(self, statement=None):
         db: Session = get_db_session()
         player = (
-            db.query(Player).filter(Player.name == self.state.aktiv_jatekos.nev).first()
+            db.query(DBPlayer)
+            .filter(DBPlayer.name == self.state.active_player.name)
+            .first()
         )
-        player.allitas = allitas
+        player.statement = statement
         db.commit()
-        self.state.aktiv_jatekos.allitas = allitas  # Az aktuális játékos állítása
+        self.state.active_player.statement = statement  # The current player's statement
 
-    def igaz_vagy_hamis(self, valasz):
-        self.state.celzott_jatekos.igaz_e = valasz  # Az aktuális játékos válasza
-        if self.state.celzott_jatekos.igaz_e is True:
-            if (
-                self.state.aktiv_jatekos.allitas
-                == self.state.kerdeses_kartya.allat_tipus
-            ):
-                print("jó válasz")
+    def check_truth(self, answer):
+        self.state.targeted_player.is_true = answer  # The current player's answer
+        if self.state.targeted_player.is_true is True:
+            if self.state.active_player.statement == self.state.question_card.type:
+                print("correct answer")
                 return True
 
             else:
-                print("rossz válasz")
+                print("wrong answer")
                 return False
 
-        elif self.state.celzott_jatekos.igaz_e is False:
-            if (
-                self.state.aktiv_jatekos.allitas
-                != self.state.kerdeses_kartya.allat_tipus
-            ):
-                print("jó válasz")
+        elif self.state.targeted_player.is_true is False:
+            if self.state.active_player.statement != self.state.question_card.type:
+                print("correct answer")
                 return True
 
             else:
-                print("rossz válasz")
+                print("wrong answer")
                 return False
 
-    def kartya_lerakas(self, jatekos):
+    def place_card(self, player):
         db: Session = get_db_session()
-        kivalasztott_kartya = (
-            db.query(Card).filter(Card.name == self.state.kerdeses_kartya.nev).first()
+        selected_card = (
+            db.query(DBCard)
+            .filter(DBCard.name == self.state.question_card.name)
+            .first()
         )
-        jatekos_db = db.query(Player).filter(Player.name == jatekos.nev).first()
-        jatekos_db.elotte_levo_kartyak.append(kivalasztott_kartya)
+        player_db = db.query(DBPlayer).filter(DBPlayer.name == player.name).first()
+        player_db.front_cards.append(selected_card)
 
         db.commit()
 
-        if self.state.kerdeses_kartya.allat_tipus not in jatekos.elotte_levo_kartyak:
-            jatekos.elotte_levo_kartyak[self.state.kerdeses_kartya.allat_tipus] = 1
+        if self.state.question_card.type not in player.cards_in_front:
+            player.cards_in_front[self.state.question_card.type] = 1
 
         else:
-            jatekos.elotte_levo_kartyak[self.state.kerdeses_kartya.allat_tipus] += 1
+            player.cards_in_front[self.state.question_card.type] += 1
 
-        self.state.aktiv_jatekos = jatekos
+        self.state.active_player = player

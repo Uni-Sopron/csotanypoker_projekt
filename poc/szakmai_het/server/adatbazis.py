@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.associationproxy import association_proxy
 from typing import Optional
+
 engine = create_engine("sqlite:///game.db")
 Base = declarative_base()
 
@@ -17,34 +18,37 @@ Base = declarative_base()
 class PlayerHandCard(Base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
     __tablename__ = "player_hand_cards"
     player_name = Column(String(50), ForeignKey("players.name"), primary_key=True)
     card_name = Column(String(100), ForeignKey("cards.name"), primary_key=True)
 
-    player = relationship("Player", back_populates="kezben_levo_kapcsolatok")
-    card = relationship("Card", back_populates="kezben_levo_kapcsolatok")
+    player = relationship("DBPlayer", back_populates="hand_card_links")
+    card = relationship("DBCard", back_populates="hand_card_links")
 
 
 class PlayerFrontCard(Base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
     __tablename__ = "player_front_cards"
     player_name = Column(String(50), ForeignKey("players.name"), primary_key=True)
     card_name = Column(String(100), ForeignKey("cards.name"), primary_key=True)
 
-    player = relationship("Player", back_populates="elotte_levo_kapcsolatok")
-    card = relationship("Card", back_populates="elotte_levo_kapcsolatok")
+    player = relationship("DBPlayer", back_populates="front_card_links")
+    card = relationship("DBCard", back_populates="front_card_links")
 
 
 class CardHolder(Base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
     __tablename__ = "cardholders"
     card_name = Column(String(100), ForeignKey("cards.name"), primary_key=True)
     player_name = Column(String(50), ForeignKey("players.name"), primary_key=True)
 
-    card = relationship("Card", back_populates="volt_ennel_kapcsolatok")
-    player = relationship("Player", back_populates="volt_nala_kapcsolatok")
+    card = relationship("DBCard", back_populates="previous_holder_links")
+    player = relationship("DBPlayer", back_populates="previously_held_card_links")
 
 
 class User(Base):
@@ -55,7 +59,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
 
     current_room = relationship("Room", back_populates="users")
-    player = relationship("Player", back_populates="user", uselist=False)
+    player = relationship("DBPlayer", back_populates="user", uselist=False)
 
     def set_current_room_id(self, room_id: Optional[str]) -> None:
         self.current_room_id = room_id
@@ -79,104 +83,104 @@ class Room(Base):
         self.game_started = game_started
 
 
-class Card(Base):
+class DBCard(Base):
     __tablename__ = "cards"
 
     name = Column(String(100), primary_key=True)
 
-    kezben_levo_kapcsolatok = relationship("PlayerHandCard", back_populates="card")
-    elotte_levo_kapcsolatok = relationship("PlayerFrontCard", back_populates="card")
-    volt_ennel_kapcsolatok = relationship("CardHolder", back_populates="card")
+    hand_card_links = relationship("PlayerHandCard", back_populates="card")
+    front_card_links = relationship("PlayerFrontCard", back_populates="card")
+    previous_holder_links = relationship("CardHolder", back_populates="card")
 
-    players_hand = association_proxy("kezben_levo_kapcsolatok", "player")
-    players_front = association_proxy("elotte_levo_kapcsolatok", "player")
-    volt_ennel_mar = association_proxy(
-    "volt_ennel_kapcsolatok",
-    "player",
-    creator=lambda player: CardHolder(player=player)
-)
+    players_hand = association_proxy("hand_card_links", "player")
+    players_front = association_proxy("front_card_links", "player")
+    previous_holders = association_proxy(
+        "previous_holder_links",
+        "player",
+        creator=lambda player: CardHolder(player=player),
+    )
 
     questioned_in_games = relationship(
         "Game",
-        foreign_keys="[Game.kerdeses_kartya_name]",
-        back_populates="kerdeses_kartya",
+        foreign_keys="[Game.questioned_card_name]",
+        back_populates="questioned_card",
     )
 
-    def get_volt_ennel_mar(self):
-        return [player.name for player in self.volt_ennel_mar]
+    def get_previous_holders(self):
+        return [player.name for player in self.previous_holders]
 
-    def add_volt_ennel_mar(self, player):
-        if player not in self.volt_ennel_mar:
-            self.volt_ennel_mar.append(player)
+    def add_previous_holder(self, player):
+        if player not in self.previous_holders:
+            self.previous_holders.append(player)
 
 
-class Player(Base):
+class DBPlayer(Base):
     __tablename__ = "players"
 
     name = Column(String(50), ForeignKey("users.username"), primary_key=True)
-    allitas = Column(String(200), nullable=True)
+    statement = Column(String(200), nullable=True)
 
-    kezben_levo_kapcsolatok = relationship("PlayerHandCard", back_populates="player", cascade="all, delete-orphan")
-
-    kezben_levo_lapok = association_proxy(
-        "kezben_levo_kapcsolatok",
-        "card",
-        creator=lambda card: PlayerHandCard(card=card)
+    hand_card_links = relationship(
+        "PlayerHandCard", back_populates="player", cascade="all, delete-orphan"
     )
-    elotte_levo_kapcsolatok = relationship("PlayerFrontCard", back_populates="player")
-    volt_nala_kapcsolatok = relationship("CardHolder", back_populates="player")
 
-   
-    elotte_levo_kartyak = association_proxy(
-    "elotte_levo_kapcsolatok",
-    "card",
-    creator=lambda card: PlayerFrontCard(card=card)
-)
-    volt_nala_mar = association_proxy(
-    "volt_nala_kapcsolatok",
-    "card",
-    creator=lambda card: CardHolder(card=card)
-)
+    hand_cards = association_proxy(
+        "hand_card_links",
+        "card",
+        creator=lambda card: PlayerHandCard(card=card),
+    )
+    front_card_links = relationship("PlayerFrontCard", back_populates="player")
+    previously_held_card_links = relationship("CardHolder", back_populates="player")
+
+    front_cards = association_proxy(
+        "front_card_links",
+        "card",
+        creator=lambda card: PlayerFrontCard(card=card),
+    )
+    previously_held_cards = association_proxy(
+        "previously_held_card_links", "card", creator=lambda card: CardHolder(card=card)
+    )
 
     user = relationship("User", back_populates="player")
     active_in_games = relationship(
-        "Game", foreign_keys="[Game.aktiv_jatekos_name]", back_populates="aktiv_jatekos"
+        "Game", foreign_keys="[Game.active_player_name]", back_populates="active_player"
     )
     targeted_in_games = relationship(
         "Game",
-        foreign_keys="[Game.celzott_jatekos_name]",
-        back_populates="celzott_jatekos",
+        foreign_keys="[Game.target_player_name]",
+        back_populates="target_player",
     )
 
 
 class Game(Base):
     __tablename__ = "games"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     room_id = Column(String(36), ForeignKey("rooms.room_id"), nullable=False)
-    aktiv_jatekos_name = Column(String(50), ForeignKey("players.name"), nullable=True)
-    celzott_jatekos_name = Column(String(50), ForeignKey("players.name"), nullable=True)
-    kerdeses_kartya_name = Column(String(100), ForeignKey("cards.name"), nullable=True)
-    nyertes = Column(String(50), ForeignKey("players.name"), nullable=True)
+    active_player_name = Column(String(50), ForeignKey("players.name"), nullable=True)
+    target_player_name = Column(String(50), ForeignKey("players.name"), nullable=True)
+    questioned_card_name = Column(String(100), ForeignKey("cards.name"), nullable=True)
+    winner = Column(String(50), ForeignKey("players.name"), nullable=True)
 
     room = relationship("Room", back_populates="game")
-    aktiv_jatekos = relationship(
-        "Player", foreign_keys=[aktiv_jatekos_name], back_populates="active_in_games"
+    active_player = relationship(
+        "DBPlayer", foreign_keys=[active_player_name], back_populates="active_in_games"
     )
-    celzott_jatekos = relationship(
-        "Player",
-        foreign_keys=[celzott_jatekos_name],
+    target_player = relationship(
+        "DBPlayer",
+        foreign_keys=[target_player_name],
         back_populates="targeted_in_games",
     )
-    kerdeses_kartya = relationship(
-        "Card",
-        foreign_keys=[kerdeses_kartya_name],
+    questioned_card = relationship(
+        "DBCard",
+        foreign_keys=[questioned_card_name],
         back_populates="questioned_in_games",
     )
 
 
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
+
 
 def get_db_session() -> Session:
     return Session()
