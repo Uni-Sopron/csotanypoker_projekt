@@ -1,14 +1,16 @@
+from typing import Any, List, Optional, Tuple
+
 import pygame
+
 from csotanypoker.kliens.client import NetworkManager
-from typing import Tuple, Optional
-from csotanypoker.kliens.colors_and_sizes import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from csotanypoker.kliens.colors_and_sizes import (FPS, SCREEN_HEIGHT,
+                                                  SCREEN_WIDTH)
 from csotanypoker.kliens.end_screen import EndScreen
-from csotanypoker.kliens.waiting_screen import WaitingScreen
+from csotanypoker.kliens.game_screen import GameScreen
 from csotanypoker.kliens.loading_screen import LoadingScreen
 from csotanypoker.kliens.login_screen import LoginScreen
-from csotanypoker.kliens.game_screen import GameScreen
+from csotanypoker.kliens.waiting_screen import WaitingScreen
 from csotanypoker.models.model import GameState
-from typing import Tuple, Optional, List, Any
 
 
 class GameController:

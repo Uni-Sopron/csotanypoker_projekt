@@ -1,5 +1,7 @@
-import pygame
 import os
+
+import pygame
+
 from csotanypoker.kliens.colors_and_sizes import FONT_SMALL
 
 

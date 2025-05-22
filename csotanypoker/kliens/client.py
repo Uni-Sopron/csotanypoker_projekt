@@ -1,6 +1,8 @@
+from typing import Any, Dict, List
+
 import socketio
-from typing import Dict, Any, List
-from csotanypoker.models.model import Player, Card
+
+from csotanypoker.models.model import Card, Player
 
 
 class NetworkManager:

@@ -1,24 +1,14 @@
-from flask import Flask, request, session
-from flask_socketio import SocketIO, emit, join_room
 import uuid
 from typing import Optional
+
+from flask import Flask, request, session
+from flask_socketio import SocketIO, emit, join_room
 from sqlalchemy.orm import Session
 
-
-from csotanypoker.server.jatek_hatter import GameLogic
 from csotanypoker.models.model import Player
-
-from csotanypoker.server.adatbazis import (
-    Game,
-    User,
-    Room,
-    DBCard,
-    DBPlayer,
-    get_db_session,
-    Base,
-    engine,
-)
-
+from csotanypoker.server.adatbazis import (Base, DBCard, DBPlayer, Game, Room,
+                                           User, engine, get_db_session)
+from csotanypoker.server.jatek_hatter import GameLogic
 
 app = Flask(__name__)
 app.secret_key = "titkos_kulcs"  # Secret key needed for session handling

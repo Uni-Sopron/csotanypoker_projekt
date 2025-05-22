@@ -1,5 +1,5 @@
-from csotanypoker.kliens.colors_and_sizes import BLACK, WHITE
 from csotanypoker.kliens.base_screen import BaseScreen
+from csotanypoker.kliens.colors_and_sizes import BLACK, WHITE
 from csotanypoker.kliens.drawing_helpers import draw_text
 
 

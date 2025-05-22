@@ -1,15 +1,10 @@
-from sqlalchemy import (
-    create_engine,
-    Column,
-    String,
-    ForeignKey,
-    Boolean,
-    Integer,
-)
+from typing import Optional
+
+from sqlalchemy import (Boolean, Column, ForeignKey, Integer, String,
+                        create_engine)
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.ext.associationproxy import association_proxy
-from typing import Optional
 
 engine = create_engine("sqlite:///game.db")
 Base = declarative_base()
