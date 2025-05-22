@@ -1,4 +1,4 @@
-from game_controller import GameController
+from csotanypoker.kliens.game_controller import GameController
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
-from colors_and_sizes import BLACK, GRAY, WHITE
+from csotanypoker.kliens.colors_and_sizes import BLACK, GRAY, WHITE
 import pygame
-from base_screen import BaseScreen
-from drawing_helpers import draw_text
+from csotanypoker.kliens.base_screen import BaseScreen
+from csotanypoker.kliens.drawing_helpers import draw_text
 
 
 class WaitingScreen(BaseScreen):

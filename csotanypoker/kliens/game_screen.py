@@ -1,4 +1,4 @@
-from colors_and_sizes import (
+from csotanypoker.kliens.colors_and_sizes import (
     BLACK,
     GRAY,
     WHITE,
@@ -11,8 +11,8 @@ from colors_and_sizes import (
 )
 
 import pygame
-from base_screen import BaseScreen
-from drawing_helpers import draw_text, load_image, draw_image
+from csotanypoker.kliens.base_screen import BaseScreen
+from csotanypoker.kliens.drawing_helpers import draw_text, load_image, draw_image
 
 
 class GameScreen(BaseScreen):

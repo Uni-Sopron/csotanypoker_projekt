@@ -1,6 +1,6 @@
-from colors_and_sizes import BLACK, WHITE
-from base_screen import BaseScreen
-from drawing_helpers import draw_text
+from csotanypoker.kliens.colors_and_sizes import BLACK, WHITE
+from csotanypoker.kliens.base_screen import BaseScreen
+from csotanypoker.kliens.drawing_helpers import draw_text
 
 
 class EndScreen(BaseScreen):

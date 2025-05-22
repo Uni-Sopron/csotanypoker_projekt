@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BaseScreen(ABC):
     """
     Abstract base class that all game screens will inherit from.

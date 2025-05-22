@@ -1,11 +1,7 @@
 from random import shuffle, choice
 from sqlalchemy.orm import Session
-from adatbazis import DBCard, DBPlayer, get_db_session
-import sys
-import os
-
-sys.path.append(os.path.abspath(".."))
-from models.model import Card, GameState
+from csotanypoker.server.adatbazis import DBCard, DBPlayer, get_db_session
+from csotanypoker.models.model import Card, GameState
 
 
 TYPES = [

@@ -1,6 +1,6 @@
-from base_screen import BaseScreen
-from colors_and_sizes import BLACK, WHITE
-from drawing_helpers import draw_text
+from csotanypoker.kliens.base_screen import BaseScreen
+from csotanypoker.kliens.colors_and_sizes import BLACK, WHITE
+from csotanypoker.kliens.drawing_helpers import draw_text
 
 
 class LoadingScreen(BaseScreen):
@@ -10,7 +10,7 @@ class LoadingScreen(BaseScreen):
     def draw(self):
         """Draw the loading screen"""
         self.client.window.fill(WHITE)
-        draw_text(self.client.window,"Betöltés...", BLACK, 400, 300, True)
+        draw_text(self.client.window, "Betöltés...", BLACK, 400, 300, True)
         print("Betöltés...")
 
     def handle_mouse_click(self, pos):

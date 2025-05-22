@@ -1,11 +1,6 @@
-import os
-import sys
 import socketio
 from typing import Dict, Any, List
-
-sys.path.append(os.path.abspath(".."))
-
-from models.model import Player, Card
+from csotanypoker.models.model import Player, Card
 
 
 class NetworkManager:
@@ -219,9 +214,7 @@ class NetworkManager:
             )
             print(f"kerdeses_kartya: {self.game_client.game_state.question_card.type}")
             print(f"kerdeses_kartya: {self.game_client.game_state.question_card.index}")
-            self.game_client.selected_card = Card(
-                data["card_type"], data["card_index"]
-            )
+            self.game_client.selected_card = Card(data["card_type"], data["card_index"])
             self.game_client.selected_card.visited_already = data["visited_by"]
 
             self.game_client.game_state.question_card.visited_already = data[

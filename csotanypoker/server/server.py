@@ -5,14 +5,19 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 
-from jatek_hatter import GameLogic
-import sys
-import os
+from csotanypoker.server.jatek_hatter import GameLogic
+from csotanypoker.models.model import Player
 
-sys.path.append(os.path.abspath(".."))
-from models.model import Player
-
-from adatbazis import Game, User, Room, DBCard, DBPlayer, get_db_session, Base, engine
+from csotanypoker.server.adatbazis import (
+    Game,
+    User,
+    Room,
+    DBCard,
+    DBPlayer,
+    get_db_session,
+    Base,
+    engine,
+)
 
 
 app = Flask(__name__)
