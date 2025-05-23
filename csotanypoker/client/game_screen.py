@@ -114,7 +114,7 @@ class GameScreen(BaseScreen):
                     False,
                     medium_font,
                 )
-                print(f"megejelenitö {player.card_count}")
+
                 draw_text(
                     self.client.window,
                     f"lapszam: {player.card_count}",

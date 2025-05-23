@@ -10,7 +10,7 @@ from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
 from csotanypoker.client.login_screen import LoginScreen
 from csotanypoker.client.waiting_screen import WaitingScreen
-from csotanypoker.models.model import GameState
+from csotanypoker.models.gamestate import GameState
 
 
 class GameController:

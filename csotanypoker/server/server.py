@@ -5,7 +5,7 @@ from flask import Flask, request, session
 from flask_socketio import SocketIO, emit, join_room
 from sqlalchemy.orm import Session
 
-from csotanypoker.models.model import Player
+from csotanypoker.models.player import Player
 from csotanypoker.server.database import (Base, DBCard, DBPlayer, Game, Room,
                                            User, engine, get_db_session)
 from csotanypoker.server.game_background import GameLogic
