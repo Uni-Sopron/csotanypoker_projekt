@@ -2,14 +2,14 @@ from typing import Any, List, Optional, Tuple
 
 import pygame
 
-from csotanypoker.kliens.client import NetworkManager
-from csotanypoker.kliens.colors_and_sizes import (FPS, SCREEN_HEIGHT,
+from csotanypoker.client.client import NetworkManager
+from csotanypoker.client.constans import (FPS, SCREEN_HEIGHT,
                                                   SCREEN_WIDTH)
-from csotanypoker.kliens.end_screen import EndScreen
-from csotanypoker.kliens.game_screen import GameScreen
-from csotanypoker.kliens.loading_screen import LoadingScreen
-from csotanypoker.kliens.login_screen import LoginScreen
-from csotanypoker.kliens.waiting_screen import WaitingScreen
+from csotanypoker.client.end_screen import EndScreen
+from csotanypoker.client.game_screen import GameScreen
+from csotanypoker.client.loading_screen import LoadingScreen
+from csotanypoker.client.login_screen import LoginScreen
+from csotanypoker.client.waiting_screen import WaitingScreen
 from csotanypoker.models.model import GameState
 
 

@@ -2,7 +2,7 @@ import os
 
 import pygame
 
-from csotanypoker.kliens.colors_and_sizes import FONT_SMALL
+from csotanypoker.client.constans import FONT_SMALL
 
 
 def draw_text(surface, text, color, x, y, centered=False, font=None):
@@ -16,12 +16,22 @@ def draw_text(surface, text, color, x, y, centered=False, font=None):
     surface.blit(text_surface, text_rect)
 
 
-def load_image(name, scale_ratio=None, size=None, logo=False):
-    if logo:
-        path = os.path.join("csotanypoker", "kliens", "kepek", f"{name}_logo.png")
-    else:
-        path = os.path.join("csotanypoker", "kliens", "kepek", f"{name}.png")
-
+def load_image(
+    name,
+    type,
+    scale_ratio=None,
+    size=None,
+):
+    if type == "logo":
+        path = os.path.join(
+            "csotanypoker", "client", "images", "logos", f"{name}_logo.png"
+        )
+    elif type == "card":
+        path = os.path.join("csotanypoker", "client", "images", "cards", f"{name}.png")
+    elif type == "button":
+        path = os.path.join(
+            "csotanypoker", "client", "images", "ui-elements", "buttons", f"{name}.png"
+        )
     image = pygame.image.load(path).convert_alpha()
 
     if scale_ratio is not None:

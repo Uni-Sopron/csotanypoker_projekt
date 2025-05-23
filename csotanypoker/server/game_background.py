@@ -3,7 +3,7 @@ from random import choice, shuffle
 from sqlalchemy.orm import Session
 
 from csotanypoker.models.model import Card, GameState
-from csotanypoker.server.adatbazis import DBCard, DBPlayer, get_db_session
+from csotanypoker.server.database import DBCard, DBPlayer, get_db_session
 
 TYPES = [
     "csotany",

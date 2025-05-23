@@ -1,9 +1,9 @@
 import pygame
 
-from csotanypoker.kliens.base_screen import BaseScreen
-from csotanypoker.kliens.colors_and_sizes import (BLACK, FONT_SMALL, GRAY, RED,
+from csotanypoker.client.base_screen import BaseScreen
+from csotanypoker.client.constans import (BLACK, FONT_SMALL, GRAY, RED,
                                                   WHITE)
-from csotanypoker.kliens.drawing_helpers import draw_text
+from csotanypoker.client.drawing_helpers import draw_text
 
 
 class LoginScreen(BaseScreen):

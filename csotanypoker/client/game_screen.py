@@ -1,11 +1,11 @@
 import pygame
 
-from csotanypoker.kliens.base_screen import BaseScreen
-from csotanypoker.kliens.colors_and_sizes import (ANIMALS, BLACK, FONT_MEDIUM,
+from csotanypoker.client.base_screen import BaseScreen
+from csotanypoker.client.constans import (ANIMALS, BLACK, FONT_MEDIUM,
                                                   FONT_SMALL, GRAY, RED,
                                                   SCREEN_HEIGHT, SCREEN_WIDTH,
                                                   WHITE)
-from csotanypoker.kliens.drawing_helpers import (draw_image, draw_text,
+from csotanypoker.client.drawing_helpers import (draw_image, draw_text,
                                                  load_image)
 
 
@@ -43,7 +43,7 @@ class GameScreen(BaseScreen):
 
         logo_images = {}
         for allat in ANIMALS:
-            logo_images[allat] = load_image(allat, size=(40, 40), logo=True)
+            logo_images[allat] = load_image(allat,type="logo", size=(40, 40))
 
         while self.client.screen != "game_over":
             self.client.window.fill(WHITE)
@@ -236,9 +236,9 @@ class GameScreen(BaseScreen):
 
             x_kep = SCREEN_WIDTH // 2
 
-            for type, lapok in lap_csoportok.items():
+            for animal_type, lapok in lap_csoportok.items():
                 meret_arany = min(SCREEN_WIDTH / 1600, SCREEN_HEIGHT / 1600)
-                kep = load_image(type, scale_ratio=meret_arany)
+                kep = load_image(animal_type, "card",scale_ratio=meret_arany)
                 kartya_meret = kep.get_size()
 
                 for i, lap in enumerate(lapok):
@@ -273,6 +273,7 @@ class GameScreen(BaseScreen):
                 if self.client.game_state.question_card.type == "kerdojel":
                     kozepso_lap_image = load_image(
                         self.client.game_state.question_card.type,
+                        type="card",
                         size=(card_width, card_height),
                     )
                     draw_image(
@@ -288,7 +289,7 @@ class GameScreen(BaseScreen):
                         self.client.game_state.targeted_player.name
                         == self.client.user.name
                     ):
-                        pipa_img = load_image("pipa", size=(40, 40))
+                        pipa_img = load_image("pipa", type="button",size=(40, 40))
                         self.checkmark_rect = pygame.Rect(
                             (card_x - 50, card_y + (card_height // 2) - 20),
                             (40, 40),
@@ -302,7 +303,7 @@ class GameScreen(BaseScreen):
                             centered=False,
                         )
 
-                        x_img = load_image("x", size=(40, 40))
+                        x_img = load_image("x", type="button", size=(40, 40))
                         self.cross_rect = pygame.Rect(
                             (
                                 card_x + card_width + 10,
@@ -343,7 +344,7 @@ class GameScreen(BaseScreen):
 
                 elif self.client.game_state.question_card:
                     lap_img = load_image(
-                        self.client.game_state.question_card.type,
+                        self.client.game_state.question_card.type,"card",
                         size=(card_width, card_height),
                     )
                     draw_image(
