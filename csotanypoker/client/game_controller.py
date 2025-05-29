@@ -3,12 +3,12 @@ from typing import Any, List, Optional, Tuple
 import pygame
 
 from csotanypoker.client.client import NetworkManager
-from csotanypoker.client.constans import (FPS, SCREEN_HEIGHT,
-                                                  SCREEN_WIDTH)
+from csotanypoker.client.constans import FPS, SCREEN_HEIGHT, SCREEN_WIDTH
 from csotanypoker.client.end_screen import EndScreen
 from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
 from csotanypoker.client.login_screen import LoginScreen
+from csotanypoker.client.rooms_screen import RoomsScreen
 from csotanypoker.client.waiting_screen import WaitingScreen
 from csotanypoker.models.gamestate import GameState
 
@@ -40,9 +40,8 @@ class GameController:
         self.visited_players = []
         self.room_input: str = ""
         self.room_active: bool = False
-        self.selected_room: Optional[int] = (
-            None  # Index of the room selected by the user
-        )
+        self.selected_room = None  # Index of the room selected by the user
+
         self.user = None
         # Handling error messages
         self.login_error: str = ""
@@ -54,11 +53,16 @@ class GameController:
         self.network: NetworkManager = NetworkManager(self)
         self.room_id: Optional[str] = None
         self.room_name: str = ""  # Current room name
-
+        self.room_list = []
         self.statement = None
         self.dropdown_state = False
         self.login = None
-        # self.keret_szin = RED  # Piros keret a kiválasztott elemhez
+        self.loading = LoadingScreen(self)
+        self.login = LoginScreen(self)
+        self.rooms_screen = RoomsScreen(self)
+        self.waiting = WaitingScreen(self)
+        self.game = GameScreen(self)
+        self.game_over = EndScreen(self)
 
     @property
     def game_state(self) -> GameState:
@@ -361,12 +365,15 @@ class GameController:
         running: bool = True
         while running:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:  # If the user closes the window
+                if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:  # Mouse click
-                    self.handle_mouse_click(event.pos)  # Process click position
-                elif event.type == pygame.KEYDOWN:  # Key press
-                    self.handle_key_press(event)  # Handle key press
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button in [1, 3]:
+                        self.handle_mouse_click(event.pos)
+                elif event.type == pygame.KEYDOWN:
+                    self.handle_key_press(event)
+                elif event.type == pygame.MOUSEWHEEL:
+                    self.rooms_screen.handle_mouse_wheel(event)
 
             # Render the current screen
             self.draw_screen()
@@ -387,14 +394,11 @@ class GameController:
         if self.screen == "login":
             self.input_active = self.login.handle_mouse_click(pos)
 
-        elif self.screen in ["waiting", "game"]:
-            # Handle the leave button
-            if self.leave_button.collidepoint(pos) and self.room_id:
-                self.network.leave_room(self.room_id)  # Leave the room
-                self.room_id = None
-                self.room_name = ""
-                self.screen = "lobby"
-                self.network.get_rooms()
+        if self.screen == "rooms_screen":
+            self.rooms_screen.handle_mouse_click(pos)
+
+        if self.screen == "waiting":
+            self.waiting.handle_mouse_click(pos)
 
         # Handle player clicks during the game
         if self.screen == "game":
@@ -424,34 +428,26 @@ class GameController:
         if self.screen == "login" and self.input_active:
             self.login.handle_key_press(event)
 
-        elif self.screen == "lobby" and self.room_active:
-            if event.key == pygame.K_RETURN:
-                if self.room_input:
-                    self.network.create_room(self.room_input)  # Create a new room
-                    self.room_input = ""
-            elif event.key == pygame.K_BACKSPACE:
-                self.room_input = self.room_input[:-1]
-            else:
-                self.room_input += event.unicode
+        elif self.screen == "rooms_screen":
+            self.rooms_screen.handle_key_press(event)
 
     def draw_screen(self) -> None:
         """
         Draw the appropriate screen based on the game state.
         """
         if self.screen == "login":
-            self.login = LoginScreen(self)
             self.login.draw()
         elif self.screen == "loading":
-            self.loading = LoadingScreen(self)
             self.loading.draw()
+
+        elif self.screen == "rooms_screen":
+            self.rooms_screen.draw()
+
         elif self.screen == "waiting":
-            self.waiting = WaitingScreen(self)
             self.waiting.draw()
         elif self.screen == "game":
-            self.game = GameScreen(self)
             self.game.draw()
         elif self.screen == "rejoin_prompt":
             self.draw_rejoin_prompt()
         elif self.screen == "game_over":
-            self.game_over = EndScreen(self)
             self.game_over.draw()

@@ -4,6 +4,7 @@ import socketio
 
 from csotanypoker.models.card import Card
 from csotanypoker.models.player import Player
+from csotanypoker.models.room import Room
 
 
 class NetworkManager:
@@ -36,8 +37,17 @@ class NetworkManager:
             """
             print(f"Login successful: {data}")
             self.game_client.username = data["username"]
+            for room_id, room_info in data["rooms"].items():
+                room = Room(
+                    room_id,
+                    room_info["name"],
+                    max_player_count=room_info["player_count"],
+                )
+                room.player_count = room_info["actual_player_count"]
+                room.password_protected = room_info["password_protected"]
+                self.game_client.room_list.append(room)
 
-            self.game_client.screen = "waiting"
+            self.game_client.screen = "rooms_screen"
 
         @self.sio.on("login_error")
         def on_login_error(data: Dict[str, str]) -> None:
@@ -49,7 +59,7 @@ class NetworkManager:
             """
             print(f"Login error: {data['message']}")
             self.game_client.login_error = data["message"]
-            self.game_client.error_display_time = 3.0  # Display for 3 seconds
+            self.game_client.error_display_time = 3.0
 
         @self.sio.on("joined_room")
         def on_joined_room(data: Dict[str, Any]) -> None:
@@ -66,9 +76,18 @@ class NetworkManager:
             self.game_client.game_state.players = [
                 Player(player) for player in data["players"]
             ]
+
+            self.game_client.selected_room = Room(
+                data["room_id"],
+                data["name"],
+                max_player_count=data["max_player_count"],
+            )
+            self.game_client.selected_room.password = data.get("password", None)
+            self.game_client.selected_room.users = self.game_client.game_state.players
             for player in self.game_client.game_state.players:
                 if player.name == data["username"]:
                     self.game_client.user = player
+            self.game_client.screen = "waiting"
 
         @self.sio.on("player_joined")
         def on_player_joined(data: Dict[str, Any]) -> None:
@@ -107,18 +126,6 @@ class NetworkManager:
             self.game_client.message = "A játék elkezdődött!"
             self.game_client.message_display_time = 3.0
 
-        @self.sio.on("error")
-        def on_error(data: Dict[str, str]) -> None:
-            """
-            Handle general errors.
-
-            Args:
-                data: A dictionary containing error message
-            """
-            print(f"Error: {data['message']}")
-            self.game_client.message = data["message"]
-            self.game_client.message_display_time = 3.0
-
         @self.sio.on("card_placed")
         def on_card_placed(data: Dict[str, Any]) -> None:
             """
@@ -150,38 +157,27 @@ class NetworkManager:
 
         @self.sio.on("player_data")
         def player_data(data: Dict[str, Any]) -> None:
-            """
-            Handle player data.
-
-            Args:
-                data: A dictionary containing player data
-            """
-
             kezbenlevo_adatok = data.get("cards_in_hand", [])
+
             for player in self.game_client.game_state.players:
                 if player.name == data.get("starting_player", "ismeretlen"):
                     self.game_client.game_state.active_player = player
-                    print(self.game_client.game_state.active_player.name)
+                    print(f"Aktív játékos: {player.name}")
+
                 if player.name == self.game_client.username:
                     self.game_client.user.cards_in_hand = []
                     for k in kezbenlevo_adatok:
-                        name, sorszam = k.rsplit("_", 1)
-
+                        *name_parts, sorszam = k.split("_")
+                        name = "_".join(name_parts)
                         self.game_client.user.cards_in_hand.append(
                             Card(name, int(sorszam))
                         )
+                player_info = data.get("player_data", {}).get(player.name)
+                if player_info:
+                    player.cards_in_front = player_info.get("cards_in_front", [])
+                    player.card_count = player_info.get("card_count", 0)
+                    print(f"{player.name} - kártyák száma: {player.card_count}")
 
-                player.cards_in_front = data.get("player_data", {})[player.name][
-                    "cards_in_front"
-                ]
-                player.card_count = data.get("player_data", {})[player.name][
-                    "card_count"
-                ]
-                print(
-                    "kartyak szama: ",
-                    data.get("player_data", {})[player.name]["card_count"],
-                )
-                print(player.card_count)
             self.game_client.passed = False
 
         @self.sio.on("card_passing")
@@ -215,8 +211,6 @@ class NetworkManager:
             self.game_client.game_state.question_card = Card(
                 data["card_type"], data["card_index"]
             )
-            print(f"kerdeses_kartya: {self.game_client.game_state.question_card.type}")
-            print(f"kerdeses_kartya: {self.game_client.game_state.question_card.index}")
             self.game_client.selected_card = Card(data["card_type"], data["card_index"])
             self.game_client.selected_card.visited_already = data["visited_by"]
 
@@ -234,11 +228,6 @@ class NetworkManager:
             self.game_client.message = data["message"]
             self.game_client.dropdown_state = True
 
-        @self.sio.on("hiba")
-        def hiba(data) -> None:
-            self.game_client.message = data["message"]
-            self.game_client.passed = False
-
         @self.sio.on("game_over")
         def game_over(data) -> None:
             if self.game_client.user.name == data["losing_player"]:
@@ -246,6 +235,67 @@ class NetworkManager:
             else:
                 self.game_client.message = "Gratulálok! Nyertél!"
             self.game_client.screen = "game_over"
+
+        @self.sio.on("rooms_updated")
+        def on_rooms_updated(data: Dict[str, Any]) -> None:
+            self.game_client.room_list.clear()
+
+            for room_id, room_info in data["rooms"].items():
+                room = Room(
+                    room_id,
+                    room_info["name"],
+                    max_player_count=room_info["player_count"],
+                )
+                room.player_count = room_info["actual_player_count"]
+                room.password_protected = room_info["password_protected"]
+                self.game_client.room_list.append(room)
+
+        @self.sio.on("room_players_updated")
+        def on_room_players_updated(data: Dict[str, Any]) -> None:
+            if (
+                self.game_client.selected_room
+                and self.game_client.selected_room.room_id == data["room_id"]
+            ):
+                self.game_client.game_state.players = [
+                    Player(player) for player in data["players"]
+                ]
+                self.game_client.selected_room.users = (
+                    self.game_client.game_state.players
+                )
+
+                for player in self.game_client.game_state.players:
+                    if player.name == self.game_client.username:
+                        self.game_client.user = player
+
+        @self.sio.on("join_room_error")
+        def on_join_room_error(data: Dict[str, str]) -> None:
+            self.game_client.message = data["message"]
+            self.game_client.message_display_time = 3.0
+
+        @self.sio.on("left_room")
+        def on_left_room(data: Dict[str, str]) -> None:
+            self.game_client.message = data["message"]
+            self.game_client.message_display_time = 3.0
+            self.game_client.screen = "rooms_screen"
+            self.game_client.selected_room = None
+            self.game_client.room_id = None
+            self.game_client.room_name = None
+
+        @self.sio.on("player_left_room")
+        def on_player_left_room(data: Dict[str, Any]) -> None:
+            self.game_client.game_state.players = [
+                Player(player) for player in data["players"]
+            ]
+
+            if self.game_client.selected_room:
+                self.game_client.selected_room.users = (
+                    self.game_client.game_state.players
+                )
+            self.game_client.message = data["message"]
+            self.game_client.message_display_time = 40
+
+    def leave_room(self) -> None:
+        self.sio.emit("leave_room", {})
 
     def connect(self, server_url: str = "http://localhost:5000") -> None:
         """
@@ -262,11 +312,6 @@ class NetworkManager:
             self.game_client.message = f"Kapcsolódási hiba: {e}"
             self.game_client.message_display_time = 3.0
 
-    def disconnect(self) -> None:
-        """Disconnect from the server."""
-        if self.sio.connected:
-            self.sio.disconnect()
-
     def login(self, username: str) -> None:
         """
         Log in to the server with the provided username.
@@ -275,6 +320,9 @@ class NetworkManager:
             username (str): The username provided by the user.
         """
         self.sio.emit("login", {"username": username})
+
+    def join_room(self, room_id: str, password: str = "") -> None:
+        self.sio.emit("join_room", {"room_id": room_id, "password": password})
 
     def guess(self, room_id: str, guess: str) -> None:
         self.sio.emit("guess", {"room_id": room_id, "guess": guess})
@@ -301,3 +349,15 @@ class NetworkManager:
 
     def passing(self, room_id: str) -> None:
         self.sio.emit("pass", {"room_id": room_id})
+
+    def create_room(
+        self, room_name: str, password_protected, max_player_count: int = 4
+    ) -> None:
+        self.sio.emit(
+            "create_room",
+            {
+                "room_name": room_name,
+                "password_protected": password_protected,
+                "max_player_count": max_player_count,
+            },
+        )

@@ -3,7 +3,7 @@ from random import choice, shuffle
 from sqlalchemy.orm import Session
 
 from csotanypoker.models.card import Card
-from csotanypoker.models.gamestate import  GameState
+from csotanypoker.models.gamestate import GameState
 from csotanypoker.server.database import DBCard, DBPlayer, get_db_session
 
 TYPES = [
@@ -54,8 +54,12 @@ class GameLogic:
         return self.state.active_player.cards_in_hand == []
 
     def has_4_cards_in_front(self):
+        if len(self.state.players) == 2:
+            lose_count = 5
+        else:
+            lose_count = 4
         for kartya, db in self.state.active_player.cards_in_front.items():
-            if db == 4:
+            if db == lose_count:
                 return True
         return False
 

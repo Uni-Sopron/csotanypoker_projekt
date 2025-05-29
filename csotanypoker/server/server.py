@@ -1,13 +1,17 @@
+import secrets
+import string
 import uuid
 from typing import Optional
 
 from flask import Flask, request, session
-from flask_socketio import SocketIO, emit, join_room
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from sqlalchemy.orm import Session
 
 from csotanypoker.models.player import Player
-from csotanypoker.server.database import (Base, DBCard, DBPlayer, Game, Room,
-                                           User, engine, get_db_session)
+from csotanypoker.models.room import Room
+from csotanypoker.models.user import User
+from csotanypoker.server.database import (Base, DBCard, DBPlayer, DBRoom,
+                                          DBUser, Game, engine, get_db_session)
 from csotanypoker.server.game_background import GameLogic
 
 app = Flask(__name__)
@@ -16,6 +20,12 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 sockets = {}
+
+ROOMS = []
+USERS = []
+
+
+game_instances = {}
 
 
 def reset_database():  # this is only needed for testing
@@ -26,9 +36,6 @@ def reset_database():  # this is only needed for testing
 @socketio.on("connect")
 def handle_connect() -> None:
     print("Kliens csatlakozott")
-
-
-game_instance = None  # Initialize the game instance
 
 
 @socketio.on("login")
@@ -43,12 +50,12 @@ def handle_login(data: dict) -> None:
         data (dict): Dictionary containing the username.
     """
     db: Session = get_db_session()
-    user: Optional[User] = (
-        db.query(User).filter(User.username == data["username"]).first()
+    dbuser: Optional[DBUser] = (
+        db.query(DBUser).filter(DBUser.username == data["username"]).first()
     )
     username: str = data["username"]
 
-    if user and user.is_active:
+    if dbuser and dbuser.is_active:
         emit(
             "login_error",
             {"message": "Ez a felhasználónév már foglalt."},
@@ -60,66 +67,266 @@ def handle_login(data: dict) -> None:
     session["socket_id"] = request.sid
     sockets[username] = session["socket_id"]
     session["username"] = username
-    if not user:
-        db.add(User(username=username, is_active=True))
+    if not dbuser:
+        db.add(DBUser(username=username, is_active=True))
     else:
-        user.set_active(True)
+        dbuser.set_active(True)
 
-    room = db.query(Room).filter(Room.name == "game").first()
-    if not room:
-        # If such room doesn't exist yet, we create it
-        room_id: str = str(uuid.uuid4())
-        room = Room(room_id=room_id, name="game")
-        db.add(room)
-        db.commit()
+    dbuser = db.query(DBUser).filter(DBUser.username == username).first()
 
-    user = db.query(User).filter(User.username == username).first()
-
-    user.current_room_id = room.room_id
     db.commit()
 
-    join_room(room.room_id)
+    rooms_data = get_rooms_data()
+    emit("login_success", {"username": username, "rooms": rooms_data})
 
-    # Query players
-    player_names: list = [user.username for user in room.users if user.is_active]
-    print("nevek", player_names)
-    emit("login_success", {"username": username, "screen_state": "waiting"})
-    emit(
-        "player_joined",
-        {
-            "players": player_names,
-            "joined_player": username,
-        },
-        room=room.room_id,
+    USERS.append(User(username=username, is_active=True, current_room_id=None))
+    db.close()
+
+
+def get_rooms_data():
+    rooms_data = {}
+    for room in ROOMS:
+        if not room.game_started:
+            rooms_data[room.room_id] = {
+                "name": room.name,
+                "player_count": room.max_player_count,
+                "password_protected": True if room.password else False,
+                "actual_player_count": len([user for user in room.users if user]),
+            }
+    return rooms_data
+
+
+def broadcast_room_list_update():
+    rooms_data = get_rooms_data()
+    for user in USERS:
+        if user.username in sockets and not user.current_room_id:
+            socketio.emit(
+                "rooms_updated", {"rooms": rooms_data}, to=sockets[user.username]
+            )
+
+
+@socketio.on("leave_room")
+def handle_leave_room(data: dict) -> None:
+    """
+    Handle user leaving a room
+    """
+    db: Session = get_db_session()
+    username = session.get("username")
+
+    db_user: Optional[DBUser] = (
+        db.query(DBUser).filter(DBUser.username == username).first()
     )
+
+
+    room_id = db_user.current_room_id
+
+    target_room = None
+    for room in ROOMS:
+        if room.room_id == room_id:
+            target_room = room
+            break
+
+    
+
+    user_to_remove = None
+    for user in USERS:
+        if user.username == username:
+            user_to_remove = user
+            break
+
+    if user_to_remove and user_to_remove in target_room.users:
+        target_room.users.remove(user_to_remove)
+        user_to_remove.current_room_id = None
+
+        db_user.current_room_id = None
+        db.commit()
+        leave_room(room_id)
+        emit("left_room", {"message": "Szoba elhagás"})
+
+        if target_room.users:
+            socketio.emit(
+                "player_left_room",
+                {
+                    "message": f"{username} elhagyta a szobát",
+                    "left_player": username,
+                    "players": [u.username for u in target_room.users],
+                    "max_player_count": target_room.max_player_count,
+                },
+                room=room_id,
+            )
+        else:
+           
+            ROOMS.remove(target_room)
+            print(f"Szoba törölve (üres): {target_room.name} ({room_id})")
+
+        print(f"Játékos elhagyta a szobát: {username} -> {room_id}")
+        print(
+            f"Szobában maradt játékosok: {[u.username for u in target_room.users] if target_room.users else 'Nincs'}"
+        )
+
+        broadcast_room_list_update()
+
+    db.close()
+
+
+@socketio.on("create_room")
+def create_room(data: dict) -> None:
+    db: Session = get_db_session()
+    username = session.get("username")
+
+    room_id: str = str(uuid.uuid4())
+    dbroom = DBRoom(
+        room_id=room_id, name=data["room_name"], player_count=data["max_player_count"]
+    )
+
+    password = None
+    if data["password_protected"]:
+        characters = string.ascii_letters + string.digits
+        password = "".join(secrets.choice(characters) for _ in range(12))
+        dbroom.password = password
+
+    room = Room(
+        room_id=room_id,
+        name=data["room_name"],
+        max_player_count=data["max_player_count"],
+    )
+    room.password = password
+
+    db.add(dbroom)
+    db.commit()
+
+    ROOMS.append(room)
+    join_user_to_room(room_id, username, skip_password_check=True)
+
+    broadcast_room_list_update()
+
+
+@socketio.on("join_room")
+def join_room_request(data: dict) -> None:
+    username = session.get("username")
+    room_id = data["room_id"]
+    provided_password = data.get("password", "")
+
+    if validate_room_password(room_id, provided_password):
+        join_user_to_room(room_id, username)
+    else:
+        emit("join_room_error", {"message": "Helytelen jelszó"}, to=request.sid)
+
+
+def validate_room_password(room_id: str, provided_password: str) -> bool:
+    db: Session = get_db_session()
+    room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
+
+    if not room:
+        return False
+
+    if not room.password:
+        return True
+
+    return room.password == provided_password
+
+
+def join_user_to_room(
+    room_id: str, username: str, skip_password_check: bool = False
+) -> None:
+    db: Session = get_db_session()
+    db_user: Optional[DBUser] = (
+        db.query(DBUser).filter(DBUser.username == username).first()
+    )
+    target_room = None
+    for room in ROOMS:
+        if room.room_id == room_id:
+            target_room = room
+            break
+
+
+    for user in USERS:
+        if user.username == username:
+            if user not in target_room.users:
+                target_room.users.append(user)
+            user.current_room_id = room_id
+            break
+
+    join_room(room_id)  
+    db_user.current_room_id = room_id
+    db.commit()
+    room_joined()
+    broadcast_room_list_update()
+
+
+    socketio.emit(
+        "room_players_updated",
+        {
+            "room_id": room_id,
+            "players": [u.username for u in target_room.users],
+            "max_player_count": target_room.max_player_count,
+        },
+        room=room_id,
+    )
+
+  
+    if len(target_room.users) >= target_room.max_player_count:
+        player_usernames = [user.username for user in target_room.users]
+        target_room.game_started = True  
+        socketio.emit("start_game", {"players": player_usernames}, room=room_id)
+        start_game(player_usernames, room_id)
+
+        broadcast_room_list_update()
+
+
+@socketio.on("room_join")
+def room_joined() -> None:
+    db: Session = get_db_session()
+    username = session.get("username")
+    user: Optional[DBUser] = (
+        db.query(DBUser).filter(DBUser.username == username).first()
+    )
+    current_room = None
+    for room in ROOMS:
+        if room.room_id == user.current_room_id:
+            current_room = room
+            break
+
+    player_names = [u.username for u in current_room.users]
 
     emit(
         "joined_room",
         {
-            "room_id": room.room_id,
-            "name": room.name,
+            "room_id": current_room.room_id,
+            "password": current_room.password if current_room.password else None,
+            "name": current_room.name,
             "players": player_names,
             "username": username,
+            "max_player_count": current_room.max_player_count,
         },
+        to=request.sid,
     )
 
-    # If there are enough players, the game can be started
-    if len(player_names) >= room.player_count:
-        room.game_started = True
-        db.commit()
-        emit("start_game", {"players": player_names}, room=room.room_id)
-        print("Játék elindult")
-        start_game(player_names)
 
+def get_user_room_id(username: str) -> Optional[str]:
+    db: Session = get_db_session()
+    user: Optional[DBUser] = (
+        db.query(DBUser).filter(DBUser.username == username).first()
+    )
     db.close()
+    return user.current_room_id if user else None
+
+
+def get_game_instance(room_id: str) -> Optional[GameLogic]:
+    return game_instances.get(room_id)
 
 
 @socketio.on("oke_click")
 def handle_oke_click(data: dict) -> None:
     db: Session = get_db_session()
     sid = request.sid
-    room = db.query(Room).filter(Room.name == "game").first()
+    username = session.get("username")
+    room_id = get_user_room_id(username)
+    room: DBRoom = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
+
     game = db.query(Game).filter(Game.room_id == room.room_id).first()
+    game_instance = get_game_instance(room_id)
+
     for card in game_instance.state.deck:
         if card.name == data["selected_card"]:
             game_instance.state.question_card = card
@@ -130,7 +337,8 @@ def handle_oke_click(data: dict) -> None:
 
     if not data["pass"]:
         if game_instance.has_cards_in_hand():
-            game_end()
+            game_end(room_id)
+            db.close()
             return
         game_instance.select_card(
             selected_card_id=game_instance.state.question_card.name
@@ -152,8 +360,6 @@ def handle_oke_click(data: dict) -> None:
         cards_in_hand = [
             k.name for k in game_instance.state.active_player.cards_in_hand
         ]
-        print("jatekos_neve", game_instance.state.active_player.name)
-        print("cards_in_hand", cards_in_hand)
         emit(
             "cards_in_hand",
             {
@@ -180,7 +386,7 @@ def handle_oke_click(data: dict) -> None:
             .first()
         )
         card_db.previous_holders.append(player_db)
-    emit(
+    socketio.emit(
         "card_passing",
         {
             "player_statement": data["set_card_giver"],
@@ -188,7 +394,7 @@ def handle_oke_click(data: dict) -> None:
             "targeted_player": game_instance.state.targeted_player.name,
             "visited_by": game_instance.state.question_card.visited_already,
         },
-        room=room.room_id,
+        room=room_id,
     )
 
     for j in game_instance.state.players:
@@ -224,54 +430,64 @@ def handle_oke_click(data: dict) -> None:
         else None
     )
     db.commit()
+    db.close()
 
 
-def card_content():
+def card_content(room_id: str):
     db: Session = get_db_session()
-    room = db.query(Room).filter(Room.name == "game").first()
-    emit(
-        "card_content",
-        {
-            "card_type": game_instance.state.question_card.type,
-            "card_index": game_instance.state.question_card.index,
-            "visited_by": game_instance.state.question_card.visited_already,
-        },
-        room=room.room_id,
-    )
+    game_instance = get_game_instance(room_id)
+
+    if game_instance:
+        socketio.emit(
+            "card_content",
+            {
+                "card_type": game_instance.state.question_card.type,
+                "card_index": game_instance.state.question_card.index,
+                "visited_by": game_instance.state.question_card.visited_already,
+            },
+            room=room_id,
+        )
+    db.close()
 
 
 @socketio.on("guess")
 def handle_guess(data: dict) -> None:
+    username = session.get("username")
+    room_id = get_user_room_id(username)
+
+    game_instance = get_game_instance(room_id)
+
     guess = data["guess"]
     result = game_instance.check_truth(guess)
-    card_content()
+    card_content(room_id)
     if result:
         game_instance.place_card(game_instance.state.active_player)
     else:
         game_instance.place_card(game_instance.state.targeted_player)
 
-    place_card()
+    place_card(room_id)
 
 
 @socketio.on("pass")
 def handle_pass(data: dict) -> None:
     db: Session = get_db_session()
     sid = request.sid
-
-    room: Room = db.query(Room).filter(Room.name == "game").first()
-
-    # Check that the target player is not None
+    username = session.get("username")
+    room_id = get_user_room_id(username)
+    game_instance = get_game_instance(room_id)
+   
     if game_instance.state.targeted_player is not None:
         game_instance.state.active_player = game_instance.state.targeted_player
         game_instance.state.targeted_player = None
 
-        emit(
+       
+        socketio.emit(
             "passed",
             {
                 "message": f"{game_instance.state.active_player.name} passed!",
                 "active_player": game_instance.state.active_player.name,
             },
-            room=room.room_id,
+            room=room_id,
         )
 
         emit(
@@ -288,10 +504,17 @@ def handle_pass(data: dict) -> None:
             game_instance.state.question_card.name,
         )
 
+    db.close()
 
-def place_card() -> None:
+
+def place_card(room_id: str) -> None:
     db = get_db_session()
-    room = db.query(Room).filter(Room.name == "game").first()
+    game_instance = get_game_instance(room_id)
+
+    if not game_instance:
+        db.close()
+        return
+
     player_data = {}
     for j in game_instance.state.players:
         print(j.cards_in_front)
@@ -300,8 +523,8 @@ def place_card() -> None:
             "card_count": len(j.cards_in_hand),
         }
 
-    # Send broadcast about the placed card
-    emit(
+   
+    socketio.emit(
         "card_placed",
         {
             "player": game_instance.state.active_player.name,
@@ -310,10 +533,9 @@ def place_card() -> None:
             else "ismeretlen",
             "active_player": game_instance.state.active_player.name,
         },
-        room=room.room_id,
+        room=room_id,
     )
 
-    # Reset the questioned card
     game_instance.state.question_card = None
 
     for j in game_instance.state.players:
@@ -332,40 +554,52 @@ def place_card() -> None:
             )
 
     if game_instance.has_4_cards_in_front():
-        game_end()
+        game_end(room_id)
+
+    db.close()
 
 
-def game_end() -> None:
+def game_end(room_id: str) -> None:
     db = get_db_session()
-    room = db.query(Room).filter(Room.name == "game").first()
+    room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
     game = db.query(Game).filter(Game.room_id == room.room_id).first()
-    game.winner = game_instance.state.active_player.name
-    db.commit()
-    emit(
-        "game_over",
-        {
-            "losing_player": game_instance.state.active_player.name,
-        },
-        room=room.room_id,
-    )
+    game_instance = get_game_instance(room_id)
+
+    if game and game_instance:
+        game.loser = game_instance.state.active_player.name
+        db.commit()
+        
+    
+        socketio.emit(
+            "game_over",
+            {
+                "losing_player": game_instance.state.active_player.name,
+            },
+            room=room_id,
+        )
+
+        if room_id in game_instances:
+            del game_instances[room_id]
+
+    db.close()
 
 
-def start_game(players: list) -> None:
+def start_game(players: list, room_id: str) -> None:
     """
-    Start the game with the given players.
+    Start the game with the given players in the specified room.
 
     Args:
         players (list): List of player usernames.
+        room_id (str): Room identifier where the game should start.
     """
-    global game_instance
-    print("players", players)
-    game_instance = GameLogic([Player(str(user)) for user in players])
+    global game_instances
+
+    game_instances[room_id] = GameLogic([Player(str(user)) for user in players])
+    game_instance = game_instances[room_id]
 
     db = get_db_session()
-    username = session.get("username")
-    user: Optional[User] = db.query(User).filter(User.username == username).first()
 
-    game = Game(room_id=user.current_room_id)
+    game = Game(room_id=room_id)
     db.add(game)
     db.commit()
 
@@ -412,7 +646,7 @@ def start_game(players: list) -> None:
                 },
                 to=player_sid,
             )
-        print("cards_in_hand", cards_in_hand)
+    db.close()
 
 
 if __name__ == "__main__":

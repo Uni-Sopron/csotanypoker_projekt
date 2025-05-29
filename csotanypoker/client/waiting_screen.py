@@ -26,22 +26,35 @@ class WaitingScreen(BaseScreen):
             True,
         )
         status = "Várakozás a játékosokra."
-
-        if self.client.selected_room is not None:
-            max_players = self.client.rooms[self.client.selected_room]["max_players"]
-            if len(self.client.game_state.players) == max_players:
-                status = "Játék indul!"
+        if self.client.selected_room.password is not None:
+            draw_text(
+                self.client.window,
+                f"Jelszó:{self.client.selected_room.password}",
+                BLACK,
+                600,
+                100,
+                True,
+            )
 
         draw_text(self.client.window, status, BLACK, 400, 100, True)
 
-        # Display the list of players
         draw_text(self.client.window, "Játékosok:", BLACK, 50, 150)
         y = 200
         for player in self.client.game_state.players:
             draw_text(self.client.window, player.name, BLACK, 60, y)
             y += 40
 
-        # Leave button
+        if self.client.message and self.client.message_display_time > 0:
+            draw_text(
+                self.client.window,
+                self.client.message,
+                BLACK,
+                self.client.window.get_width() // 2,
+                self.client.window.get_height() // 2,
+                True,
+            )
+            self.client.message_display_time -= 1
+
         pygame.draw.rect(self.client.window, GRAY, self.client.leave_button)
         draw_text(
             self.client.window,
@@ -53,7 +66,10 @@ class WaitingScreen(BaseScreen):
         )
 
     def handle_mouse_click(self, pos):
-        pass
+        """Handle mouse clicks on the waiting screen"""
+        if self.client.leave_button.collidepoint(pos):
+            print("Leaving room")
+            self.client.network.leave_room()
 
     def handle_key_press(self, key):
         pass

@@ -46,14 +46,14 @@ class CardHolder(Base):
     player = relationship("DBPlayer", back_populates="previously_held_card_links")
 
 
-class User(Base):
+class DBUser(Base):
     __tablename__ = "users"
     username = Column(String(50), primary_key=True)
     password = Column(String(100), nullable=True)
     current_room_id = Column(String(36), ForeignKey("rooms.room_id"), nullable=True)
     is_active = Column(Boolean, default=True)
 
-    current_room = relationship("Room", back_populates="users")
+    current_room = relationship("DBRoom", back_populates="users")
     player = relationship("DBPlayer", back_populates="user", uselist=False)
 
     def set_current_room_id(self, room_id: Optional[str]) -> None:
@@ -63,15 +63,15 @@ class User(Base):
         self.is_active = active_status
 
 
-class Room(Base):
+class DBRoom(Base):
     __tablename__ = "rooms"
 
     room_id = Column(String(36), primary_key=True)
     name = Column(String(100), nullable=False)
     game_started = Column(Boolean, default=False)
     player_count = Column(Integer, default=4)
-
-    users = relationship("User", back_populates="current_room")
+    password = Column(String(100), default=None, nullable=True)
+    users = relationship("DBUser", back_populates="current_room")
     game = relationship("Game", back_populates="room", uselist=False)
 
     def set_game_started(self, game_started: bool) -> None:
@@ -136,7 +136,7 @@ class DBPlayer(Base):
         "previously_held_card_links", "card", creator=lambda card: CardHolder(card=card)
     )
 
-    user = relationship("User", back_populates="player")
+    user = relationship("DBUser", back_populates="player")
     active_in_games = relationship(
         "Game", foreign_keys="[Game.active_player_name]", back_populates="active_player"
     )
@@ -155,9 +155,9 @@ class Game(Base):
     active_player_name = Column(String(50), ForeignKey("players.name"), nullable=True)
     target_player_name = Column(String(50), ForeignKey("players.name"), nullable=True)
     questioned_card_name = Column(String(100), ForeignKey("cards.name"), nullable=True)
-    winner = Column(String(50), ForeignKey("players.name"), nullable=True)
+    loser = Column(String(50), ForeignKey("players.name"), nullable=True)
 
-    room = relationship("Room", back_populates="game")
+    room = relationship("DBRoom", back_populates="game")
     active_player = relationship(
         "DBPlayer", foreign_keys=[active_player_name], back_populates="active_in_games"
     )
