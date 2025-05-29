@@ -150,9 +150,7 @@ class NetworkManager:
                 name, index = k.rsplit("_", 1)
 
                 self.game_client.user.cards_in_hand.append(Card(name, int(index)))
-            print("cards_in_hand:")
-            for card in self.game_client.user.cards_in_hand:
-                print(f"nev: {card.name}, sorszam: {card.sorszam}")
+        
             self.game_client.game_state
 
         @self.sio.on("player_data")
