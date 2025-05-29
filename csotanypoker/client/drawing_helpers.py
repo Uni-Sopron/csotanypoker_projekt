@@ -5,10 +5,15 @@ import pygame
 from csotanypoker.client.constans import FONT_SMALL
 
 
-def draw_text(surface, text, color, x, y, centered=False, font=None):
+def draw_text(surface, text, color, x, y, centered=False, font=None, vcenter_rect=None):
     if font is None:
         font = pygame.font.Font(None, FONT_SMALL)
     text_surface = font.render(str(text), True, color)
+
+    if vcenter_rect is not None:
+        text_height = text_surface.get_height()
+        y = vcenter_rect.y + (vcenter_rect.height - text_height) // 2
+
     if centered:
         text_rect = text_surface.get_rect(center=(x, y))
     else:
