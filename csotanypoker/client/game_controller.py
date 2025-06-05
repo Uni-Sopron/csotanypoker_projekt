@@ -7,7 +7,8 @@ from csotanypoker.client.constans import FPS, SCREEN_HEIGHT, SCREEN_WIDTH
 from csotanypoker.client.end_screen import EndScreen
 from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
-from csotanypoker.client.login_screen import LoginScreen
+from csotanypoker.client.reconnect_screen import ReconnectScreen
+from csotanypoker.client.registration import LoginScreen
 from csotanypoker.client.rooms_screen import RoomsScreen
 from csotanypoker.client.waiting_screen import WaitingScreen
 from csotanypoker.models.gamestate import GameState
@@ -25,7 +26,7 @@ class GameController:
         pygame.display.set_caption("Csotány Póker")
         self.clock: pygame.time.Clock = pygame.time.Clock()
 
-        self.screen: str = "loading"  # Current screen ("login", "lobby", "waiting", "game", "rejoin_prompt")
+        self.screen: str = "loading"
 
         self.pipa_rect = None  # Rectangle for the checkmark image
         self.x_rect = None
@@ -51,18 +52,20 @@ class GameController:
 
         # Network communication
         self.network: NetworkManager = NetworkManager(self)
+        self.username: str = ""
         self.room_id: Optional[str] = None
         self.room_name: str = ""  # Current room name
         self.room_list = []
         self.statement = None
         self.dropdown_state = False
-        self.login = None
+
         self.loading = LoadingScreen(self)
         self.login = LoginScreen(self)
         self.rooms_screen = RoomsScreen(self)
         self.waiting = WaitingScreen(self)
         self.game = GameScreen(self)
         self.game_over = EndScreen(self)
+        self.reconnect_screen = ReconnectScreen(self)
 
     @property
     def game_state(self) -> GameState:
@@ -289,22 +292,6 @@ class GameController:
         self._login = value
 
     @property
-    def rejoin_room_id(self) -> Any:
-        return self._rejoin_room_id
-
-    @rejoin_room_id.setter
-    def rejoin_room_id(self, value: Any) -> None:
-        self._rejoin_room_id = value
-
-    @property
-    def rejoin_room_name(self) -> Any:
-        return self._rejoin_room_name
-
-    @rejoin_room_name.setter
-    def rejoin_room_name(self, value: Any) -> None:
-        self._rejoin_room_name = value
-
-    @property
     def yes_button(self) -> Any:
         return self._yes_button
 
@@ -402,21 +389,11 @@ class GameController:
 
         # Handle player clicks during the game
         if self.screen == "game":
-            player_btns = self.get_player_buttons()
-            for player, rect in player_btns:
-                if rect.collidepoint(pos) and self.room_id:
-                    self.network.player_click(self.room_id, player)
-
-        # Handle interactions on the rejoin screen
-        elif self.screen == "rejoin_prompt":
-            if self.yes_button.collidepoint(pos) and self.rejoin_room_id is not None:
-                self.network.send_rejoin_decision(self.rejoin_room_id, True)
-                self.rejoin_room_id = None
-                self.rejoin_room_name = None
-            elif self.no_button.collidepoint(pos) and self.rejoin_room_id is not None:
-                self.network.send_rejoin_decision(self.rejoin_room_id, False)
-                self.rejoin_room_id = None
-                self.rejoin_room_name = None
+            pass
+        if self.screen == "reconnect_screen":
+            self.reconnect_screen.handle_mouse_click(pos)
+        if self.screen == "game_over":
+            self.game_over.handle_mouse_click(pos)
 
     def handle_key_press(self, event: pygame.event.Event) -> None:
         """
@@ -447,7 +424,7 @@ class GameController:
             self.waiting.draw()
         elif self.screen == "game":
             self.game.draw()
-        elif self.screen == "rejoin_prompt":
-            self.draw_rejoin_prompt()
+        elif self.screen == "reconnect_screen":
+            self.reconnect_screen.draw()
         elif self.screen == "game_over":
             self.game_over.draw()

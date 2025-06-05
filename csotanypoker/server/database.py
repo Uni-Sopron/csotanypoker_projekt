@@ -119,31 +119,34 @@ class DBPlayer(Base):
         "PlayerHandCard", back_populates="player", cascade="all, delete-orphan"
     )
 
-    hand_cards = association_proxy(
-        "hand_card_links",
-        "card",
-        creator=lambda card: PlayerHandCard(card=card),
+    front_card_links = relationship(
+        "PlayerFrontCard", back_populates="player", cascade="all, delete-orphan"
     )
-    front_card_links = relationship("PlayerFrontCard", back_populates="player")
-    previously_held_card_links = relationship("CardHolder", back_populates="player")
+
+    previously_held_card_links = relationship(
+        "CardHolder", back_populates="player", cascade="all, delete-orphan"
+    )
+
+    hand_cards = association_proxy(
+        "hand_card_links", "card", creator=lambda card: PlayerHandCard(card=card)
+    )
 
     front_cards = association_proxy(
-        "front_card_links",
-        "card",
-        creator=lambda card: PlayerFrontCard(card=card),
+        "front_card_links", "card", creator=lambda card: PlayerFrontCard(card=card)
     )
+
     previously_held_cards = association_proxy(
         "previously_held_card_links", "card", creator=lambda card: CardHolder(card=card)
     )
 
     user = relationship("DBUser", back_populates="player")
+
     active_in_games = relationship(
         "Game", foreign_keys="[Game.active_player_name]", back_populates="active_player"
     )
+
     targeted_in_games = relationship(
-        "Game",
-        foreign_keys="[Game.target_player_name]",
-        back_populates="target_player",
+        "Game", foreign_keys="[Game.target_player_name]", back_populates="target_player"
     )
 
 

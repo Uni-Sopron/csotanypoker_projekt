@@ -1,4 +1,5 @@
-from typing import  List
+from typing import List
+
 
 class Card:
     def __init__(self, type, index):

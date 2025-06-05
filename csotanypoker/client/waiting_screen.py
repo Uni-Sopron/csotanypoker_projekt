@@ -37,10 +37,14 @@ class WaitingScreen(BaseScreen):
             )
 
         draw_text(self.client.window, status, BLACK, 400, 100, True)
-
         draw_text(self.client.window, "Játékosok:", BLACK, 50, 150)
         y = 200
         for player in self.client.game_state.players:
+            dot_color = (
+                (0, 200, 0) if getattr(player, "is_active", False) else (200, 0, 0)
+            )
+            pygame.draw.circle(self.client.window, dot_color, (40, y + 10), 8)
+
             draw_text(self.client.window, player.name, BLACK, 60, y)
             y += 40
 

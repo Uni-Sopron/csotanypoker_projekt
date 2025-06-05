@@ -53,8 +53,10 @@ class RoomsScreen(BaseScreen):
         self.password_active = False
         self.password_protected = False
         self.max_players = 4
-        self.room_name_text = ""
+        self.room_name_text = self.client.username
         self.password_text = ""
+        self.password_text_input = ""
+        self.create_password_input = pygame.Rect(700, 650, 150, 40)
         self.selected_room_index = None
 
         self.rooms = self.client.room_list
@@ -64,18 +66,11 @@ class RoomsScreen(BaseScreen):
         self.rooms = self.client.room_list
         if self.search_text == "":
             self.rooms = self.client.room_list
-            print("A")
         else:
-            print("B")
-            print(self.rooms)
             keresett_szoveg = self.search_text.lower()
             rooms = []
             for room in self.rooms:
                 room_name = room.name.lower()
-                print(room.name)
-                print(type(room.name))
-                print(self.search_text)
-                print(type(self.search_text))
                 if keresett_szoveg in room_name:
                     rooms.append(room)
             self.rooms = rooms
@@ -97,7 +92,7 @@ class RoomsScreen(BaseScreen):
         self.draw_search_section()
         self.draw_room_list_header()
         self.draw_room_list()
-        self._draw_room_creation()
+        self.draw_room_creation()
 
     def draw_search_section(self):
         font_small = pygame.font.Font(None, FONT_SMALL)
@@ -350,7 +345,6 @@ class RoomsScreen(BaseScreen):
         if self.search_button.collidepoint(pos):
             print(f"Keresés: '{self.search_text}'")
             self.search()
-
             return
 
         if self.filter_checkbox.collidepoint(pos):
@@ -415,9 +409,15 @@ class RoomsScreen(BaseScreen):
             self.join_password_active = False
             return
 
+        if self.create_password_input.collidepoint(pos) and self.password_protected:
+            self.password_active = True
+            self.room_name_active = False
+            self.search_active = False
+            self.join_password_active = False
+            return
+
         if self.password_checkbox.collidepoint(pos):
             print(self.password_protected)
-
             self.password_protected = not self.password_protected
             print(self.password_protected)
             return
@@ -434,17 +434,20 @@ class RoomsScreen(BaseScreen):
                 print(f"Max játékosok: {self.max_players}")
             return
 
-        if self.create_button.collidepoint(pos) and self.room_name_text.strip():
-            # print(f"Szoba létrehozása:")
-            # print(f"  Név: '{self.room_name_text}'")
-            # print(f"  Jelszó védett: {'Igen' if self.password_protected else 'Nem'}")
-            # print(f"  Max játékosok: {self.max_players}")
-            self.client.network.create_room(
-                self.room_name_text,
-                self.password_protected,
-                self.max_players,
-            )
-            return
+        if self.create_button.collidepoint(pos) and self.room_name_text.strip() :
+            if self.password_protected and  self.password_text_input:
+
+                password = self.password_text_input if self.password_protected else ""
+                self.client.network.create_room(
+                    self.room_name_text, self.password_protected, self.max_players, password
+                )
+                return
+            elif not self.password_protected:
+                password = self.password_text_input if self.password_protected else ""
+                self.client.network.create_room(
+                    self.room_name_text, self.password_protected, self.max_players, password
+                )
+                return
 
         self.room_name_active = False
         self.password_active = False
@@ -465,11 +468,9 @@ class RoomsScreen(BaseScreen):
         if self.search_active:
             if event.key == pygame.K_RETURN:
                 self.search()
-
                 self.search_active = False
             elif event.key == pygame.K_BACKSPACE:
                 self.search_text = self.search_text[:-1]
-
             else:
                 if len(self.search_text) < 20:
                     self.search_text += event.unicode
@@ -502,13 +503,13 @@ class RoomsScreen(BaseScreen):
             if event.key == pygame.K_RETURN:
                 self.password_active = False
             elif event.key == pygame.K_BACKSPACE:
-                self.password_text = self.password_text[:-1]
+                self.password_text_input = self.password_text_input[:-1]
             elif event.key == pygame.K_TAB:
                 self.password_active = False
                 self.room_name_active = True
             else:
-                if len(self.password_text) < 15:
-                    self.password_text += event.unicode
+                if len(self.password_text_input) < 15:
+                    self.password_text_input += event.unicode
 
         elif not any(
             [
@@ -548,7 +549,7 @@ class RoomsScreen(BaseScreen):
         else:
             self.scroll_offset = 0
 
-    def _draw_room_creation(self):
+    def draw_room_creation(self):
         font_large = pygame.font.Font(None, 48)
         draw_text(
             self.client.window,
@@ -589,6 +590,8 @@ class RoomsScreen(BaseScreen):
                 font=font_small,
                 vcenter_rect=self.room_name_input,
             )
+        elif not self.room_name_active and self.room_name_text == "":
+            self.room_name_text = self.client.username
 
         draw_text(
             self.client.window,
@@ -674,3 +677,33 @@ class RoomsScreen(BaseScreen):
             centered=True,
             font=font_small,
         )
+
+        if self.password_protected:
+            draw_text(
+                self.client.window,
+                "Jelszó:",
+                BLACK,
+                550,
+                0,
+                centered=False,
+                font=font_small,
+                vcenter_rect=self.create_password_input,
+            )
+
+            password_color = BLUE if self.password_active else GRAY
+            pygame.draw.rect(self.client.window, WHITE, self.create_password_input)
+            pygame.draw.rect(
+                self.client.window, password_color, self.create_password_input, 2
+            )
+
+            if self.password_text_input:
+                draw_text(
+                    self.client.window,
+                    self.password_text_input,
+                    BLACK,
+                    self.create_password_input.x + 5,
+                    0,
+                    centered=False,
+                    font=font_small,
+                    vcenter_rect=self.create_password_input,
+                )

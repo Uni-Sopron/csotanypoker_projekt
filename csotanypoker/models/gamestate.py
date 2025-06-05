@@ -2,6 +2,8 @@ from typing import List, Optional
 
 from csotanypoker.models.card import Card
 from csotanypoker.models.player import Player
+
+
 class GameState:
     def __init__(self):
         self._players = []

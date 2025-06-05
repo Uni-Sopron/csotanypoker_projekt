@@ -1,8 +1,7 @@
 import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (BLACK, FONT_SMALL, GRAY, RED,
-                                                  WHITE)
+from csotanypoker.client.constans import BLACK, FONT_SMALL, GRAY, RED, WHITE
 from csotanypoker.client.drawing_helpers import draw_text
 
 
