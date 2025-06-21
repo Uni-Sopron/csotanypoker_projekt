@@ -1,8 +1,16 @@
 import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (BLACK, BLUE, FONT_MEDIUM, FONT_SMALL,
-                                          GRAY, GREEN, WHITE)
+from csotanypoker.client.constans import (
+    BLACK,
+    BLUE,
+    FONT_MEDIUM,
+    FONT_SMALL,
+    GRAY,
+    GREEN,
+    SCREEN_WIDTH,
+    WHITE,
+)
 from csotanypoker.client.drawing_helpers import draw_text
 
 
@@ -58,11 +66,12 @@ class RoomsScreen(BaseScreen):
         self.password_text_input = ""
         self.create_password_input = pygame.Rect(700, 650, 150, 40)
         self.selected_room_index = None
+        self.logout_button = pygame.Rect(700, 700, 140, 50)
 
         self.rooms = self.client.room_list
 
     def search(self):
-        print(self.search_text)
+        # print(self.search_text)
         self.rooms = self.client.room_list
         if self.search_text == "":
             self.rooms = self.client.room_list
@@ -93,6 +102,7 @@ class RoomsScreen(BaseScreen):
         self.draw_room_list_header()
         self.draw_room_list()
         self.draw_room_creation()
+        self.draw_logout_button()
 
     def draw_search_section(self):
         font_small = pygame.font.Font(None, FONT_SMALL)
@@ -336,21 +346,21 @@ class RoomsScreen(BaseScreen):
     def handle_mouse_click(self, pos):
         if self.search_input.collidepoint(pos):
             self.search_active = True
-            print("Keresés aktiválva")
+            # print("Keresés aktiválva")
             self.room_name_active = False
             self.password_active = False
             self.join_password_active = False
             return
 
         if self.search_button.collidepoint(pos):
-            print(f"Keresés: '{self.search_text}'")
+            # print(f"Keresés: '{self.search_text}'")
             self.search()
             return
 
         if self.filter_checkbox.collidepoint(pos):
             self.filter_state = (self.filter_state + 1) % 3
             filter_names = ["Semmi", "Pipa", "X"]
-            print(f"Szűrő állapot: {filter_names[self.filter_state]}")
+            # print(f"Szűrő állapot: {filter_names[self.filter_state]}")
             self.fileter_rooms()
             return
 
@@ -358,10 +368,10 @@ class RoomsScreen(BaseScreen):
         if room_index is not None:
             if self.selected_room_index == room_index:
                 self.selected_room_index = None
-                print("Szoba kijelölés törölve")
+                # print("Szoba kijelölés törölve")
             else:
                 self.selected_room_index = room_index
-                print(f"Kiválasztott szoba: {self.rooms[room_index].name}")
+                # print(f"Kiválasztott szoba: {self.rooms[room_index].name}")
             return
 
         if (
@@ -394,13 +404,13 @@ class RoomsScreen(BaseScreen):
             )
             self.client.network.join_room(selected_room.room_id, password)
 
-            if selected_room.password_protected:
-                print(
-                    f"Csatlakozás szobához: {selected_room.name}, Jelszó: '{password}'"
-                )
-            else:
-                print(f"Csatlakozás szobához: {selected_room.name}")
-            return
+            # if selected_room.password_protected:
+            #     print(
+            #         f"Csatlakozás szobához: {selected_room.name}, Jelszó: '{password}'"
+            #     )
+            # else:
+            #     print(f"Csatlakozás szobához: {selected_room.name}")
+            # return
 
         if self.room_name_input.collidepoint(pos):
             self.room_name_active = True
@@ -417,37 +427,46 @@ class RoomsScreen(BaseScreen):
             return
 
         if self.password_checkbox.collidepoint(pos):
-            print(self.password_protected)
+            # print(self.password_protected)
             self.password_protected = not self.password_protected
-            print(self.password_protected)
+            # print(self.password_protected)
             return
 
         if self.max_players_up.collidepoint(pos):
             if self.max_players < 6:
                 self.max_players += 1
-                print(f"Max játékosok: {self.max_players}")
+                # print(f"Max játékosok: {self.max_players}")
             return
 
         if self.max_players_down.collidepoint(pos):
             if self.max_players > 2:
                 self.max_players -= 1
-                print(f"Max játékosok: {self.max_players}")
+                # print(f"Max játékosok: {self.max_players}")
             return
 
-        if self.create_button.collidepoint(pos) and self.room_name_text.strip() :
-            if self.password_protected and  self.password_text_input:
-
+        if self.create_button.collidepoint(pos) and self.room_name_text.strip():
+            if self.password_protected and self.password_text_input:
                 password = self.password_text_input if self.password_protected else ""
                 self.client.network.create_room(
-                    self.room_name_text, self.password_protected, self.max_players, password
+                    self.room_name_text,
+                    self.password_protected,
+                    self.max_players,
+                    password,
                 )
                 return
             elif not self.password_protected:
                 password = self.password_text_input if self.password_protected else ""
                 self.client.network.create_room(
-                    self.room_name_text, self.password_protected, self.max_players, password
+                    self.room_name_text,
+                    self.password_protected,
+                    self.max_players,
+                    password,
                 )
                 return
+        if self.logout_button.collidepoint(pos):
+            self.client.network.logout()
+
+            return
 
         self.room_name_active = False
         self.password_active = False
@@ -591,7 +610,7 @@ class RoomsScreen(BaseScreen):
                 vcenter_rect=self.room_name_input,
             )
         elif not self.room_name_active and self.room_name_text == "":
-            self.room_name_text = self.client.username
+            self.room_name_text = f"{self.client.username} szobája"
 
         draw_text(
             self.client.window,
@@ -707,3 +726,16 @@ class RoomsScreen(BaseScreen):
                     font=font_small,
                     vcenter_rect=self.create_password_input,
                 )
+
+    def draw_logout_button(self):
+        font_medium = pygame.font.Font(None, FONT_MEDIUM)
+        pygame.draw.rect(self.client.window, GRAY, self.logout_button)
+        draw_text(
+            self.client.window,
+            "Kijelentkezés",
+            BLACK,
+            self.logout_button.centerx,
+            self.logout_button.centery,
+            centered=True,
+            font=font_medium,
+        )

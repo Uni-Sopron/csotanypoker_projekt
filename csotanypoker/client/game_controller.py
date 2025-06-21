@@ -41,7 +41,7 @@ class GameController:
         self.visited_players = []
         self.room_input: str = ""
         self.room_active: bool = False
-        self.selected_room = None  # Index of the room selected by the user
+        self.selected_room = None
 
         self.user = None
         # Handling error messages

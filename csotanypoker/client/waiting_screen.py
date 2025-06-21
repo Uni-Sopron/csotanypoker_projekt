@@ -1,13 +1,14 @@
 import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import BLACK, GRAY, WHITE
+from csotanypoker.client.constans import BLACK, FONT_MEDIUM, GRAY, SCREEN_WIDTH, WHITE
 from csotanypoker.client.drawing_helpers import draw_text
 
 
 class WaitingScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
+        self.logout_button = pygame.Rect(SCREEN_WIDTH // 3, 600, 140, 50)
 
     def draw(self) -> None:
         """
@@ -40,6 +41,7 @@ class WaitingScreen(BaseScreen):
         draw_text(self.client.window, "Játékosok:", BLACK, 50, 150)
         y = 200
         for player in self.client.game_state.players:
+            print(player.is_active)
             dot_color = (
                 (0, 200, 0) if getattr(player, "is_active", False) else (200, 0, 0)
             )
@@ -68,12 +70,26 @@ class WaitingScreen(BaseScreen):
             self.client.leave_button.centery,
             True,
         )
+        font_medium = pygame.font.Font(None, FONT_MEDIUM)
+        pygame.draw.rect(self.client.window, GRAY, self.logout_button)
+        draw_text(
+            self.client.window,
+            "Kijelentkezés",
+            BLACK,
+            self.logout_button.centerx,
+            self.logout_button.centery,
+            centered=True,
+            font=font_medium,
+        )
 
     def handle_mouse_click(self, pos):
         """Handle mouse clicks on the waiting screen"""
         if self.client.leave_button.collidepoint(pos):
-            print("Leaving room")
+            # print("Leaving room")
             self.client.network.leave_room()
+        elif self.logout_button.collidepoint(pos):
+            # print("Logging out")
+            self.client.network.logout()
 
     def handle_key_press(self, key):
         pass

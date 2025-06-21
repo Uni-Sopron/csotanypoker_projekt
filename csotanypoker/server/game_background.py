@@ -1,10 +1,9 @@
 from random import choice, shuffle
-
-from sqlalchemy.orm import Session
+import uuid
 
 from csotanypoker.models.card import Card
 from csotanypoker.models.gamestate import GameState
-from csotanypoker.server.database import DBCard, DBPlayer, get_db_session
+
 
 TYPES = [
     "csotany",
@@ -19,9 +18,8 @@ TYPES = [
 
 
 class GameLogic:
-    def __init__(self, players, from_db=False):
-        self.state = GameState()
-
+    def __init__(self, id, players, from_db=False):
+        self.state = GameState(id, f"{id}.pkl")
         self.state.players = players
         self.state.active_player = self.choose_starting_player()
         self.generate_deck()
@@ -29,14 +27,18 @@ class GameLogic:
         self.deal_cards()
 
     def generate_deck(self):
+        deck_cards = []
         for type in TYPES:
             for i in range(1, 9):
-                self.state.deck.append(Card(type, i))
+                deck_cards.append(Card(type, i))
+        self.state.deck = deck_cards
 
     def shuffle_deck(self):
-        shuffle(self.state.deck)
+        deck_list = list(self.state.deck)
+        shuffle(deck_list)
         if len(self.state.players) == 2:
-            self.state.deck = self.state.deck[:-10]
+            deck_list = deck_list[:-10]
+        self.state.deck = deck_list
 
     def deal_cards(self):
         player_count = len(self.state.players)
@@ -46,46 +48,41 @@ class GameLogic:
             self.state.players[i].cards_in_hand = self.state.deck[
                 i * portions : (i + 1) * portions
             ]
+        for player in self.state.players:
+            player.card_count = len(player.cards_in_hand)
 
     def choose_starting_player(self):
         return choice(self.state.players)
 
     def has_cards_in_hand(self):
-        return self.state.active_player.cards_in_hand == []
+        return len(self.state.active_player.cards_in_hand) == 0
 
     def has_4_cards_in_front(self):
         if len(self.state.players) == 2:
             lose_count = 5
         else:
             lose_count = 4
-        for kartya, db in self.state.active_player.cards_in_front.items():
-            if db == lose_count:
+        for card_type, count in self.state.active_player.cards_in_front.items():
+            if count >= lose_count:
                 return True
         return False
 
     def select_target_player(self, name):
-        for i in self.state.players:
-            if name == i.name:
-                self.state.targeted_player = i
+        for player in self.state.players:
+            if player.name == name:
+                self.state.targeted_player = player
                 break
 
     def select_card(self, selected_card_id=None):
-        db: Session = get_db_session()
-        player_db = (
-            db.query(DBPlayer)
-            .filter(DBPlayer.name == self.state.active_player.name)
-            .first()
-        )
-
         for card in self.state.active_player.cards_in_hand:
             if card.name == selected_card_id:
                 self.state.question_card = card
-                selected_card = (
-                    db.query(DBCard)
-                    .filter(DBCard.name == self.state.question_card.name)
-                    .first()
+                self.state.active_player.cards_in_hand.remove(card)
+
+                self.state.active_player.card_count = len(
+                    self.state.active_player.cards_in_hand
                 )
-                self.state.active_player.cards_in_hand.remove(card)  # Remove the card
+
                 if (
                     self.state.active_player.name
                     not in self.state.question_card.visited_already
@@ -93,57 +90,35 @@ class GameLogic:
                     self.state.question_card.visited_already.append(
                         self.state.active_player.name
                     )
-                    selected_card.previous_holders.append(player_db)
-                    db.commit()
                 return
 
     def make_statement(self, statement=None):
-        db: Session = get_db_session()
-        player = (
-            db.query(DBPlayer)
-            .filter(DBPlayer.name == self.state.active_player.name)
-            .first()
-        )
-        player.statement = statement
-        db.commit()
-        self.state.active_player.statement = statement  # The current player's statement
+        self.state.active_player.statement = statement
 
     def check_truth(self, answer):
-        self.state.targeted_player.is_true = answer  # The current player's answer
+        self.state.targeted_player.is_true = answer
         if self.state.targeted_player.is_true is True:
             if self.state.active_player.statement == self.state.question_card.type:
                 print("correct answer")
                 return True
-
             else:
                 print("wrong answer")
                 return False
-
         elif self.state.targeted_player.is_true is False:
             if self.state.active_player.statement != self.state.question_card.type:
                 print("correct answer")
                 return True
-
             else:
                 print("wrong answer")
                 return False
 
     def place_card(self, player):
-        db: Session = get_db_session()
-        selected_card = (
-            db.query(DBCard)
-            .filter(DBCard.name == self.state.question_card.name)
-            .first()
-        )
-        player_db = db.query(DBPlayer).filter(DBPlayer.name == player.name).first()
-        player_db.front_cards.append(selected_card)
-
-        db.commit()
-
-        if self.state.question_card.type not in player.cards_in_front:
-            player.cards_in_front[self.state.question_card.type] = 1
-
+        # A játékos elhelyezi a kérdéskártyát maga előtt
+        card_type = self.state.question_card.type
+        if card_type not in player.cards_in_front:
+            player.cards_in_front[card_type] = 1
         else:
-            player.cards_in_front[self.state.question_card.type] += 1
+            player.cards_in_front[card_type] += 1
 
+        # Visszaállítjuk az aktív játékost az új játékosra
         self.state.active_player = player

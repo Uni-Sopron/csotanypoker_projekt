@@ -1,14 +1,16 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+from csotanypoker.models.card import Card
 
 
 class Player:
     def __init__(self, nev):
-        self._name = nev
-        self._cards_in_hand = []
-        self._cards_in_front = {}
-        self._card_count = 0
-        self._statement = None
-        self._is_true = None
+        self._name:str = nev
+        self._cards_in_hand:List[Card] = []
+        self._cards_in_front:Dict[str, int]  = {}
+        self._card_count:int= 0
+        self._statement: Optional[str] = None  # allitás amit a kártyárol tett (allat tipusa)
+        self._is_true :Optional[bool]= None  # a játkos szerint igazat vagy hamis az az állitás amit mondtak neki (true/false)
 
     @property
     def name(self) -> str:

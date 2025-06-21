@@ -1,11 +1,18 @@
 import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (ANIMALS, BLACK, FONT_MEDIUM,
-                                          FONT_SMALL, GRAY, RED, SCREEN_HEIGHT,
-                                          SCREEN_WIDTH, WHITE)
-from csotanypoker.client.drawing_helpers import (draw_image, draw_text,
-                                                 load_image)
+from csotanypoker.client.constans import (
+    ANIMALS,
+    BLACK,
+    FONT_MEDIUM,
+    FONT_SMALL,
+    GRAY,
+    RED,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    WHITE,
+)
+from csotanypoker.client.drawing_helpers import draw_image, draw_text, load_image
 
 
 class GameScreen(BaseScreen):
@@ -30,6 +37,8 @@ class GameScreen(BaseScreen):
         self.cross_rect = None
         self.passing = False
         self.client.passed = False
+        self.logout_button = pygame.Rect(100, 600, 140, 50)
+        self.leave_button = pygame.Rect(100, 500, 140, 50)
 
     def draw(self) -> None:
         """
@@ -44,8 +53,34 @@ class GameScreen(BaseScreen):
         for allat in ANIMALS:
             logo_images[allat] = load_image(allat, type="logo", size=(40, 40))
 
-        while self.client.screen != "game_over":
+        while self.client.screen == "game":
             self.client.window.fill(WHITE)
+            font_medium = pygame.font.Font(None, FONT_MEDIUM)
+            pygame.draw.rect(self.client.window, GRAY, self.logout_button)
+            draw_text(
+                self.client.window,
+                "Kijelentkezés",
+                BLACK,
+                self.logout_button.centerx,
+                self.logout_button.centery,
+                centered=True,
+                font=font_medium,
+            )
+          
+            if any(not getattr(player, "is_active", True) for player in self.client.game_state.players):
+                pygame.draw.rect(self.client.window, GRAY, self.leave_button)
+                draw_text(
+                    self.client.window,
+                    "Szoba elhagyása",
+                    BLACK,
+                    self.leave_button.centerx,
+                    self.leave_button.centery,
+                    centered=True,
+                    font=font_medium,
+                )
+           
+
+
             draw_text(
                 self.client.window,
                 f"Szoba: {self.client.room_name}",
@@ -104,6 +139,7 @@ class GameScreen(BaseScreen):
                 pygame.draw.rect(
                     self.client.window, GRAY, player_panel_rect, border_radius=5
                 )
+
                 draw_text(
                     self.client.window,
                     player.name,
@@ -113,7 +149,6 @@ class GameScreen(BaseScreen):
                     False,
                     medium_font,
                 )
-
                 draw_text(
                     self.client.window,
                     f"lapszam: {player.card_count}",
@@ -425,23 +460,29 @@ class GameScreen(BaseScreen):
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     mx, my = event.pos
                     talalt = False
-
+                    if self.logout_button.collidepoint(mx, my):
+                        # print("Kijelentkezés gombra kattintva!")
+                        self.client.network.logout()
+                        return
+                    if self.leave_button.collidepoint(mx, my):
+                        print("Szoba elhagyása gombra kattintva!")
+                        self.client.network.leave_room()
                     for rect, lap in reversed(kartya_poziciok):
-                        if (
-                            self.client.game_state.active_player.name
-                            != self.client.user.name
-                        ):
-                            print(
-                                f"Nem te vagy az aktív játékos. Aktív: {self.client.game_state.active_player.name}, Te: {self.client.user.name}"
-                            )
-                        if self.client.dropdown_state:
-                            print("A lenyíló ablak nyitva van.")
-                        if self.client.passed:
-                            print("Már átadta a kört.")
-                        if self.passing:
-                            print("Passzoltál ebben a körben.")
-                        if talalt:
-                            print("Már kiválasztottál egy kártyát.")
+                        # if (
+                        #     self.client.game_state.active_player.name
+                        #     != self.client.user.name
+                        # ):
+                        #     # print(
+                        #     #     f"Nem te vagy az aktív játékos. Aktív: {self.client.game_state.active_player.name}, Te: {self.client.user.name}"
+                        #     # )
+                        # if self.client.dropdown_state:
+                        #     print("A lenyíló ablak nyitva van.")
+                        # if self.client.passed:
+                        #     print("Már átadta a kört.")
+                        # if self.passing:
+                        #     print("Passzoltál ebben a körben.")
+                        # if talalt:
+                        #     print("Már kiválasztottál egy kártyát.")
 
                         if (
                             rect.collidepoint(mx, my)
@@ -453,7 +494,7 @@ class GameScreen(BaseScreen):
                             and not talalt
                         ):
                             self.client.game_state.question_card = None
-                            print(f"Rákattintottál: {lap}")
+                            # print(f"Rákattintottál: {lap}")
                             if lap != None:
                                 self.client.selected_card = lap
                             self.selected_card_frame = rect
@@ -461,6 +502,10 @@ class GameScreen(BaseScreen):
                             break
 
                     mx, my = event.pos
+                    
+                  
+                    inactive_players = [p for p in self.client.game_state.players if not getattr(p, "is_active", True)]
+                    
                     for rect, player_name in player_panels:
                         if (
                             rect.collidepoint(mx, my)
@@ -468,17 +513,36 @@ class GameScreen(BaseScreen):
                             == self.client.user.name
                             and not self.client.passed
                         ):
+                            
+                            if inactive_players:
+                                inactive_names = ", ".join([p.name for p in inactive_players])
+                                self.client.message = f"{inactive_names} inaktív"
+                                break
+
+                            player_obj = next(
+                                (
+                                    p
+                                    for p in self.client.game_state.players
+                                    if p.name == player_name
+                                ),
+                                None,
+                            )
+
+                            if player_obj is None:
+                                self.client.message = "Hiba: játékos nem található."
+                                break
+
                             if (
                                 self.client.game_state.question_card == None
                                 or player_name
                                 not in self.client.game_state.question_card.visited_already
                             ):
                                 self.client.game_state.question_card = None
-                                print(f"Rákattintottál {player_name}-ra")
+                             
                                 self.selected_player = player_name
                                 self.selected_player_frame = rect
                             else:
-                                self.client.message = "már volt már ennél a játékosnál"
+                                self.client.message = "Már volt már ennél a játékosnál"
 
                     if self.dropdown_position.collidepoint(mx, my):
                         self.client.dropdown_state = not self.client.dropdown_state
@@ -498,7 +562,7 @@ class GameScreen(BaseScreen):
                         self.accept_button_position.collidepoint(mx, my)
                         and self.statement
                     ):
-                        print(f"Elfogadott állat: {self.statement}")
+                        # print(f"Elfogadott állat: {self.statement}")
                         if self.selected_player and self.client.selected_card:
                             self.client.network.oke_click(
                                 self.client.room_id,
@@ -518,13 +582,13 @@ class GameScreen(BaseScreen):
                         self.checkmark_rect is not None
                         and self.checkmark_rect.collidepoint(mx, my)
                     ):
-                        print("Igazat mondott")
+                        # print("Igazat mondott")
                         self.client.game_state.question_card = None
                         self.client.network.guess(self.client.room_id, True)
                     if self.cross_rect is not None and self.cross_rect.collidepoint(
                         mx, my
                     ):
-                        print("Hazudott")
+                        # print("Hazudott")
                         self.client.game_state.question_card = None
 
                         self.client.network.guess(self.client.room_id, False)
@@ -532,10 +596,9 @@ class GameScreen(BaseScreen):
                     if hasattr(self, "pass_rect") and self.pass_rect.collidepoint(
                         mx, my
                     ):
-                        print("PASS gombra kattintva!")
+                        # print("PASS gombra kattintva!")
                         self.client.network.passing(self.client.room_id)
                         self.passing = True
-
             pygame.display.flip()
 
     def handle_key_press(self, event):
