@@ -1,6 +1,5 @@
+import os
 from random import choice, shuffle
-import uuid
-
 from csotanypoker.models.card import Card
 from csotanypoker.models.gamestate import GameState
 
@@ -19,7 +18,9 @@ TYPES = [
 
 class GameLogic:
     def __init__(self, id, players, from_db=False):
-        self.state = GameState(id, f"{id}.pkl")
+        save_dir = "csotanypoker\games_saves"
+        os.makedirs(save_dir, exist_ok=True)
+        self.state = GameState(id=id, save_path=os.path.join(save_dir, f"{id}.pkl"))
         self.state.players = players
         self.state.active_player = self.choose_starting_player()
         self.generate_deck()
@@ -30,7 +31,7 @@ class GameLogic:
         deck_cards = []
         for type in TYPES:
             for i in range(1, 9):
-                deck_cards.append(Card(type, i))
+                deck_cards.append(Card(type=type, index=i))
         self.state.deck = deck_cards
 
     def shuffle_deck(self):

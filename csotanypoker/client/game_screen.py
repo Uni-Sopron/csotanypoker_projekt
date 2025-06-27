@@ -14,7 +14,6 @@ from csotanypoker.client.constans import (
 )
 from csotanypoker.client.drawing_helpers import draw_image, draw_text, load_image
 
-
 class GameScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
@@ -66,8 +65,11 @@ class GameScreen(BaseScreen):
                 centered=True,
                 font=font_medium,
             )
-          
-            if any(not getattr(player, "is_active", True) for player in self.client.game_state.players):
+            print(f"A játék során aktiv játékosok: {self.client.active_player_list_name}")
+
+            if len(self.client.active_player_list_name) < len(
+                self.client.game_state.players
+            ):
                 pygame.draw.rect(self.client.window, GRAY, self.leave_button)
                 draw_text(
                     self.client.window,
@@ -78,8 +80,6 @@ class GameScreen(BaseScreen):
                     centered=True,
                     font=font_medium,
                 )
-           
-
 
             draw_text(
                 self.client.window,
@@ -502,10 +502,13 @@ class GameScreen(BaseScreen):
                             break
 
                     mx, my = event.pos
-                    
-                  
-                    inactive_players = [p for p in self.client.game_state.players if not getattr(p, "is_active", True)]
-                    
+
+                    inactive_players = [
+                        p
+                        for p in self.client.game_state.players
+                        if player.name not in self.client.active_player_list_name
+                    ]
+
                     for rect, player_name in player_panels:
                         if (
                             rect.collidepoint(mx, my)
@@ -513,9 +516,10 @@ class GameScreen(BaseScreen):
                             == self.client.user.name
                             and not self.client.passed
                         ):
-                            
                             if inactive_players:
-                                inactive_names = ", ".join([p.name for p in inactive_players])
+                                inactive_names = ", ".join(
+                                    [p.name for p in inactive_players]
+                                )
                                 self.client.message = f"{inactive_names} inaktív"
                                 break
 
@@ -538,7 +542,7 @@ class GameScreen(BaseScreen):
                                 not in self.client.game_state.question_card.visited_already
                             ):
                                 self.client.game_state.question_card = None
-                             
+
                                 self.selected_player = player_name
                                 self.selected_player_frame = rect
                             else:

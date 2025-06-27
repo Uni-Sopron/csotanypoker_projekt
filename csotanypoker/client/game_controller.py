@@ -25,7 +25,7 @@ class GameController:
         self.height = SCREEN_HEIGHT
         pygame.display.set_caption("Csotány Póker")
         self.clock: pygame.time.Clock = pygame.time.Clock()
-
+        self.active_player_list_name: List[str] = []  # List of active player names
         self.screen: str = "loading"
 
         self.pipa_rect = None  # Rectangle for the checkmark image
@@ -66,7 +66,7 @@ class GameController:
         self.game = GameScreen(self)
         self.game_over = EndScreen(self)
         self.reconnect_screen = ReconnectScreen(self)
-
+    
     @property
     def game_state(self) -> GameState:
         return self._game_state
@@ -339,6 +339,7 @@ class GameController:
     def game_over(self, value: Optional[EndScreen]) -> None:
         self._game_over = value
 
+    
     def run(self) -> None:
         """
         Handles events, updates game state, and screen rendering.
@@ -357,6 +358,8 @@ class GameController:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button in [1, 3]:
                         self.handle_mouse_click(event.pos)
+                elif event.type == pygame.MOUSEMOTION:
+                    self.handle_mouse_motion(event.pos)
                 elif event.type == pygame.KEYDOWN:
                     self.handle_key_press(event)
                 elif event.type == pygame.MOUSEWHEEL:
@@ -395,6 +398,16 @@ class GameController:
         if self.screen == "game_over":
             self.game_over.handle_mouse_click(pos)
 
+    def handle_mouse_motion(self, pos: Tuple) -> None:
+        """
+        Handles mouse motion on different screens.
+
+        Args:
+            pos (Tuple): Mouse position with (x, y) coordinates
+        """
+        if self.screen == "waiting":
+            self.waiting.handle_mouse_motion(pos)
+
     def handle_key_press(self, event: pygame.event.Event) -> None:
         """
         Handle key presses based on the game state.
@@ -428,3 +441,6 @@ class GameController:
             self.reconnect_screen.draw()
         elif self.screen == "game_over":
             self.game_over.draw()
+
+    # Minden property metódus itt marad változatlanul...
+   

@@ -1,47 +1,17 @@
 from typing import Optional
 
 
-class User:
-    def __init__(
-        self,
-        username: str,
-        password: Optional[str] = None,
-        current_room_id: Optional[str] = None,
-        is_active: bool = True,
-    ):
-        self._username: str = username
-        self._password: Optional[str] = password
-        self._current_room_id: Optional[str] = current_room_id
-        self._is_active: bool = is_active
+from pydantic import BaseModel, Field, ConfigDict
 
-    @property
-    def username(self) -> str:
-        return self._username
 
-    @username.setter
-    def username(self, value: str) -> None:
-        self._username = value
 
-    @property
-    def password(self) -> Optional[str]:
-        return self._password
-
-    @password.setter
-    def password(self, value: Optional[str]) -> None:
-        self._password = value
-
-    @property
-    def current_room_id(self) -> Optional[str]:
-        return self._current_room_id
-
-    @current_room_id.setter
-    def current_room_id(self, value: Optional[str]) -> None:
-        self._current_room_id = value
-
-    @property
-    def is_active(self) -> bool:
-        return self._is_active
-
-    @is_active.setter
-    def is_active(self, value: bool) -> None:
-        self._is_active = value
+class User(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,  # SQLAlchemy objektumokból is lehet példányosítani
+        validate_assignment=True  # Validálja az értékadást
+    )
+    
+    username: str = Field(..., min_length=1, max_length=50)
+    password: Optional[str] = Field(None, max_length=100)
+    current_room_id: Optional[str] = Field(None, max_length=50)
+    is_active: bool = Field(default=True)

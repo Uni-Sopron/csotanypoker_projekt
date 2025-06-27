@@ -1,121 +1,94 @@
-from typing import List, Optional, Callable, Iterable
-
-from csotanypoker.models.card import Card
-from csotanypoker.models.player import Player
-from csotanypoker.models.room import Room
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Literal, Callable, Iterable
 import pickle
+import os
 
 
-class AutoSavingList(list):
+class AutoSavingSet(set):
     def __init__(
         self, iterable: Optional[Iterable] = None, callback: Optional[Callable] = None
     ):
-        super().__init__(iterable or [])
+        super().__init__(iterable)
         self._callback = callback
 
-    def _trigger(self):
-        if self._callback:
-            self._callback()
+        def _save(self):
+            if self._callback:
+                self._callback()
 
-    def append(self, item):
-        super().append(item)
-        self._trigger()
+        def add(self, item):
+            super().add(item)
+            self._save()
 
-    def remove(self, item):
-        super().remove(item)
-        self._trigger()
+        def remove(self, item):
+            super().remove(item)
+            self._save()
+
+        def discard(self, item):
+            super().discard(item)
+            self._save()
+
+        def pop(self):
+            result = super().pop()
+            self._save()
+            return result
+
+        def clear(self):
+            super().clear()
+            self._save()
+
+        def update(self, *others):
+            super().update(*others)
+            self._save()
 
 
-class GameState:
-    def __init__(self, id=None, save_path=None):
-        self.id: Optional[str] = id
-        self._save_path: Optional[str] = save_path
+class GameState(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True, validate_by_name=True)
 
-        self._players: AutoSavingList[Player] = AutoSavingList(callback=self._save)
-        self._deck: AutoSavingList[Card] = AutoSavingList(callback=self._save)
-        self._active_player: Optional[Player] = None
-        self._targeted_player: Optional[Player] = None
-        self._question_card: Optional[Card] = None
+    id: Optional[str] = None
+    save_path: Optional[str] = Field(None, alias="_save_path")
 
-        self._game_status: str = "run"  # "run" vagy "end"
-        self._voters: set[str] = set()
-        self._loser_username: str = ""
+    active_player: Optional[dict] = None
+    targeted_player: Optional[dict] = None
+    question_card: Optional[dict] = None
+    game_status: Literal["run", "end"] = "run"
+    loser_username: str = ""
+
+    def __init__(self, players=None, deck=None, voters=None, **data):
+        super().__init__(**data)
+        # ki kell kerülni a __setattr__ hívását, mert az AutoSavingSet osztályban is van __setattr__ és az végtelen ciklust okozna
+        object.__setattr__(self, "_save_enabled", True)
+        object.__setattr__(
+            self, "players", AutoSavingSet(players or set(), callback=self._save)
+        )
+        object.__setattr__(
+            self, "deck", AutoSavingSet(deck or set(), callback=self._save)
+        )
+        object.__setattr__(
+            self, "voters", AutoSavingSet(voters or set(), callback=self._save)
+        )
+
         self._save()
+
+    def __setattr__(self, name, value):
+        if name in ["players", "deck", "voters"]:
+            object.__setattr__(self, name, value)
+        else:
+            super().__setattr__(name, value)
+            if hasattr(self, "_save_enabled") and not name.startswith("_"):
+                self._save()
 
     def _save(self):
-        if self._save_path is not None:
-            with open(self._save_path, "wb") as f:
+        if not getattr(self, "_save_enabled", False) or self.save_path is None:
+            return
+        try:
+            directory = os.path.dirname(self.save_path)
+            if directory and not os.path.exists(directory):
+                os.makedirs(directory)
+            with open(self.save_path, "wb") as f:
                 pickle.dump(self, f)
+        except Exception as e:
+            print(f"Hiba a mentés során: {e}")
 
-    # TODO: Vissza kell olvasni az adatokat
-    @property
-    def players(self):
-        return self._players
-
-    @players.setter
-    def players(self, value):
-        self._players = AutoSavingList(value, callback=self._save)
-        self._save()
-
-    @property
-    def deck(self):
-        return self._deck
-
-    @deck.setter
-    def deck(self, value):
-        self._deck = AutoSavingList(value, callback=self._save)
-        self._save()
-
-    @property
-    def active_player(self):
-        return self._active_player
-
-    @active_player.setter
-    def active_player(self, value):
-        self._active_player = value
-        self._save()
-
-    @property
-    def targeted_player(self):
-        return self._targeted_player
-
-    @targeted_player.setter
-    def targeted_player(self, value):
-        self._targeted_player = value
-        self._save()
-
-    @property
-    def question_card(self):
-        return self._question_card
-
-    @question_card.setter
-    def question_card(self, value):
-        self._question_card = value
-        self._save()
-
-    @property
-    def game_status(self) -> str:
-        return self._game_status
-
-    @game_status.setter
-    def game_status(self, value: str) -> None:
-        self._game_status = value
-        self._save()
-
-    @property
-    def voters(self) -> List[str]:
-        return self._voters
-
-    @voters.setter
-    def voters(self, value: List[str]) -> None:
-        self._voters = value
-        self._save()
-
-    @property
-    def loser_username(self) -> str:
-        return self._loser_username
-
-    @loser_username.setter
-    def loser_username(self, value: str) -> None:
-        self._loser_username = value
-        self._save()
+    @classmethod
+    def load_from_file():
+        pass

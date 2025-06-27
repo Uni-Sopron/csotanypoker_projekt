@@ -1,43 +1,21 @@
 from typing import List
+from pydantic import BaseModel, Field, computed_field, ConfigDict
 
 
-class Card:
-    def __init__(self, type, index):
-        self._name: str = f"{type}_{index}"
-        self._type: str = type
-        self._index: int = index
-        self._visited_already: List[str] = []
+class Card(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True, #objectumokból is lehet példányosítani nem csak dict-ből
+        validate_assignment=True, # értékadáskor is ellenörzi a mezők típusát
+        extra="forbid" # nem engedélyezi az ismeretlen mezőket
+    )
 
+    type: str
+    index: int
+    visited_already: List[str] = Field(default_factory=list)
+
+    @computed_field # automatikusan számított mező
     @property
     def name(self) -> str:
-        return self._name
+        return f"{self.type}_{self.index}"
 
-    @name.setter
-    def name(self, value: str) -> None:
-        self._name = value
-
-    @property
-    def type(self) -> str:
-        return self._type
-
-    @type.setter
-    def type(self, value: str) -> None:
-        self._type = value
-        self._name = f"{self._type}_{self._index}"
-
-    @property
-    def index(self) -> int:
-        return self._index
-
-    @index.setter
-    def index(self, value: int) -> None:
-        self._index = value
-        self._name = f"{self._type}_{self._index}"
-
-    @property
-    def visited_already(self) -> List[str]:
-        return self._visited_already
-
-    @visited_already.setter
-    def visited_already(self, value: List[str]) -> None:
-        self._visited_already = value
+  

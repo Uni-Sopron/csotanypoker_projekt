@@ -38,9 +38,8 @@ class DBUser(Base):
 
     current_room = relationship("DBRoom", back_populates="users")
     rooms_in = relationship(
-        "DBRoom", secondary=room_user_association, back_populates="users_in_room"
+        "DBRoom", secondary="room_user_association", back_populates="users_in_room"
     )
-
 
 
 class DBRoom(Base):

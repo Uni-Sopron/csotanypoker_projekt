@@ -34,10 +34,9 @@ class NetworkManager:
             self.game_client.username = data["username"]
             self.game_client.room_list.clear()
             for room_id, room_info in data["rooms"].items():
-                
                 room = Room(
-                    room_id,
-                    room_info["name"],
+                    room_id=room_id,
+                    name=room_info["name"],
                     max_player_count=room_info["player_count"],
                 )
                 room.player_count = room_info["actual_player_count"]
@@ -67,8 +66,8 @@ class NetworkManager:
 
             for room_id, room_info in data["rooms"].items():
                 room = Room(
-                    room_id,
-                    room_info["name"],
+                    room_id=room_id,
+                    name=room_info["name"],
                     max_player_count=room_info["player_count"],
                 )
                 room.player_count = room_info["actual_player_count"]
@@ -102,12 +101,12 @@ class NetworkManager:
             self.game_client.room_name = data["name"]
 
             self.game_client.game_state.players = [
-                Player(player) for player in data["players"]
+                Player(name=player) for player in data["players"]
             ]
 
             self.game_client.selected_room = Room(
-                data["room_id"],
-                data["name"],
+                room_id=data["room_id"],
+                name=data["name"],
                 max_player_count=data["max_player_count"],
             )
             self.game_client.selected_room.password = data.get("password", None)
@@ -127,7 +126,7 @@ class NetworkManager:
             """
 
             self.game_client.game_state.players = [
-                Player(player) for player in data["players"]
+                Player(name=player) for player in data["players"]
             ]
             self.game_client.message = (
                 f"{data['joined_player']} csatlakozott a szobához."
@@ -145,13 +144,16 @@ class NetworkManager:
             # print("Game started")
 
             self.game_client.game_state.players = [
-                Player(player) for player in data["players"]
+                Player(name=player) for player in data["players"]
             ]
+            print("Játékosok:", self.game_client.game_state.players)
+            print("jatekosok:", data["players"])
+
             self.game_client.game_state.voters = []
             for players in self.game_client.game_state.players:
                 if players.name == self.game_client.username:
                     self.game_client.user = players
-            
+
             self.game_client.selected_room.game_ids = data.get("game_ids")
             print(f"Game IDs: {self.game_client.selected_room.game_ids}")
             self.game_client.screen = "game"
@@ -181,7 +183,9 @@ class NetworkManager:
             for k in data.get("cards_in_hand", []):
                 name, index = k.rsplit("_", 1)
 
-                self.game_client.user.cards_in_hand.append(Card(name, int(index)))
+                self.game_client.user.cards_in_hand.append(
+                    Card(type=name, index=int(index))
+                )
 
             self.game_client.game_state
 
@@ -192,11 +196,11 @@ class NetworkManager:
             # print("kezbenlevo_adatok:", kezbenlevo_adatok)
             # print("aktív játékos:", data.get("starting_player", "ismeretlen"))
             # print("játékos_adatok:", data["player_data"])
-
+            self.game_client.active_player_list_name = []
             for player in self.game_client.game_state.players:
                 if player.name == data.get("starting_player", "ismeretlen"):
                     self.game_client.game_state.active_player = player
-                    # print(f"Aktív játékos: {player.name}")
+                    print(f"Aktív játékos: {player.name}")
 
                 if player.name == self.game_client.username:
                     self.game_client.user = player
@@ -205,16 +209,20 @@ class NetworkManager:
                         *name_parts, sorszam = k.split("_")
                         name = "_".join(name_parts)
                         self.game_client.user.cards_in_hand.append(
-                            Card(name, int(sorszam))
+                            Card(type=name, index=int(sorszam))
                         )
 
                 player_info = data["player_data"][player.name]
+                
                 if player_info:
                     # print(f"Játékos: {player.name}")
                     # print(f"elotte lévő kártyák: {player_info['cards_in_front']}")
                     player.cards_in_front = player_info["cards_in_front"]
                     player.card_count = player_info["card_count"]
-                    player.is_active = player_info["is_active"]
+                    if player_info["is_active"] is True:
+                        self.game_client.active_player_list_name.append(player.name)
+              
+                    # Eltávolítva: player.is_active = player_info["is_active"]
                     # print(f"{player.name} - kártyák száma: {player.card_count}")
 
             self.game_client.passed = False
@@ -225,7 +233,7 @@ class NetworkManager:
                 "player_statement", ""
             )
 
-            self.game_client.game_state.question_card = Card("kerdojel", 0)
+            self.game_client.game_state.question_card = Card(type="kerdojel", index=0)
             for player in self.game_client.game_state.players:
                 if player.name == data.get("targeted_player", "ismeretlen"):
                     self.game_client.game_state.targeted_player = player
@@ -248,9 +256,11 @@ class NetworkManager:
         @self.sio.on("card_content")
         def card_content(data) -> None:
             self.game_client.game_state.question_card = Card(
-                data["card_type"], data["card_index"]
+                type=data["card_type"], index=data["card_index"]
             )
-            self.game_client.selected_card = Card(data["card_type"], data["card_index"])
+            self.game_client.selected_card = Card(
+                type=data["card_type"], index=data["card_index"]
+            )
             self.game_client.selected_card.visited_already = data["visited_by"]
 
             self.game_client.game_state.question_card.visited_already = data[
@@ -282,8 +292,8 @@ class NetworkManager:
 
             for room_id, room_info in data["rooms"].items():
                 room = Room(
-                    room_id,
-                    room_info["name"],
+                    room_id=room_id,
+                    name=room_info["name"],
                     max_player_count=room_info["player_count"],
                 )
                 room.player_count = room_info["actual_player_count"]
@@ -298,17 +308,21 @@ class NetworkManager:
                 and self.game_client.selected_room.room_id == data["room_id"]
             ):
                 self.game_client.game_state.players = [
-                    Player(player) for player in data["players"]
+                    Player(name=player) for player in data["players"]
                 ]
                 self.game_client.selected_room.users = (
                     self.game_client.game_state.players
                 )
-
+                self.game_client.active_player_list_name = []
                 for player in self.game_client.game_state.players:
-                    player.is_active = player.name in aktiv_users
-
-                    if player.name == self.game_client.username:
-                        self.game_client.user = player
+                    if player.name in aktiv_users:
+                    # player.is_active = player.name in aktiv_users helyett:
+                   
+                        self.game_client.active_player_list_name.append(player.name)
+   
+                        
+                        
+                  
 
         @self.sio.on("join_room_error")
         def on_join_room_error(data: Dict[str, str]) -> None:
@@ -329,11 +343,15 @@ class NetworkManager:
         def on_player_left_room(data: Dict[str, Any]) -> None:
             aktiv_users = data.get("activ_users", [])
             self.game_client.game_state.players = [
-                Player(player) for player in data["players"]
+                Player(name=player) for player in data["players"]
             ]
-
+            self.game_client.active_player_list_name = []
+            # Csak a saját user objektumhoz állítjuk be az is_active-ot
             for player in self.game_client.game_state.players:
-                player.is_active = player.name in aktiv_users
+                if player.name in aktiv_users:
+                 
+                    self.game_client.active_player_list_name.append(player.name)
+               
 
             if self.game_client.selected_room:
                 self.game_client.selected_room.users = (
@@ -347,11 +365,11 @@ class NetworkManager:
             aktiv_users = data["activ_users"]
             print(f"AKTIV USERS: {aktiv_users}")
             self.game_client.game_state.players = [
-                Player(player) for player in data["players"]
+                Player(name=player) for player in data["players"]
             ]
             self.game_client.selected_room = Room(
-                data["room_id"],
-                data["room_name"],
+                room_id=data["room_id"],
+                name=data["room_name"],
                 max_player_count=data["max_player_count"],
             )
             self.game_client.room_name = data["room_name"]
@@ -365,14 +383,15 @@ class NetworkManager:
                 self.game_client.selected_room.users = (
                     self.game_client.game_state.players
                 )
-                # self.game_client.selected_room.game_started = False
             self.game_client.selected_room.room_id = data["room_id"]
+            self.game_client.active_player_list_name = []
+            # Csak a saját user objektumhoz állítjuk be az is_active-ot
             for player in self.game_client.game_state.players:
-                if player.name == self.game_client.username:
-                    self.game_client.user = player
-                    break
-            for player in self.game_client.game_state.players:
-                player.is_active = player.name in aktiv_users
+                if player.name in aktiv_users:
+                
+                    self.game_client.active_player_list_name.append(player.name)
+                
+
             self.game_client.screen = "waiting"
             self.game_client.message = "Visszaléptél a váróterembe"
             self.game_client.message_display_time = 3.0
@@ -413,8 +432,8 @@ class NetworkManager:
                 if room.room_id == room_id:
                     self.game_client.room_id = room_id
                     self.game_client.selected_room = Room(
-                        data["previous_room_id"],
-                        data["room_name"],
+                        room_id=data["previous_room_id"],
+                        name=data["room_name"],
                         max_player_count=max_player_count,
                     )
 
@@ -428,19 +447,16 @@ class NetworkManager:
         @self.sio.on("rematch_vote_received")
         def on_vote_rematch(data: Dict[str, Any]) -> None:
             # print("BELEPETT a rematch_vote_received eseménybe")
-            self.game_client.game_state.voters= data["voters"]
+            self.game_client.game_state.voters = data["voters"]
 
         @self.sio.on("player_rejoined")
         def on_player_rejoined(data: Dict[str, Any]) -> None:
             username = data["rejoined_player"]
-            for player in self.game_client.game_state.players:
-                if player.name == username:
-                    player.is_active = True
-                    self.game_client.message = (
-                        f"{username} újra csatlakozott a játékhoz."
-                    )
-                    self.game_client.message_display_time = 3.0
-                    break
+            # Csak ha ez a saját felhasználó, akkor állítjuk be az is_active-ot
+            self.game_client.active_player_list_name.append(username)
+
+            self.game_client.message = f"{username} újra csatlakozott a játékhoz."
+            self.game_client.message_display_time = 3.0
 
     def logout(self) -> None:
         self.sio.emit("logout", {"username": self.game_client.username})
