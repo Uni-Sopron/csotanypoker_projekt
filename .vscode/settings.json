@@ -1,0 +1,10 @@
+
+{   "python.linting.enabled": true,
+    "python.linting.ruffEnabled": true,     
+    "python.linting.ruffArgs": [
+        "--select", "E,F,W,C",    
+        "--ignore", "E501,W503"  
+    ],
+    "python.analysis.autoImportCompletions": true
+   
+}
