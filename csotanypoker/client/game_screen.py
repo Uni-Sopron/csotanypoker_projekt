@@ -14,6 +14,7 @@ from csotanypoker.client.constans import (
 )
 from csotanypoker.client.drawing_helpers import draw_image, draw_text, load_image
 
+
 class GameScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
@@ -65,7 +66,9 @@ class GameScreen(BaseScreen):
                 centered=True,
                 font=font_medium,
             )
-            print(f"A játék során aktiv játékosok: {self.client.active_player_list_name}")
+            print(
+                f"A játék során aktiv játékosok: {self.client.active_player_list_name}"
+            )
 
             if len(self.client.active_player_list_name) < len(
                 self.client.game_state.players
@@ -304,7 +307,7 @@ class GameScreen(BaseScreen):
                 card_width, card_height = 100, 150
                 card_x = (SCREEN_WIDTH - card_width) // 2
                 card_y = (SCREEN_HEIGHT - card_height) // 2
-                if self.client.game_state.question_card.type == "kerdojel":
+                if self.client.game_state.question_card.type == "hatlap":
                     kozepso_lap_image = load_image(
                         self.client.game_state.question_card.type,
                         type="card",

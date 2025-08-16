@@ -213,7 +213,7 @@ class NetworkManager:
                         )
 
                 player_info = data["player_data"][player.name]
-                
+
                 if player_info:
                     # print(f"Játékos: {player.name}")
                     # print(f"elotte lévő kártyák: {player_info['cards_in_front']}")
@@ -221,7 +221,7 @@ class NetworkManager:
                     player.card_count = player_info["card_count"]
                     if player_info["is_active"] is True:
                         self.game_client.active_player_list_name.append(player.name)
-              
+
                     # Eltávolítva: player.is_active = player_info["is_active"]
                     # print(f"{player.name} - kártyák száma: {player.card_count}")
 
@@ -233,7 +233,7 @@ class NetworkManager:
                 "player_statement", ""
             )
 
-            self.game_client.game_state.question_card = Card(type="kerdojel", index=0)
+            self.game_client.game_state.question_card = Card(type="hatlap", index=0)
             for player in self.game_client.game_state.players:
                 if player.name == data.get("targeted_player", "ismeretlen"):
                     self.game_client.game_state.targeted_player = player
@@ -316,13 +316,9 @@ class NetworkManager:
                 self.game_client.active_player_list_name = []
                 for player in self.game_client.game_state.players:
                     if player.name in aktiv_users:
-                    # player.is_active = player.name in aktiv_users helyett:
-                   
+                        # player.is_active = player.name in aktiv_users helyett:
+
                         self.game_client.active_player_list_name.append(player.name)
-   
-                        
-                        
-                  
 
         @self.sio.on("join_room_error")
         def on_join_room_error(data: Dict[str, str]) -> None:
@@ -349,9 +345,7 @@ class NetworkManager:
             # Csak a saját user objektumhoz állítjuk be az is_active-ot
             for player in self.game_client.game_state.players:
                 if player.name in aktiv_users:
-                 
                     self.game_client.active_player_list_name.append(player.name)
-               
 
             if self.game_client.selected_room:
                 self.game_client.selected_room.users = (
@@ -388,9 +382,7 @@ class NetworkManager:
             # Csak a saját user objektumhoz állítjuk be az is_active-ot
             for player in self.game_client.game_state.players:
                 if player.name in aktiv_users:
-                
                     self.game_client.active_player_list_name.append(player.name)
-                
 
             self.game_client.screen = "waiting"
             self.game_client.message = "Visszaléptél a váróterembe"
