@@ -1,100 +1,181 @@
 import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (BLACK, BLUE, FONT_SMALL, GRAY, RED,
-                                          WHITE)
-from csotanypoker.client.drawing_helpers import draw_text
+from csotanypoker.client.constans import (
+    RED,
+    WHITE,
+    DARK_GREEN,
+    LIGHT_GREEN,
+    MIDDLE_GREEN_TRANSPARENT_70,
+    MIDDLE_GREEN_TRANSPARENT_90,
+    MIDDLE_GREEN,
+)
+from csotanypoker.client.drawing_helpers import (
+    draw_text,
+    load_background,
+    draw_input_box,
+    validate_text_input,
+    draw_button,
+)
 
 
 class LoginScreen(BaseScreen):
     def __init__(self, client):
         super().__init__(client)
-
-        self.username_box = pygame.Rect(250, 200, 300, 40)
-        self.password_box = pygame.Rect(250, 270, 300, 40)
-
-        self.login_button = pygame.Rect(200, 350, 180, 50)
-        self.register_button = pygame.Rect(420, 350, 180, 50)
-
-      
-        self.active_field = None  
-
+        self.active_field = None
         self.username_text = ""
         self.password_text = ""
 
-        self.login_button_color = GRAY
-        self.register_button_color = GRAY
-        self.input_border_color = GRAY
-        self.active_input_color = BLUE
+        self.login_button_color = MIDDLE_GREEN
+        self.register_button_color = MIDDLE_GREEN
+        self.input_border_color = MIDDLE_GREEN_TRANSPARENT_90
+        self.active_input_color = MIDDLE_GREEN_TRANSPARENT_70
+
+        self.login_button_hovered = False
+        self.register_button_hovered = False
+        self.login_button_pressed = False
+        self.register_button_pressed = False
+
+        self.cursor_visible = True
+        self.cursor_timer = 0
+
+        self.input_padding = 15
+        self.cursor_blink_interval = 400
+
+    def _update_cursor_state(self):
+        current_time = pygame.time.get_ticks()
+        if current_time - self.cursor_timer > self.cursor_blink_interval:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_timer = current_time
+
+    def _calculate_ui_rects(self):
+        center_x = self.client.width // 2
+        quarter_height = self.client.height // 4
+
+        self.username_box = pygame.Rect(center_x - 250, quarter_height, 500, 75)
+        self.password_box = pygame.Rect(center_x - 250, quarter_height + 85, 500, 75)
+        self.login_button = pygame.Rect(
+            center_x - 250, self.client.height // 2, 220, 85
+        )
+        self.register_button = pygame.Rect(
+            center_x + 30, self.client.height // 2, 220, 85
+        )
+
+    def _update_button_states(self):
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+
+        self.login_button_hovered = self.login_button.collidepoint(mouse_pos)
+        self.register_button_hovered = self.register_button.collidepoint(mouse_pos)
+
+        self.login_button_pressed = self.login_button_hovered and mouse_pressed
+        self.register_button_pressed = self.register_button_hovered and mouse_pressed
+
+    def _draw_error_message(self):
+        if self.client.login_error and self.client.error_display_time > 0:
+            error_y = self.register_button.bottom + 150
+            draw_text(
+                self.client.window,
+                self.client.login_error,
+                RED,
+                self.client.width // 2,
+                error_y,
+                True,
+                font="bold",
+                font_size=40,
+            )
 
     def draw(self):
-        self.client.window.fill(WHITE)
+        self._update_cursor_state()
+        self._calculate_ui_rects()
+        self._update_button_states()
 
-        draw_text(self.client.window, "Csotány Póker", BLACK, 400, 100, True)
-        draw_text(self.client.window, "Felhasználónév:", BLACK, 250, 180, False)
-        draw_text(self.client.window, "Jelszó:", BLACK, 250, 250, False)
-
-        username_border_color = (
-            self.active_input_color
-            if self.active_field == "username"
-            else self.input_border_color
-        )
-        password_border_color = (
-            self.active_input_color
-            if self.active_field == "password"
-            else self.input_border_color
-        )
-
-        pygame.draw.rect(self.client.window, WHITE, self.username_box)
-        pygame.draw.rect(
-            self.client.window, username_border_color, self.username_box, 2
-        )
-
-        pygame.draw.rect(self.client.window, WHITE, self.password_box)
-        pygame.draw.rect(
-            self.client.window, password_border_color, self.password_box, 2
-        )
-
-        font = pygame.font.Font(None, FONT_SMALL)
-
-        username_surface = font.render(self.username_text, True, BLACK)
-        self.client.window.blit(
-            username_surface, (self.username_box.x + 5, self.username_box.y + 5)
-        )
-
-        password_display = "*" * len(self.password_text)
-        password_surface = font.render(password_display, True, BLACK)
-        self.client.window.blit(
-            password_surface, (self.password_box.x + 5, self.password_box.y + 5)
-        )
-
-        pygame.draw.rect(self.client.window, self.login_button_color, self.login_button)
-        pygame.draw.rect(
-            self.client.window, self.register_button_color, self.register_button
+        load_background(
+            self.client.width, self.client.height, self.client.window, type="background"
         )
 
         draw_text(
             self.client.window,
-            "Bejelentkezés",
-            BLACK,
-            self.login_button.centerx,
-            self.login_button.centery,
+            "Csótány Póker",
+            DARK_GREEN,
+            self.client.width // 2,
+            self.client.height // 6,
             True,
-        )
-        draw_text(
-            self.client.window,
-            "Regisztráció",
-            BLACK,
-            self.register_button.centerx,
-            self.register_button.centery,
-            True,
+            "Bold",
+            85,
         )
 
-        if self.client.login_error and self.client.error_display_time > 0:
-            draw_text(self.client.window, self.client.login_error, RED, 400, 420, True)
+        draw_input_box(
+            surface=self.client.window,
+            rect=self.username_box,
+            text=self.username_text,
+            is_active=(self.active_field == "username"),
+            is_password=False,
+            cursor_visible=self.cursor_visible,
+            background_color=self.input_border_color,
+            active_background_color=self.active_input_color,
+            border_color=None,
+            text_color=WHITE,
+            cursor_color=WHITE,
+            font_size=27,
+            padding=self.input_padding,
+            placeholder="Felhasználónév",
+            placeholder_color=DARK_GREEN,
+        )
+
+        draw_input_box(
+            surface=self.client.window,
+            rect=self.password_box,
+            text=self.password_text,
+            is_active=(self.active_field == "password"),
+            is_password=True,
+            cursor_visible=self.cursor_visible,
+            background_color=self.input_border_color,
+            active_background_color=self.active_input_color,
+            border_color=None,
+            text_color=WHITE,
+            cursor_color=WHITE,
+            font_size=27,
+            padding=self.input_padding,
+            placeholder="Jelszó",
+            placeholder_color=DARK_GREEN,
+        )
+
+        draw_button(
+            surface=self.client.window,
+            rect=self.login_button,
+            text="Bejelentkezés",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered=self.login_button_hovered,
+            is_pressed=self.login_button_pressed,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )
+
+        draw_button(
+            surface=self.client.window,
+            rect=self.register_button,
+            text="Regisztráció",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered=self.register_button_hovered,
+            is_pressed=self.register_button_pressed,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )
+
+        self._draw_error_message()
 
     def handle_mouse_click(self, pos):
-
         if self.username_box.collidepoint(pos):
             self.active_field = "username"
             return True
@@ -115,26 +196,40 @@ class LoginScreen(BaseScreen):
         if not self.active_field:
             return
 
-        if event.key == pygame.K_RETURN:  
+        if event.key == pygame.K_RETURN:
             self.handle_login()
-        elif event.key == pygame.K_TAB: 
-            if self.active_field == "username":
-                self.active_field = "password"
-            else:
-                self.active_field = "username"
-        elif event.key == pygame.K_BACKSPACE:  
+        elif event.key == pygame.K_TAB:
+            self.active_field = (
+                "password" if self.active_field == "username" else "username"
+            )
+        elif event.key == pygame.K_BACKSPACE:
             if self.active_field == "username":
                 self.username_text = self.username_text[:-1]
             elif self.active_field == "password":
                 self.password_text = self.password_text[:-1]
         else:
-         
             if len(event.unicode) == 1 and event.unicode.isprintable():
                 if self.active_field == "username":
-                    if len(self.username_text) < 20:  
+                    if validate_text_input(
+                        self.username_text,
+                        event.unicode,
+                        self.username_box,
+                        20,
+                        False,
+                        font_size=27,
+                        padding=self.input_padding,
+                    ):
                         self.username_text += event.unicode
                 elif self.active_field == "password":
-                    if len(self.password_text) < 30:  
+                    if validate_text_input(
+                        self.password_text,
+                        event.unicode,
+                        self.password_box,
+                        20,
+                        True,
+                        font_size=27,
+                        padding=self.input_padding,
+                    ):
                         self.password_text += event.unicode
 
     def handle_login(self):
@@ -152,8 +247,7 @@ class LoginScreen(BaseScreen):
         if not self.username_text.strip():
             self.set_error("A felhasználónév nem lehet üres!")
             return
-
-        if not self.password_text.strip():
+        elif not self.password_text.strip():
             self.set_error("A jelszó nem lehet üres!")
             return
 
@@ -161,9 +255,7 @@ class LoginScreen(BaseScreen):
 
     def set_error(self, message):
         self.client.login_error = message
-        self.client.error_display_time = (
-            pygame.time.get_ticks() + 3000
-        ) 
+        self.client.error_display_time = pygame.time.get_ticks() + 3000
 
     def clear_error(self):
         self.client.login_error = ""

@@ -13,69 +13,46 @@ from sqlalchemy.orm import relationship
 engine = create_engine("sqlite:///game.db")
 Base = declarative_base()
 
-room_user_association = Table(
-    "room_user_association",
+Users_in_Game = Table(
+    "Users_in_Game",
     Base.metadata,
-    Column("room_id", String(50), ForeignKey("rooms.room_id"), primary_key=True),
+    Column("game_id", String(50), ForeignKey("games.game_id"), primary_key=True),
     Column("username", String(50), ForeignKey("users.username"), primary_key=True),
-)
-
-room_game_association = Table(
-    "room_game_association",
-    Base.metadata,
-    Column("room_id", String(50), ForeignKey("rooms.room_id"), primary_key=True),
-    Column("game_id", String(50), ForeignKey("games.id"), primary_key=True),
 )
 
 
 class DBUser(Base):
     __tablename__ = "users"
-
     username = Column(String(50), primary_key=True)
-    password = Column(String(100), nullable=True)
-    current_room_id = Column(String(50), ForeignKey("rooms.room_id"), nullable=True)
+    password = Column(String(100), nullable=False)
     is_active = Column(Boolean, default=True)
+    current_room_id = Column(String(50), ForeignKey("rooms.room_id"), nullable=True)
 
-    current_room = relationship("DBRoom", back_populates="users")
-    rooms_in = relationship(
-        "DBRoom", secondary="room_user_association", back_populates="users_in_room"
-    )
+    current_room = relationship("DBRoom", back_populates="current_users")
+    games = relationship("DBGame", secondary=Users_in_Game, back_populates="players")
 
 
 class DBRoom(Base):
     __tablename__ = "rooms"
-
     room_id = Column(String(50), primary_key=True)
     name = Column(String(100), nullable=False)
-    password = Column(String(100), nullable=True)
-    password_protected = Column(Boolean, default=False)
     max_player_count = Column(Integer, default=4)
-    player_count = Column(Integer, default=0)
+    password_protected = Column(Boolean, default=False)
+    password = Column(String(100), nullable=True)
 
-    users = relationship("DBUser", back_populates="current_room")
-
-  
-    game_ids = relationship(
-        "Game", secondary=room_game_association, back_populates="rooms_played_in"
-    )
-
-    users_in_room = relationship(
-        "DBUser", secondary=room_user_association, back_populates="rooms_in"
-    )
+    current_users = relationship("DBUser", back_populates="current_room")
+    games = relationship("DBGame", back_populates="room")
 
 
-class Game(Base):
+class DBGame(Base):
     __tablename__ = "games"
-
-    id = Column(String(50), primary_key=True)
-    game_status = Column(String(10), default="run")  # 'run' vagy 'end'
+    game_id = Column(String(50), primary_key=True)
     loser_username = Column(String(50), nullable=True)
+    game_status = Column(String(10), default="run")  # "run" vagy "end"
+    room_id = Column(String(50), ForeignKey("rooms.room_id"), nullable=False)
 
-    rooms_played_in = relationship(
-        "DBRoom", secondary=room_game_association, back_populates="game_ids"
-    )
-
-
+    room = relationship("DBRoom", back_populates="games")
+    players = relationship("DBUser", secondary=Users_in_Game, back_populates="games")
 
 
 def create_tables():

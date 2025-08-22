@@ -4,293 +4,390 @@ from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import (
     BLACK,
     BLUE,
-    FONT_MEDIUM,
-    FONT_SMALL,
+    DARK_GREEN_TRANSPARENT,
     GRAY,
     GREEN,
-    SCREEN_WIDTH,
+    LIGHT_GREEN,
+    LIGHT_GREEN_TRANSPARENT,
+    LIGHTER_GREEN,
+    MIDDLE_GREEN,
+    MIDDLE_GREEN_TRANSPARENT_70,
     WHITE,
+    DARK_GREEN,
 )
-from csotanypoker.client.drawing_helpers import draw_text
+from csotanypoker.client.drawing_helpers import (
+    draw_text,
+    load_background,
+    draw_button,
+    draw_input_box,
+    load_image,
+    draw_image,
+    _draw_rounded_rect,
+)
 
 
 class RoomsScreen(BaseScreen):
     def __init__(self, client):
         super().__init__(client)
-
-        self.room_list_rect = pygame.Rect(100, 160, 1200, 200)
-        self.room_item_height = 50
-        self.room_padding = 0
-
-        self.scroll_offset = 0
-        self.max_visible_rooms = self.room_list_rect.height // (
-            self.room_item_height + self.room_padding
-        )
-        self.scroll_bar_width = 20
-        self.scroll_bar_rect = pygame.Rect(
-            self.room_list_rect.right - self.scroll_bar_width,
-            self.room_list_rect.top,
-            self.scroll_bar_width,
-            self.room_list_rect.height,
-        )
-
-        self.search_input = pygame.Rect(280, 125, 240, 30)
-        self.search_button = pygame.Rect(525, 125, 80, 30)
+        self.client = client
+        self.logout_button_hovered = False
+        self.logout_button_pressed = False
         self.search_text = ""
+        self.password_text = ""
+        self.create_button_hovered = False
+        self.create_button_pressed = False
+
+        self.rooms = self.client.room_list
+
+        self.selected_room = None
+        self.selected_room_index = None
+        self.filter_state = 0
+        self.scroll_offset = 0
+        self.max_visible_rooms = 4
+
         self.search_active = False
-
-        self.filter_checkbox = pygame.Rect(630, 130, 20, 20)
-        self.filter_state = 0  # 0=None, 1=Check, 2=X
-
-        self.join_password_input = pygame.Rect(370, 395, 150, 40)
-        self.join_password_text = ""
+        self.room_name_active = False
+        self.password_active = False
         self.join_password_active = False
 
-        self.room_name_input = pygame.Rect(220, 600, 240, 35)
+        self.password_text_input = ""
+        self.join_password_text = ""
+        self.password_protected = False
+        self.max_players = 4
 
-        self.max_players_rect = pygame.Rect(970, 600, 80, 35)
-        self.password_checkbox = pygame.Rect(700, 600, 35, 35)
-
+        self.max_count = pygame.Rect(700, 600, 35, 35)
         self.max_players_up = pygame.Rect(1055, 600, 20, 17)
         self.max_players_down = pygame.Rect(1055, 617, 20, 17)
 
-        self.join_button = pygame.Rect(1130, 395, 150, 40)
-        self.create_button = pygame.Rect(1130, 600, 150, 40)
+        self.scroll_bar_width = 20
+        self.scroll_bar_rect = None
 
-        self.room_name_active = False
-        self.password_active = False
-        self.password_protected = False
-        self.max_players = 4
-        self.room_name_text = self.client.username
-        self.password_text = ""
-        self.password_text_input = ""
-        self.create_password_input = pygame.Rect(700, 650, 150, 40)
-        self.selected_room_index = None
-        self.logout_button = pygame.Rect(700, 700, 140, 50)
+        self.rooms_area_rect = None
+        self.room_row_height = 55
+        self.room_padding = 2
 
-        self.rooms = self.client.room_list
-
-    def search(self):
-        # print(self.search_text)
-        self.rooms = self.client.room_list
-        if self.search_text == "":
-            self.rooms = self.client.room_list
-        else:
-            keresett_szoveg = self.search_text.lower()
-            rooms = []
-            for room in self.rooms:
-                room_name = room.name.lower()
-                if keresett_szoveg in room_name:
-                    rooms.append(room)
-            self.rooms = rooms
+        self.join_button_hovered = False
+        self.join_button_pressed = False
+        self.room_name_text = ""
 
     def draw(self):
-        self.client.window.fill(WHITE)
+        # print(self.room_name_text)
+        self.join_button = pygame.Rect(
+            self.client.width - 200, self.client.height // 1.7, 190, 70
+        )
 
-        font_large = pygame.font.Font(None, 48)
+        self.join_password_input = pygame.Rect(
+            self.client.width - 330 - self.join_button.width,
+            self.join_button.y + 20,
+            300,
+            40,
+        )
+
+        self.join_password_input.x = self.client.width - 330 - self.join_button.width
+        self.join_password_input.y = self.join_button.y + 20
+
+        self.logout_button = pygame.Rect(20, self.client.height - 105, 220, 85)
+
+        load_background(self.client.width, self.client.height, self.client.window)
+
         draw_text(
             self.client.window,
-            "Szobák:",
-            BLACK,
+            "Szobák",
+            DARK_GREEN,
             self.client.width // 2,
-            80,
+            45,
             True,
-            font_large,
+            "Regular",
+            60,
         )
-
-        self.draw_search_section()
-        self.draw_room_list_header()
-        self.draw_room_list()
-        self.draw_room_creation()
-        self.draw_logout_button()
-
-    def draw_search_section(self):
-        font_small = pygame.font.Font(None, FONT_SMALL)
-
-        draw_text(self.client.window, "Név", BLACK, 180, 140, True, font_small)
-
-        color = BLUE if self.search_active else GRAY
-        pygame.draw.rect(self.client.window, WHITE, self.search_input)
-        pygame.draw.rect(self.client.window, color, self.search_input, 2)
-
-        if self.search_text:
-            draw_text(
-                self.client.window,
-                self.search_text,
-                BLACK,
-                self.search_input.x + 5,
-                self.search_input.y + 15,
-                False,
-                font_small,
-            )
-
-        pygame.draw.rect(self.client.window, GRAY, self.search_button)
-        pygame.draw.rect(self.client.window, BLACK, self.search_button, 2)
         draw_text(
             self.client.window,
-            "keresés",
-            BLACK,
-            self.search_button.centerx,
-            self.search_button.centery,
+            "Szoba létrehozás",
+            DARK_GREEN,
+            self.client.width // 2,
+            self.client.height // 1.4,
             True,
-            font_small,
+            "Regular",
+            60,
+        )
+        self.menu()
+        self.rooms_area()
+        self.draw_room_creation()
+        draw_button(
+            surface=self.client.window,
+            rect=self.logout_button,
+            text="Kijelentkezés",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered=self.logout_button_hovered,
+            is_pressed=self.logout_button_pressed,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
         )
 
-        pygame.draw.rect(self.client.window, WHITE, self.filter_checkbox)
-        pygame.draw.rect(self.client.window, BLACK, self.filter_checkbox, 2)
+    def menu(self):
+        menu_font_size = 38
 
-        if self.filter_state == 1:
-            draw_text(
-                self.client.window,
-                "O",
-                BLACK,
-                self.filter_checkbox.centerx,
-                self.filter_checkbox.centery,
-                True,
-                font_small,
-            )
-        elif self.filter_state == 2:
-            draw_text(
-                self.client.window,
-                "X",
-                BLACK,
-                self.filter_checkbox.centerx,
-                self.filter_checkbox.centery,
-                True,
-                font_small,
-            )
+        section_width = self.client.width // 5
+        menu_y = self.client.height // 6
+        input_height = 40
 
-    def draw_room_list_header(self):
-        header_y = 120
-        font_medium = pygame.font.Font(None, FONT_MEDIUM)
-
+        name_x = section_width // 2 + 30
         draw_text(
-            self.client.window, "Jelszó", BLACK, 720, header_y + 15, True, font_medium
+            self.client.window,
+            "Név",
+            DARK_GREEN,
+            name_x,
+            menu_y,
+            True,
+            "Regular",
+            menu_font_size,
         )
+
+        input_x = name_x + 60
+        input_width = self.client.width // 4
+        input_y = menu_y - (input_height // 2)
+        self.search_input = pygame.Rect(input_x, input_y, input_width, input_height)
+        draw_input_box(
+            surface=self.client.window,
+            rect=self.search_input,
+            text=self.search_text,
+            text_color=DARK_GREEN,
+            background_color=LIGHT_GREEN_TRANSPARENT,
+            border_color=None,
+            border_radius=0.50,
+            font_size=25,
+            cursor_color=DARK_GREEN,
+            is_active=self.search_active,
+            placeholder="Keresés...",
+            placeholder_color=MIDDLE_GREEN,
+        )
+
+        icons_x = input_x + input_width + 20
+        search_image = load_image("search_symbol", "button", size=(35, 35))
+
+        search_button_x = icons_x - 15
+        search_button_y = menu_y - 15
+        self.search_button = pygame.Rect(search_button_x, search_button_y, 35, 35)
+
+        draw_image(
+            surface=self.client.window,
+            image=search_image,
+            x=icons_x,
+            y=menu_y,
+            centered=True,
+        )
+
+        padlock_transparent = load_image("padlock_transparent", "button", size=(35, 35))
+        padlock_locked = load_image("padlock", "button", size=(35, 35))
+        padlock_unlocked = load_image("unlock_padlock", "button", size=(35, 35))
+
+        if self.filter_state == 0:
+            current_padlock_image = padlock_transparent
+        elif self.filter_state == 1:
+            current_padlock_image = padlock_locked
+        else:
+            current_padlock_image = padlock_unlocked
+
+        lock_button_x = icons_x + 35 - 17.5
+        lock_button_y = menu_y - 17.5
+        self.lock_button = pygame.Rect(lock_button_x, lock_button_y, 35, 35)
+
+        draw_image(
+            surface=self.client.window,
+            image=current_padlock_image,
+            x=icons_x + 35,
+            y=menu_y,
+            centered=True,
+        )
+
+        self.password_x = section_width * 3 + (section_width // 2)
         draw_text(
-            self.client.window, "Létszám", BLACK, 1200, header_y + 15, True, font_medium
+            self.client.window,
+            "Jelszóvédett",
+            DARK_GREEN,
+            self.password_x,
+            menu_y,
+            True,
+            "Regular",
+            menu_font_size,
         )
 
-    def draw_room_list(self):
-        font_small = pygame.font.Font(None, FONT_SMALL)
-
-        room_content_rect = pygame.Rect(
-            self.room_list_rect.x,
-            self.room_list_rect.y,
-            self.room_list_rect.width - self.scroll_bar_width,
-            self.room_list_rect.height,
+        self.count_x = section_width * 4 + (section_width // 2)
+        draw_text(
+            self.client.window,
+            "Létszám",
+            DARK_GREEN,
+            self.count_x,
+            menu_y,
+            True,
+            "Regular",
+            menu_font_size,
         )
-        pygame.draw.rect(self.client.window, WHITE, room_content_rect)
-        pygame.draw.rect(self.client.window, BLACK, room_content_rect, 2)
 
-        clip_surface = pygame.Surface(
-            (room_content_rect.width, room_content_rect.height)
-        )
-        clip_surface.fill(WHITE)
+    def rooms_area(self):
+        margin = 20
+        area_x = margin
+        area_y = self.client.height // 5
+        area_width = self.client.width - (2 * margin)
+        area_height = self.client.height // 2.5
 
-        room_name_counts = {}
-        for room in self.rooms:
-            room_name_counts[room.name] = room_name_counts.get(room.name, 0) + 1
+        self.rooms_area_rect = pygame.Rect(area_x, area_y, area_width, area_height)
 
-        start_index = max(0, self.scroll_offset)
-        end_index = min(len(self.rooms), start_index + self.max_visible_rooms)
-
-        for i in range(start_index, end_index):
-            room = self.rooms[i]
-            visible_index = i - start_index
-            y_pos = visible_index * (self.room_item_height + self.room_padding)
-            room_rect = pygame.Rect(
-                0, y_pos, room_content_rect.width, self.room_item_height
+        if len(self.rooms) > self.max_visible_rooms:
+            list_margin = 10
+            list_y = area_y + list_margin
+            list_height = self.max_visible_rooms * (
+                self.room_row_height + self.room_padding
             )
 
-            if i == self.selected_room_index:
-                pygame.draw.rect(clip_surface, (200, 255, 200), room_rect)
-                pygame.draw.rect(clip_surface, GREEN, room_rect, 3)
-            else:
-                pygame.draw.rect(clip_surface, BLACK, room_rect, 1)
-
-            display_name = room.name
-            if room_name_counts[room.name] > 1:
-                display_name = f"{room.name} (ID: {room.room_id})"
-
-            draw_text(
-                clip_surface,
-                display_name,
-                BLACK,
-                room_rect.x + 20,
-                0,
-                False,
-                font_small,
-                vcenter_rect=room_rect,
+            scroll_x = area_x + area_width - self.scroll_bar_width
+            self.scroll_bar_rect = pygame.Rect(
+                scroll_x + 15, list_y, self.scroll_bar_width, list_height
             )
 
-            if room.password_protected:
-                draw_text(
-                    clip_surface,
-                    "X",
-                    BLACK,
-                    620,
-                    y_pos + self.room_item_height // 2,
-                    True,
-                    font_small,
-                )
-
-            player_text = f"{room.player_count}/{room.max_player_count}"
-            draw_text(
-                clip_surface,
-                player_text,
-                BLACK,
-                1100,
-                y_pos + self.room_item_height // 2,
-                True,
-                font_small,
-            )
-
-        self.client.window.blit(
-            clip_surface, (room_content_rect.x, room_content_rect.y)
-        )
+        visible_rooms = self.get_visible_rooms()
+        for i, room in enumerate(visible_rooms):
+            self.room_row(room, i)
 
         if len(self.rooms) > self.max_visible_rooms:
             self.draw_scrollbar()
 
+        self.draw_bottom_buttons()
+
+    def get_visible_rooms(self):
+        start_index = self.scroll_offset
+        end_index = min(len(self.rooms), start_index + self.max_visible_rooms)
+        return self.rooms[start_index:end_index]
+
+    def room_row(self, room, row_index):
+        if not self.rooms_area_rect:
+            return
+
+        row_margin = 10
+        row_x = self.rooms_area_rect.x + row_margin
+        row_y = (
+            self.rooms_area_rect.y
+            + row_margin
+            + (row_index * (self.room_row_height + self.room_padding))
+        )
+        row_width = self.rooms_area_rect.width - (2 * row_margin)
+        row_height = self.room_row_height
+
+        row_rect = pygame.Rect(row_x, row_y, row_width, row_height)
+
+        if (
+            self.selected_room_index is not None
+            and self.rooms[self.selected_room_index].room_id == room.room_id
+        ):
+            print("Selected room:", room.name)
+            bg_color = LIGHTER_GREEN
+            border_color = MIDDLE_GREEN
+            border_width = 2
+        else:
+            bg_color = MIDDLE_GREEN_TRANSPARENT_70
+            border_color = None
+            border_width = 0
+
+        _draw_rounded_rect(
+            surface=self.client.window,
+            color=bg_color,
+            rect=row_rect,
+            border_color=border_color,
+            border_width=border_width,
+        )
+
+        name_text = room.name
+
+        same_name_rooms = [r for r in self.rooms if r.name == room.name]
+        if len(same_name_rooms) > 1:
+            name_text = f"{room.name} ID: {room.room_id}"
+
+        draw_text(
+            surface=self.client.window,
+            text=name_text,
+            color=DARK_GREEN,
+            x=row_x + 70,
+            y=row_y + row_height // 2,
+            centered=False,
+            font="regular",
+            font_size=25,
+            vcenter_rect=row_rect,
+        )
+
+        if room.password_protected:
+            lock_x = self.password_x
+            lock_image = load_image("padlock", "button", size=(40, 40))
+
+            draw_image(
+                surface=self.client.window,
+                image=lock_image,
+                x=lock_x,
+                y=row_y + row_height // 2,
+                centered=True,
+            )
+
+        count_text = f"{room.player_count}/{room.max_player_count}"
+
+        draw_text(
+            surface=self.client.window,
+            text=count_text,
+            color=DARK_GREEN,
+            x=self.count_x,
+            y=row_y + row_height // 2,
+            centered=True,
+            font="regular",
+            font_size=30,
+        )
+
+    def draw_bottom_buttons(self):
         if (
             self.selected_room_index is not None
             and self.selected_room_index < len(self.rooms)
             and self.rooms[self.selected_room_index].password_protected
         ):
-            draw_text(self.client.window, "Jelszó megadása:", BLACK, 250, 415, False)
-            color = BLUE if self.join_password_active else GRAY
-            pygame.draw.rect(self.client.window, WHITE, self.join_password_input)
-            pygame.draw.rect(self.client.window, color, self.join_password_input, 2)
+            draw_input_box(
+                surface=self.client.window,
+                rect=self.join_password_input,
+                text=self.join_password_text,
+                text_color=WHITE,
+                background_color=LIGHT_GREEN_TRANSPARENT,
+                border_color=MIDDLE_GREEN,
+                border_radius=0.50,
+                font_size=20,
+                cursor_color=WHITE,
+                placeholder="Jelszó",
+                placeholder_color=WHITE,
+                is_active=self.join_password_active,
+                is_password=True,
+            )
 
-            if self.join_password_text:
-                draw_text(
-                    self.client.window,
-                    self.join_password_text,
-                    BLACK,
-                    self.join_password_input.x + 5,
-                    self.join_password_input.y + 20,
-                    False,
-                )
-
-        pygame.draw.rect(
-            self.client.window,
-            GREEN if self.selected_room_index is not None else GRAY,
-            self.join_button,
-        )
-        pygame.draw.rect(self.client.window, BLACK, self.join_button, 2)
-        draw_text(
-            self.client.window,
-            "Csatlakozás:",
-            BLACK,
-            self.join_button.centerx,
-            self.join_button.centery,
-            True,
+        draw_button(
+            surface=self.client.window,
+            rect=self.join_button,
+            text="Csatlakozás:",
+            text_color=WHITE,
+            background_color=MIDDLE_GREEN
+            if self.selected_room_index is not None
+            else MIDDLE_GREEN_TRANSPARENT_70,
+            border_color=DARK_GREEN,
+            font_size=25,
+            font_type="bold",
+            border_width=3,
+            is_hovered=self.join_button_hovered,
+            is_pressed=self.join_button_pressed,
+            hover_color=DARK_GREEN_TRANSPARENT,
+            pressed_color=LIGHT_GREEN,
         )
 
     def draw_scrollbar(self):
-        pygame.draw.rect(self.client.window, GRAY, self.scroll_bar_rect)
-        pygame.draw.rect(self.client.window, BLACK, self.scroll_bar_rect, 1)
+        _draw_rounded_rect(
+            self.client.window, LIGHT_GREEN_TRANSPARENT, self.scroll_bar_rect
+        )
 
         if len(self.rooms) > self.max_visible_rooms:
             total_rooms = len(self.rooms)
@@ -308,78 +405,93 @@ class RoomsScreen(BaseScreen):
                 self.scroll_bar_rect.width - 4,
                 thumb_height,
             )
-
-            pygame.draw.rect(self.client.window, WHITE, thumb_rect)
-            pygame.draw.rect(self.client.window, BLACK, thumb_rect, 1)
+            _draw_rounded_rect(self.client.window, MIDDLE_GREEN, thumb_rect)
 
     def get_room_index_at_position(self, pos):
-        if not self.room_list_rect.collidepoint(pos):
+        if not self.rooms_area_rect.collidepoint(pos):
             return None
 
         room_content_rect = pygame.Rect(
-            self.room_list_rect.x,
-            self.room_list_rect.y,
-            self.room_list_rect.width - self.scroll_bar_width,
-            self.room_list_rect.height,
+            self.rooms_area_rect.x,
+            self.rooms_area_rect.y,
+            self.rooms_area_rect.width - self.scroll_bar_width,
+            self.rooms_area_rect.height,
         )
 
         if not room_content_rect.collidepoint(pos):
             return None
 
-        relative_y = pos[1] - self.room_list_rect.y
-        room_index = relative_y // (self.room_item_height + self.room_padding)
+        relative_y = pos[1] - self.rooms_area_rect.y
+        room_index = relative_y // self.room_row_height
         actual_index = self.scroll_offset + room_index
 
         if 0 <= actual_index < len(self.rooms):
             return actual_index
         return None
 
-    def fileter_rooms(self):
-        self.rooms = self.client.room_list
-        if self.filter_state == 0:
-            self.rooms = self.client.room_list
-        elif self.filter_state == 1:
+    def filter_rooms(self):
+        self.search()
+
+    def search(self):
+        print(f"Keresés: '{self.search_text}'")
+
+        self.rooms = self.client.room_list.copy()
+        if self.search_text.strip():
+            keresett_szoveg = self.search_text.lower().strip()
+            filtered_rooms = []
+            for room in self.rooms:
+                room_name = room.name.lower()
+                room_id = room.room_id.lower()
+
+                if keresett_szoveg in room_name or keresett_szoveg in room_id:
+                    filtered_rooms.append(room)
+            self.rooms = filtered_rooms
+
+        if self.filter_state == 1:
             self.rooms = [room for room in self.rooms if room.password_protected]
         elif self.filter_state == 2:
             self.rooms = [room for room in self.rooms if not room.password_protected]
 
+        self.scroll_offset = 0
+
     def handle_mouse_click(self, pos):
         if self.search_input.collidepoint(pos):
             self.search_active = True
-            # print("Keresés aktiválva")
+            print("Keresés aktiválva")
             self.room_name_active = False
             self.password_active = False
             self.join_password_active = False
             return
 
         if self.search_button.collidepoint(pos):
-            # print(f"Keresés: '{self.search_text}'")
+            print(f"Keresőgomb megnyomva! Keresés: '{self.search_text}'")
             self.search()
             return
 
-        if self.filter_checkbox.collidepoint(pos):
+        if self.lock_button.collidepoint(pos):
             self.filter_state = (self.filter_state + 1) % 3
-            filter_names = ["Semmi", "Pipa", "X"]
+            # filter_names = ["Minden szoba", "Csak jelszóvédett", "Csak nyilvános"]
             # print(f"Szűrő állapot: {filter_names[self.filter_state]}")
-            self.fileter_rooms()
+            self.filter_rooms()
             return
 
         room_index = self.get_room_index_at_position(pos)
         if room_index is not None:
             if self.selected_room_index == room_index:
                 self.selected_room_index = None
-                # print("Szoba kijelölés törölve")
+                print("Szoba kijelölés törölve")
             else:
                 self.selected_room_index = room_index
-                # print(f"Kiválasztott szoba: {self.rooms[room_index].name}")
+                print(f"Kiválasztott szoba: {self.rooms[room_index].name}")
+
             return
 
         if (
-            self.scroll_bar_rect.collidepoint(pos)
+            self.rooms_area_rect.collidepoint(pos)
             and len(self.rooms) > self.max_visible_rooms
         ):
-            relative_y = pos[1] - self.scroll_bar_rect.y
-            scroll_ratio = relative_y / self.scroll_bar_rect.height
+            relative_y = pos[1] - self.rooms_area_rect.y
+            scroll_ratio = relative_y / self.rooms_area_rect.height
             max_scroll = len(self.rooms) - self.max_visible_rooms
             self.scroll_offset = max(0, min(max_scroll, int(scroll_ratio * max_scroll)))
             return
@@ -403,14 +515,16 @@ class RoomsScreen(BaseScreen):
                 self.join_password_text if selected_room.password_protected else ""
             )
             self.client.network.join_room(selected_room.room_id, password)
-
-            # if selected_room.password_protected:
-            #     print(
-            #         f"Csatlakozás szobához: {selected_room.name}, Jelszó: '{password}'"
-            #     )
-            # else:
-            #     print(f"Csatlakozás szobához: {selected_room.name}")
-            # return
+        if (
+            self.scroll_bar_rect
+            and self.scroll_bar_rect.collidepoint(pos)
+            and len(self.rooms) > self.max_visible_rooms
+        ):
+            relative_y = pos[1] - self.scroll_bar_rect.y
+            scroll_ratio = relative_y / self.scroll_bar_rect.height
+            max_scroll = len(self.rooms) - self.max_visible_rooms
+            self.scroll_offset = max(0, min(max_scroll, int(scroll_ratio * max_scroll)))
+            return
 
         if self.room_name_input.collidepoint(pos):
             self.room_name_active = True
@@ -420,6 +534,7 @@ class RoomsScreen(BaseScreen):
             return
 
         if self.create_password_input.collidepoint(pos) and self.password_protected:
+            print("Jelszó mező aktiválva")
             self.password_active = True
             self.room_name_active = False
             self.search_active = False
@@ -427,21 +542,18 @@ class RoomsScreen(BaseScreen):
             return
 
         if self.password_checkbox.collidepoint(pos):
-            # print(self.password_protected)
+            print("Jelszó védett: ", not self.password_protected)
             self.password_protected = not self.password_protected
-            # print(self.password_protected)
             return
 
         if self.max_players_up.collidepoint(pos):
             if self.max_players < 6:
                 self.max_players += 1
-                # print(f"Max játékosok: {self.max_players}")
             return
 
         if self.max_players_down.collidepoint(pos):
             if self.max_players > 2:
                 self.max_players -= 1
-                # print(f"Max játékosok: {self.max_players}")
             return
 
         if self.create_button.collidepoint(pos) and self.room_name_text.strip():
@@ -463,6 +575,7 @@ class RoomsScreen(BaseScreen):
                     password,
                 )
                 return
+
         if self.logout_button.collidepoint(pos):
             self.client.network.logout()
 
@@ -569,173 +682,148 @@ class RoomsScreen(BaseScreen):
             self.scroll_offset = 0
 
     def draw_room_creation(self):
-        font_large = pygame.font.Font(None, 48)
-        draw_text(
-            self.client.window,
-            "Szoba készítés:",
-            BLACK,
-            self.client.width // 2,
-            550,
-            True,
-            font_large,
-        )
+        creation_title_y = self.client.height // 1.4
 
-        font_small = pygame.font.Font(None, FONT_SMALL)
+        creation_start_y = creation_title_y + 60
 
         draw_text(
             self.client.window,
-            "Név:",
-            BLACK,
-            150,
-            0,
+            "Szoba neve:",
+            DARK_GREEN,
+            100,
+            creation_start_y,
             centered=False,
-            font=font_small,
-            vcenter_rect=self.room_name_input,
+            font="regular",
+            font_size=30,
         )
+        self.room_name_input = pygame.Rect(150 + 100 + 10, creation_start_y, 230, 35)
 
-        color = BLUE if self.room_name_active else GRAY
+        self.room_name_input.y = creation_start_y
 
-        pygame.draw.rect(self.client.window, WHITE, self.room_name_input)
-        pygame.draw.rect(self.client.window, color, self.room_name_input, 2)
-
-        if self.room_name_text:
-            draw_text(
-                self.client.window,
-                self.room_name_text,
-                BLACK,
-                self.room_name_input.x + 5,
-                0,
-                centered=False,
-                font=font_small,
-                vcenter_rect=self.room_name_input,
-            )
-        elif not self.room_name_active and self.room_name_text == "":
+        if not self.room_name_active and self.room_name_text == "":
             self.room_name_text = f"{self.client.username} szobája"
-
-        draw_text(
-            self.client.window,
-            "Jelszóval védett:",
-            BLACK,
-            550,
-            0,
-            centered=False,
-            font=font_small,
-            vcenter_rect=self.password_checkbox,
+        draw_input_box(
+            surface=self.client.window,
+            rect=self.room_name_input,
+            text=self.room_name_text,
+            text_color=WHITE,
+            background_color=LIGHT_GREEN_TRANSPARENT,
+            border_color=None,
+            border_radius=0.50,
+            font_size=20,
+            is_active=self.room_name_active,
         )
-        pygame.draw.rect(self.client.window, WHITE, self.password_checkbox)
-        pygame.draw.rect(self.client.window, BLACK, self.password_checkbox, 2)
 
-        checkbox_char = "O" if self.password_protected else "X"
-        draw_text(
-            self.client.window,
-            checkbox_char,
-            BLACK,
-            self.password_checkbox.centerx,
-            self.password_checkbox.centery,
-            centered=True,
-            font=font_small,
+        checkbox_y = creation_start_y
+
+        self.max_players_rect = pygame.Rect(
+            self.room_name_input.x + self.room_name_input.width + 10,
+            checkbox_y,
+            150,
+            35,
         )
+        self.max_count.y = checkbox_y
+        self.max_count.x = self.max_players_rect.x + self.max_players_rect.width + 10
+
+        draw_input_box(
+            surface=self.client.window,
+            rect=self.max_count,
+            text=str(self.max_players),
+            text_color=DARK_GREEN,
+            background_color=LIGHT_GREEN_TRANSPARENT,
+            border_color=MIDDLE_GREEN,
+            border_radius=0.25,
+            font_size=20,
+            is_active=False,
+            cursor_visible=False,
+            cursor_color=DARK_GREEN,
+        )
+
+        self.max_players_up.y = checkbox_y - 5
+        self.max_players_down.y = checkbox_y + 25
 
         draw_text(
             self.client.window,
             "Max létszám:",
-            BLACK,
-            850,
-            0,
+            DARK_GREEN,
+            self.max_players_rect.x,
+            self.max_players_rect.y,
             centered=False,
-            font=font_small,
+            font="regular",
+            font_size=30,
             vcenter_rect=self.max_players_rect,
         )
-        pygame.draw.rect(self.client.window, WHITE, self.max_players_rect)
-        pygame.draw.rect(self.client.window, BLACK, self.max_players_rect, 2)
-
-        draw_text(
-            self.client.window,
-            str(self.max_players),
-            BLACK,
-            self.max_players_rect.centerx,
-            self.max_players_rect.centery,
-            centered=True,
-            font=font_small,
+        up_and_down_buttons = padlock_image = load_image(
+            "fel_le_nyilak", "button", size=(60, 50)
         )
 
-        pygame.draw.rect(self.client.window, GRAY, self.max_players_up)
-        pygame.draw.rect(self.client.window, BLACK, self.max_players_up, 1)
-        draw_text(
-            self.client.window,
-            "^",
-            BLACK,
-            self.max_players_up.centerx,
-            self.max_players_up.centery,
-            centered=True,
-            font=font_small,
+        draw_image(
+            surface=self.client.window,
+            image=up_and_down_buttons,
+            x=self.max_players_rect.x + self.max_players_rect.width + 50,
+            y=self.max_players_rect.y - 8,
+            centered=False,
         )
 
-        pygame.draw.rect(self.client.window, GRAY, self.max_players_down)
-        pygame.draw.rect(self.client.window, BLACK, self.max_players_down, 1)
-        draw_text(
-            self.client.window,
-            "v",
-            BLACK,
-            self.max_players_down.centerx,
-            self.max_players_down.centery,
-            centered=True,
-            font=font_small,
-        )
-
-        create_enabled = bool(self.room_name_text.strip())
-        button_color = GREEN if create_enabled else GRAY
-        pygame.draw.rect(self.client.window, button_color, self.create_button)
-        pygame.draw.rect(self.client.window, BLACK, self.create_button, 2)
-        draw_text(
-            self.client.window,
-            "Létrehozás:",
-            BLACK,
-            self.create_button.centerx,
-            self.create_button.centery,
-            centered=True,
-            font=font_small,
+        self.create_password_input = pygame.Rect(
+            self.client.width // 1.5, checkbox_y, 200, 35
         )
 
         if self.password_protected:
-            draw_text(
-                self.client.window,
-                "Jelszó:",
-                BLACK,
-                550,
-                0,
-                centered=False,
-                font=font_small,
-                vcenter_rect=self.create_password_input,
-            )
+            padlock_image = load_image("padlock", "button", size=(35, 35))
+        else:
+            padlock_image = load_image("unlock_padlock", "button", size=(35, 35))
 
-            password_color = BLUE if self.password_active else GRAY
-            pygame.draw.rect(self.client.window, WHITE, self.create_password_input)
-            pygame.draw.rect(
-                self.client.window, password_color, self.create_password_input, 2
-            )
-
-            if self.password_text_input:
-                draw_text(
-                    self.client.window,
-                    self.password_text_input,
-                    BLACK,
-                    self.create_password_input.x + 5,
-                    0,
-                    centered=False,
-                    font=font_small,
-                    vcenter_rect=self.create_password_input,
-                )
-
-    def draw_logout_button(self):
-        font_medium = pygame.font.Font(None, FONT_MEDIUM)
-        pygame.draw.rect(self.client.window, GRAY, self.logout_button)
-        draw_text(
-            self.client.window,
-            "Kijelentkezés",
-            BLACK,
-            self.logout_button.centerx,
-            self.logout_button.centery,
+        self.password_checkbox = pygame.Rect(
+            self.create_password_input.x - 40,
+            self.create_password_input.y + 15,
+            35,
+            35,
+        )
+        draw_image(
+            surface=self.client.window,
+            image=padlock_image,
+            x=self.password_checkbox.x,
+            y=self.password_checkbox.y,
             centered=True,
-            font=font_medium,
+        )
+
+        if self.password_protected:
+            draw_input_box(
+                surface=self.client.window,
+                rect=self.create_password_input,
+                text=self.password_text_input,
+                text_color=WHITE,
+                background_color=LIGHT_GREEN_TRANSPARENT,
+                border_color=None,
+                border_radius=0.50,
+                font_size=20,
+                is_active=self.password_active,
+                is_password=True,
+                placeholder="Jelszó",
+                placeholder_color=MIDDLE_GREEN,
+            )
+        self.create_button = pygame.Rect(
+            self.client.width - 210,
+            checkbox_y - 15,
+            170,
+            60,
+        )
+        create_enabled = bool(self.room_name_text.strip())
+        button_color = DARK_GREEN if create_enabled else DARK_GREEN_TRANSPARENT
+
+        draw_button(
+            surface=self.client.window,
+            rect=self.create_button,
+            text="Létrehozás",
+            text_color=WHITE,
+            background_color=button_color,
+            border_color=DARK_GREEN,
+            font_size=24,
+            font_type="bold",
+            border_width=2,
+            is_hovered=self.create_button_hovered and create_enabled,
+            is_pressed=self.create_button_pressed and create_enabled,
+            hover_color=MIDDLE_GREEN_TRANSPARENT_70,
+            pressed_color=LIGHT_GREEN,
         )

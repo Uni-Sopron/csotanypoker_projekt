@@ -3,26 +3,31 @@ from typing import Any, List, Optional, Tuple
 import pygame
 
 from csotanypoker.client.client import NetworkManager
-from csotanypoker.client.constans import FPS, SCREEN_HEIGHT, SCREEN_WIDTH
-from csotanypoker.client.end_screen import EndScreen
-from csotanypoker.client.game_screen import GameScreen
+from csotanypoker.client.constans import FPS, SCREEN_WIDTH, SCREEN_HEIGHT
+
+# from csotanypoker.client.end_screen import EndScreen
+# from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
-from csotanypoker.client.reconnect_screen import ReconnectScreen
+
+# from csotanypoker.client.reconnect_screen import ReconnectScreen
 from csotanypoker.client.registration import LoginScreen
 from csotanypoker.client.rooms_screen import RoomsScreen
-from csotanypoker.client.waiting_screen import WaitingScreen
-from csotanypoker.models.gamestate import GameState
+# from csotanypoker.client.waiting_screen import WaitingScreen
+# from csotanypoker.models.gamestate import GameState
 
 
 class GameController:
     def __init__(self) -> None:
         pygame.init()  # Initialize Pygame
-        self.game_state = GameState()
+        # self.game_state = GameState()
+        width, height = SCREEN_WIDTH, SCREEN_HEIGHT
+
         self.window: pygame.Surface = pygame.display.set_mode(
-            (SCREEN_WIDTH, SCREEN_HEIGHT)
-        )  # width: 1400, height: 800
-        self.width = SCREEN_WIDTH
-        self.height = SCREEN_HEIGHT
+            (width, height), pygame.RESIZABLE
+        )
+        # olvasd ki az ablak méretét
+        self.width = self.window.get_size()[0]
+        self.height = self.window.get_size()[1]
         pygame.display.set_caption("Csotány Póker")
         self.clock: pygame.time.Clock = pygame.time.Clock()
         self.active_player_list_name: List[str] = []  # List of active player names
@@ -62,18 +67,18 @@ class GameController:
         self.loading = LoadingScreen(self)
         self.login = LoginScreen(self)
         self.rooms_screen = RoomsScreen(self)
-        self.waiting = WaitingScreen(self)
-        self.game = GameScreen(self)
-        self.game_over = EndScreen(self)
-        self.reconnect_screen = ReconnectScreen(self)
-    
-    @property
-    def game_state(self) -> GameState:
-        return self._game_state
+        # self.waiting = WaitingScreen(self)
+        # self.game = GameScreen(self)
+        # self.game_over = EndScreen(self)
+        # self.reconnect_screen = ReconnectScreen(self)
 
-    @game_state.setter
-    def game_state(self, value: GameState) -> None:
-        self._game_state = value
+    # @property
+    # def game_state(self) -> GameState:
+    #     return self._game_state
+
+    # @game_state.setter
+    # def game_state(self, value: GameState) -> None:
+    #     self._game_state = value
 
     @property
     def window(self) -> pygame.Surface:
@@ -243,13 +248,13 @@ class GameController:
     def leave_button(self, value: pygame.Rect) -> None:
         self._leave_button = value
 
-    @property
-    def network(self) -> NetworkManager:
-        return self._network
+    # @property
+    # def network(self) -> NetworkManager:
+    #     return self._network
 
-    @network.setter
-    def network(self, value: NetworkManager) -> None:
-        self._network = value
+    # @network.setter
+    # def network(self, value: NetworkManager) -> None:
+    #     self._network = value
 
     @property
     def room_id(self) -> Optional[str]:
@@ -283,13 +288,13 @@ class GameController:
     def dropdown_state(self, value: bool) -> None:
         self._dropdown_state = value
 
-    @property
-    def login(self) -> Optional[LoginScreen]:
-        return self._login
+    # @property
+    # def login(self) -> Optional[LoginScreen]:
+    #     return self._login
 
-    @login.setter
-    def login(self, value: Optional[LoginScreen]) -> None:
-        self._login = value
+    # @login.setter
+    # def login(self, value: Optional[LoginScreen]) -> None:
+    #     self._login = value
 
     @property
     def yes_button(self) -> Any:
@@ -315,31 +320,35 @@ class GameController:
     def loading(self, value: Optional[LoadingScreen]) -> None:
         self._loading = value
 
-    @property
-    def waiting(self) -> Optional[WaitingScreen]:
-        return self._waiting
+    # @property
+    # def waiting(self) -> Optional[WaitingScreen]:
+    #     return self._waiting
 
-    @waiting.setter
-    def waiting(self, value: Optional[WaitingScreen]) -> None:
-        self._waiting = value
+    # @waiting.setter
+    # def waiting(self, value: Optional[WaitingScreen]) -> None:
+    #     self._waiting = value
 
-    @property
-    def game(self) -> Optional[GameScreen]:
-        return self._game
+    # @property
+    # def game(self) -> Optional[GameScreen]:
+    #     return self._game
 
-    @game.setter
-    def game(self, value: Optional[GameScreen]) -> None:
-        self._game = value
+    # @game.setter
+    # def game(self, value: Optional[GameScreen]) -> None:
+    #     self._game = value
 
-    @property
-    def game_over(self) -> Optional[EndScreen]:
-        return self._game_over
+    # @property
+    # def game_over(self) -> Optional[EndScreen]:
+    #     return self._game_over
 
-    @game_over.setter
-    def game_over(self, value: Optional[EndScreen]) -> None:
-        self._game_over = value
+    # @game_over.setter
+    # def game_over(self, value: Optional[EndScreen]) -> None:
+    #     self._game_over = value
+    # def calculate_screen_size(self) -> Tuple[int, int]:
+    #     # a monitor alapján add meg mekkora  képernyö de ugy hogy a felsö menüsor látszódjon
+    #     info = pygame.display.Info()
+    #     screen_width, screen_height = info.current_w, info.current_h - 50
+    #     return screen_width, screen_height
 
-    
     def run(self) -> None:
         """
         Handles events, updates game state, and screen rendering.
@@ -355,6 +364,22 @@ class GameController:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                # abalak méretezés:
+                elif event.type == pygame.VIDEORESIZE:
+                    self.width = event.w
+                    self.height = event.h
+                    print(f"Window resized: {self.width}x{self.height}")
+                elif event.type == pygame.WINDOWMINIMIZED:
+                    print(f"Window minimized: {self.width}x{self.height}")
+                elif event.type == pygame.WINDOWMAXIMIZED:
+                    self.width = self.window.get_size()[0]
+                    self.height = self.window.get_size()[1]
+                    print(f"Window maximized: {self.width}x{self.height}")
+
+                elif event.type == pygame.WINDOWRESTORED:
+                    self.width = self.window.get_size()[0]
+                    self.height = self.window.get_size()[1]
+                    print(f"Window restored: {self.width}x{self.height}")
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button in [1, 3]:
                         self.handle_mouse_click(event.pos)
@@ -363,6 +388,7 @@ class GameController:
                 elif event.type == pygame.KEYDOWN:
                     self.handle_key_press(event)
                 elif event.type == pygame.MOUSEWHEEL:
+                    pass
                     self.rooms_screen.handle_mouse_wheel(event)
 
             # Render the current screen
@@ -371,7 +397,7 @@ class GameController:
             pygame.display.update()
             self.clock.tick(FPS)
 
-        self.network.disconnect()
+        # self.network.disconnect()
         pygame.quit()
 
     def handle_mouse_click(self, pos: Tuple) -> None:
@@ -381,6 +407,7 @@ class GameController:
         Args:
             pos (Tuple): Mouse click position with (x, y) coordinates
         """
+
         if self.screen == "login":
             self.input_active = self.login.handle_mouse_click(pos)
 
@@ -443,4 +470,3 @@ class GameController:
             self.game_over.draw()
 
     # Minden property metódus itt marad változatlanul...
-   
