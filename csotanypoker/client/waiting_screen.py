@@ -2,215 +2,264 @@ import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import (
-    BLACK,
-    FONT_MEDIUM,
-    GRAY,
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
+    GREEN,
+    LIGHT_GREEN,
+    LIGHT_GREEN_TRANSPARENT,
+    LIGHTER_GREEN,
+    MIDDLE_GREEN,
+    MIDDLE_GREEN_TRANSPARENT_90,
+    RED,
+    TITLE_FONT_SIZE,
     WHITE,
+    DARK_GREEN,
+    JATEKSZABALY,
 )
-from csotanypoker.client.drawing_helpers import draw_text
-
-
-Jatek_szabaly = {
-    "2": """
-Adj át egy kártyát az ellenfélnek és mondd meg mi van rajta (igazat vagy hazugságot).
-
-Az ellenfél eldönti, hogy szerinte igaz-e. 
-Ha eltalálja, te kapod vissza a kártyát, ha nem, nála marad. Aki végül megkapja a kártyát, az kezdi a következő kört.
-
-Vesztesz, ha összegyűlik 5 ugyanolyan kártya előtted vagy elfogynak a kártyáid.""",
-    "3-6": """
-Adj át egy kártyát valakinek és mondd meg mi van rajta (igazat vagy hazugságot). 
-
-A megcélzott játékos eldöntheti, hogy elfogadja és tippel, vagy továbbadja másnak.
-Ha valaki tippel és eltalálja, a feladó kapja vissza a kártyát, ha nem, a tippelőnél marad.Aki végül megkapja a kártyát, az kezdi a következő kört. 
-
-Vesztesz, ha összegyűlik 4 ugyanolyan kártya előtted vagy elfogynak a kártyáid.
-""",
-}
+from csotanypoker.client.drawing_helpers import (
+    draw_button,
+    draw_text,
+    load_background,
+    draw_image,
+    load_image,
+    create_logout_button_rect,
+    create_rules_button_rect,
+    draw_logout_button,
+    draw_rules_button,
+    draw_rules_popup,
+    check_logout_button_interaction,
+    check_rules_button_interaction,
+    handle_logout_button_click,
+    wrap_text,
+)
 
 
 class WaitingScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
-        self.logout_button = pygame.Rect(SCREEN_WIDTH // 3, 600, 140, 50)
-        self.rules_button = pygame.Rect(SCREEN_WIDTH - 50, 10, 40, 40)
+        self.logout_button = create_logout_button_rect(self.client.height)
+        self.leave_button = pygame.Rect(
+            self.client.width // 2 - 140, self.client.height - 150, 350, 90
+        )
+        self.rules_button = create_rules_button_rect(
+            self.client.width, self.client.height
+        )
+        self.plus_button = pygame.Rect(0, 0, 40, 40)
+        self.ai_player_button = pygame.Rect(0, 0, 400, 55)
         self.show_rules = False
+        self.margin = 30
+        self.hovered_elements = set()
+        self.pressed_elements = set()
+
+    def _update_button_states(self):
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+
+        self.hovered_elements.clear()
+        if not mouse_pressed:
+            self.pressed_elements.clear()
+
+        is_logout_hovered, is_logout_pressed = check_logout_button_interaction(
+            mouse_pos, mouse_pressed, self.logout_button
+        )
+        if is_logout_hovered:
+            self.hovered_elements.add("logout")
+        if is_logout_pressed:
+            self.pressed_elements.add("logout")
+
+        if self.leave_button.collidepoint(mouse_pos):
+            self.hovered_elements.add("leave")
+            if mouse_pressed:
+                self.pressed_elements.add("leave")
+
+        self.show_rules = check_rules_button_interaction(mouse_pos, self.rules_button)
+
+        if hasattr(self, "ai_player_button") and self.ai_player_button.collidepoint(
+            mouse_pos
+        ):
+            self.hovered_elements.add("ai_player")
+            if mouse_pressed:
+                self.pressed_elements.add("ai_player")
 
     def draw(self) -> None:
         """
         Draw the waiting screen.
         """
-        self.client.window.fill(WHITE)
-        draw_text(
-            self.client.window, f"Szoba: {self.client.room_name}", BLACK, 400, 50, True
+
+        self.logout_button = create_logout_button_rect(self.client.height)
+        self.leave_button = pygame.Rect(
+            self.client.width // 2 - 140, self.client.height - 150, 350, 90
         )
-        draw_text(
-            self.client.window,
-            f"Felhasználónév: {self.client.username}",
-            BLACK,
-            600,
-            50,
-            True,
+        self.rules_button = create_rules_button_rect(
+            self.client.width, self.client.height
         )
-        status = "Várakozás a játékosokra."
-        if self.client.selected_room.password is not None:
-            draw_text(
-                self.client.window,
-                f"Jelszó:{self.client.selected_room.password}",
-                BLACK,
-                600,
-                100,
-                True,
+
+        self._update_button_states()
+
+        load_background(self.client.width, self.client.height, self.client.window)
+
+        if self.client.selected_room is not None:
+            wrapped_text = wrap_text(
+                f"{self.client.room_name} {self.client.selected_room.player_count}/{self.client.selected_room.max_player_count}",
+                max_length=20,
             )
-
-        draw_text(self.client.window, status, BLACK, 400, 100, True)
-        draw_text(self.client.window, "Játékosok:", BLACK, 50, 150)
-        y = 200
-        for player in self.client.game_state.players:
-            dot_color = (
-                (0, 200, 0)
-                if player.name in self.client.active_player_list_name
-                else (200, 0, 0)
-            )
-            pygame.draw.circle(self.client.window, dot_color, (40, y + 10), 8)
-
-            draw_text(self.client.window, player.name, BLACK, 60, y)
-            y += 40
-
-        if self.client.message and self.client.message_display_time > 0:
-            draw_text(
-                self.client.window,
-                self.client.message,
-                BLACK,
-                self.client.window.get_width() // 2,
-                self.client.window.get_height() // 2,
-                True,
-            )
-            self.client.message_display_time -= 1
-
-        pygame.draw.rect(self.client.window, GRAY, self.client.leave_button)
-        draw_text(
-            self.client.window,
-            "Szoba elhagyása",
-            BLACK,
-            self.client.leave_button.centerx,
-            self.client.leave_button.centery,
-            True,
-        )
-        font_medium = pygame.font.Font(None, FONT_MEDIUM)
-        pygame.draw.rect(self.client.window, GRAY, self.logout_button)
-        draw_text(
-            self.client.window,
-            "Kijelentkezés",
-            BLACK,
-            self.logout_button.centerx,
-            self.logout_button.centery,
-            centered=True,
-            font=font_medium,
-        )
-
-        # Kérdőjel gomb rajzolása
-        pygame.draw.rect(self.client.window, GRAY, self.rules_button)
-        pygame.draw.rect(self.client.window, BLACK, self.rules_button, 2)
-        draw_text(
-            self.client.window,
-            "?",
-            BLACK,
-            self.rules_button.centerx,
-            self.rules_button.centery,
-            centered=True,
-            font=font_medium,
-        )
-
-        # Játékszabály megjelenítése ha az egér a kérdőjel gombon van
-        if self.show_rules:
-            self.draw_rules_popup()
-
-    def draw_rules_popup(self):
-        popup_width = int(SCREEN_WIDTH * 0.6)
-        popup_height = int(SCREEN_HEIGHT * 0.6)
-        popup_x = (SCREEN_WIDTH - popup_width) // 2
-        popup_y = (SCREEN_HEIGHT - popup_height) // 2
-
-        popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
-
-        pygame.draw.rect(self.client.window, (173, 216, 230), popup_rect)
-
-        max_players = getattr(self.client.selected_room, "max_player_count")
-        print(f"Max players: {max_players}")
-        rules_key = "2" if max_players == 2 else "3-6"
-        rules_text = Jatek_szabaly[rules_key]
-
-        title = f"Játékszabály ({rules_key} játékos)"
-        draw_text(
-            self.client.window,
-            title,
-            BLACK,
-            popup_rect.centerx,
-            popup_y + 30,
-            centered=True,
-            font=pygame.font.Font(None, 40),
-        )
-
-       
-        font = pygame.font.Font(None, 30)
-        lines = []
-        raw_lines = rules_text.strip().split("\n")
-
-        for raw_line in raw_lines:
-            raw_line = raw_line.strip()
-
-            if not raw_line:
-                lines.append("")
-                continue
-
-            words = raw_line.split()
-            current_line = ""
-
-            for word in words:
-                test_line = current_line + " " + word if current_line else word
-                text_width = font.size(test_line)[0]
-
-                if text_width <= popup_width - 60:
-                    current_line = test_line
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = word
-
-            if current_line:
-                lines.append(current_line)
-
-      
-        line_height = 30
-        start_y = popup_y + 80
-
-        for i, line in enumerate(lines):
-            if line:  
+            for i, line in enumerate(wrapped_text):
                 draw_text(
                     self.client.window,
                     line,
-                    BLACK,
-                    popup_x + 30,
-                    start_y + i * line_height,
-                    centered=False,
-                    font=font,
+                    DARK_GREEN,
+                    self.client.width // 2,
+                    self.margin + (i * 30),
+                    True,
+                    "bold",
+                    TITLE_FONT_SIZE,
+                )
+            draw_text(
+                self.client.window,
+                f"ID:{self.client.selected_room.room_id}",
+                DARK_GREEN,
+                250,
+                50,
+                centered=True,
+                font="thin",
+                font_size=25,
+            )
+
+        draw_text(
+            self.client.window,
+            f"Várakozás a többi játékosra.",
+            DARK_GREEN,
+            self.client.width // 2,
+            self.margin + 50,
+            True,
+            "thin",
+            30,
+        )
+
+        start_y = self.client.height // 5
+        start_x = 200
+
+        for i, player in enumerate(self.client.users):
+            dot_color = GREEN if player.is_active else RED
+            pygame.draw.circle(
+                self.client.window,
+                dot_color,
+                (start_x - 70, start_y + 30),
+                17,
+            )
+
+            draw_text(
+                self.client.window,
+                player.username,
+                DARK_GREEN,
+                start_x,
+                start_y,
+                font_size=55,
+            )
+            start_y += 70
+            if (
+                i == len(self.client.users) - 1
+                and len(self.client.users) < self.client.selected_room.max_player_count
+            ):
+                self.plus_button = pygame.Rect(start_x - 70, start_y + 7, 40, 40)
+                self.ai_player_button = pygame.Rect(start_x - 90, start_y, 400, 55)
+
+        if self.client.message and self.client.message_display_time > 0:
+            message_lines = wrap_text(self.client.message, 30)
+
+            for i, line in enumerate(message_lines):
+                draw_text(
+                    self.client.window,
+                    line,
+                    RED,
+                    self.client.width - 200,
+                    50 + (i * 30),
+                    centered=True,
+                    font="thin",
+                    font_size=25,
                 )
 
+            self.client.message_display_time -= 1
+
+        draw_button(
+            surface=self.client.window,
+            rect=self.leave_button,
+            text="Szoba elhagyása",
+            text_color=WHITE,
+            background_color=MIDDLE_GREEN,
+            border_color=DARK_GREEN,
+            font_size=35,
+            font_type="bold",
+            border_width=5,
+            is_hovered="leave" in self.hovered_elements,
+            is_pressed="leave" in self.pressed_elements,
+            hover_color=MIDDLE_GREEN_TRANSPARENT_90,
+            pressed_color=LIGHT_GREEN,
+        )
+        draw_logout_button(
+            self.client.window,
+            self.logout_button,
+            is_hovered="logout" in self.hovered_elements,
+            is_pressed="logout" in self.pressed_elements,
+        )
+        draw_rules_button(self.client.window, self.rules_button)
+
+        if (
+            self.client.selected_room
+            and len(self.client.users) < self.client.selected_room.max_player_count
+        ):
+            draw_button(
+                surface=self.client.window,
+                rect=self.ai_player_button,
+                text="AI játékos hozzáadása",
+                text_color=DARK_GREEN,
+                background_color=LIGHT_GREEN_TRANSPARENT,
+                border_color=MIDDLE_GREEN,
+                font_size=25,
+                font_type="thin",
+                border_width=3,
+                is_hovered="ai_player" in self.hovered_elements,
+                is_pressed="ai_player" in self.pressed_elements,
+                hover_color=MIDDLE_GREEN_TRANSPARENT_90,
+                pressed_color=LIGHTER_GREEN,
+            )
+            plus = load_image(
+                "plus", "button", size=(self.plus_button.width, self.plus_button.height)
+            )
+            draw_image(self.client.window, plus, self.plus_button.x, self.plus_button.y)
+
+        if self.show_rules:
+            draw_rules_popup(
+                self.client.window,
+                self.client.width,
+                self.client.height,
+                JATEKSZABALY[
+                    "2" if self.client.selected_room.max_player_count == 2 else "3-6"
+                ],
+                self.client.selected_room.max_player_count,
+            )
+
     def handle_mouse_click(self, pos):
-        """Handle mouse clicks on the waiting screen"""
-        if self.client.leave_button.collidepoint(pos):
-            # print("Leaving room")
+        if self.leave_button.collidepoint(pos):
+            print("Leaving room")
             self.client.network.leave_room()
-        elif self.logout_button.collidepoint(pos):
-            # print("Logging out")
-            self.client.network.logout()
+            return True
+        elif handle_logout_button_click(pos, self.logout_button, self.client.network):
+            return True
+        elif hasattr(self, "ai_player_button") and self.ai_player_button.collidepoint(
+            pos
+        ):
+            if len(self.client.users) < self.client.selected_room.max_player_count:
+                print("AI hozzáadás")
+
+                return True
+        elif hasattr(self, "plus_button") and self.plus_button.collidepoint(pos):
+            if len(self.client.users) < self.client.selected_room.max_player_count:
+                print("AI hozzáadás")
+
+                return True
+        return False
 
     def handle_mouse_motion(self, pos):
-        """Handle mouse motion for rules button hover"""
-        self.show_rules = self.rules_button.collidepoint(pos)
+        pass
 
     def handle_key_press(self, key):
         pass

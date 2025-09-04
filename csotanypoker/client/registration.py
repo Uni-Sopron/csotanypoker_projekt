@@ -36,9 +36,6 @@ class LoginScreen(BaseScreen):
         self.login_button_pressed = False
         self.register_button_pressed = False
 
-        self.cursor_visible = True
-        self.cursor_timer = 0
-
         self.input_padding = 15
         self.cursor_blink_interval = 400
 
@@ -83,10 +80,12 @@ class LoginScreen(BaseScreen):
                 True,
                 font="bold",
                 font_size=40,
+                
             )
+            self.client.error_display_time -= 1
 
     def draw(self):
-        self._update_cursor_state()
+
         self._calculate_ui_rects()
         self._update_button_states()
 
@@ -111,7 +110,6 @@ class LoginScreen(BaseScreen):
             text=self.username_text,
             is_active=(self.active_field == "username"),
             is_password=False,
-            cursor_visible=self.cursor_visible,
             background_color=self.input_border_color,
             active_background_color=self.active_input_color,
             border_color=None,
@@ -129,7 +127,6 @@ class LoginScreen(BaseScreen):
             text=self.password_text,
             is_active=(self.active_field == "password"),
             is_password=True,
-            cursor_visible=self.cursor_visible,
             background_color=self.input_border_color,
             active_background_color=self.active_input_color,
             border_color=None,
@@ -254,8 +251,8 @@ class LoginScreen(BaseScreen):
         self.client.network.register(self.username_text.strip(), self.password_text)
 
     def set_error(self, message):
-        self.client.login_error = message
-        self.client.error_display_time = pygame.time.get_ticks() + 3000
+        self.client.login_error = message#TODO ez itt nem jo le kell cserélni a message_display_time-ra
+        self.client.error_display_time = 30
 
     def clear_error(self):
         self.client.login_error = ""

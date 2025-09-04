@@ -2,11 +2,15 @@ from enum import Enum
 
 
 class Animal(Enum):
-    COCKROACH = "csótány"
-    RAT = "patkány"
-    BAT = "denevér"
-    TOAD = "varangy"
-    BEDBUG = "poloska"
-    SPIDER = "pók"
-    FLY = "légy"
-    SCORPION = "skorpió"
+    COCKROACH = "cockroach"
+    RAT = "rat"
+    BAT = "bat"
+    TOAD = "toad"
+    BEDBUG = "bedbug"
+    SPIDER = "spider"
+    FLY = "fly"
+    SCORPION = "scorpion"
+
+
+    def __str__(self):
+        return self.value

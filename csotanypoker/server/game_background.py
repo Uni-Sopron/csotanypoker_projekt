@@ -1,19 +1,7 @@
 import os
 from random import choice, shuffle
-from csotanypoker.models.card import Card
+from csotanypoker.models.animal import Animal
 from csotanypoker.models.gamestate import GameState
-
-
-TYPES = [
-    "csotany",
-    "denever",
-    "poloska",
-    "patkany",
-    "légy",
-    "varangy",
-    "skorpió",
-    "pók",
-]
 
 
 class GameLogic:
@@ -23,34 +11,45 @@ class GameLogic:
         self.state = GameState(id=id, save_path=os.path.join(save_dir, f"{id}.pkl"))
         self.state.players = players
         self.state.active_player = self.choose_starting_player()
+        self.deck = []
         self.generate_deck()
         self.shuffle_deck()
         self.deal_cards()
 
     def generate_deck(self):
         deck_cards = []
-        for type in TYPES:
+        for type in Animal:
             for i in range(1, 9):
-                deck_cards.append(Card(type=type, index=i))
-        self.state.deck = deck_cards
+                deck_cards.append(Animal(type))
+        self.deck = deck_cards
+
+        self.deck = [animal for animal in Animal for _ in range(8)]
+        print("Deck generated with animals:", self.deck)
 
     def shuffle_deck(self):
-        deck_list = list(self.state.deck)
+        deck_list = list(self.deck)
         shuffle(deck_list)
         if len(self.state.players) == 2:
             deck_list = deck_list[:-10]
-        self.state.deck = deck_list
+        self.deck = deck_list
 
     def deal_cards(self):
         player_count = len(self.state.players)
-        deck_size = len(self.state.deck)
+        deck_size = len(self.deck)
         portions = deck_size // player_count
         for i in range(player_count):
-            self.state.players[i].cards_in_hand = self.state.deck[
+            self.state.players[i].cards_in_hand = self.deck[
                 i * portions : (i + 1) * portions
             ]
         for player in self.state.players:
-            player.card_count = len(player.cards_in_hand)
+            print(
+                "Player:",
+                player.username,
+                "Cards in hand:",
+                player.cards_in_hand,
+                "Card count:",
+                player.card_count(),
+            )
 
     def choose_starting_player(self):
         return choice(self.state.players)
@@ -63,34 +62,32 @@ class GameLogic:
             lose_count = 5
         else:
             lose_count = 4
-        for card_type, count in self.state.active_player.cards_in_front.items():
-            if count >= lose_count:
-                return True
+        for player in self.state.players:
+            for card_type, count in player.cards_in_front.items():
+                if count >= lose_count:
+                    self.state.active_player = player
+                    return True
         return False
 
     def select_target_player(self, name):
         for player in self.state.players:
-            if player.name == name:
+            if player.username == name:
                 self.state.targeted_player = player
                 break
 
-    def select_card(self, selected_card_id=None):
+    def select_card(self, selected_card=None, passing=None):
         for card in self.state.active_player.cards_in_hand:
-            if card.name == selected_card_id:
+            if card == selected_card:
                 self.state.question_card = card
-                self.state.active_player.cards_in_hand.remove(card)
+                if not passing:
+                    self.state.active_player.cards_in_hand.remove(card)
 
-                self.state.active_player.card_count = len(
-                    self.state.active_player.cards_in_hand
+                print(
+                    f"Active player card count: {self.state.active_player.card_count()}"
                 )
 
-                if (
-                    self.state.active_player.name
-                    not in self.state.question_card.visited_already
-                ):
-                    self.state.question_card.visited_already.append(
-                        self.state.active_player.name
-                    )
+                if self.state.active_player.username not in self.state.visited_already:
+                    self.state.visited_already.append(self.state.active_player.username)
                 return
 
     def make_statement(self, statement=None):
@@ -99,14 +96,14 @@ class GameLogic:
     def check_truth(self, answer):
         self.state.targeted_player.is_true = answer
         if self.state.targeted_player.is_true is True:
-            if self.state.active_player.statement == self.state.question_card.type:
+            if self.state.active_player.statement == self.state.question_card.value:
                 print("correct answer")
                 return True
             else:
                 print("wrong answer")
                 return False
         elif self.state.targeted_player.is_true is False:
-            if self.state.active_player.statement != self.state.question_card.type:
+            if self.state.active_player.statement != self.state.question_card.value:
                 print("correct answer")
                 return True
             else:
@@ -115,11 +112,9 @@ class GameLogic:
 
     def place_card(self, player):
         # A játékos elhelyezi a kérdéskártyát maga előtt
-        card_type = self.state.question_card.type
+        card_type = self.state.question_card
         if card_type not in player.cards_in_front:
             player.cards_in_front[card_type] = 1
         else:
             player.cards_in_front[card_type] += 1
-
-        # Visszaállítjuk az aktív játékost az új játékosra
-        self.state.active_player = player
+        return player

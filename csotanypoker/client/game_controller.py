@@ -5,42 +5,45 @@ import pygame
 from csotanypoker.client.client import NetworkManager
 from csotanypoker.client.constans import FPS, SCREEN_WIDTH, SCREEN_HEIGHT
 
-# from csotanypoker.client.end_screen import EndScreen
-# from csotanypoker.client.game_screen import GameScreen
+from csotanypoker.client.end_screen import EndScreen
+from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
 
-# from csotanypoker.client.reconnect_screen import ReconnectScreen
+
+from csotanypoker.client.reconnect_screen import ReconnectScreen
 from csotanypoker.client.registration import LoginScreen
 from csotanypoker.client.rooms_screen import RoomsScreen
-# from csotanypoker.client.waiting_screen import WaitingScreen
-# from csotanypoker.models.gamestate import GameState
+
+from csotanypoker.client.waiting_screen import WaitingScreen
+from csotanypoker.models.gamestate import ClientGameState
+from csotanypoker.models.player import OpponentPlayer, VisiblePlayer
 
 
 class GameController:
     def __init__(self) -> None:
         pygame.init()  # Initialize Pygame
-        # self.game_state = GameState()
+        self.game_state = ClientGameState()
         width, height = SCREEN_WIDTH, SCREEN_HEIGHT
 
         self.window: pygame.Surface = pygame.display.set_mode(
             (width, height), pygame.RESIZABLE
         )
-        # olvasd ki az ablak méretét
+
         self.width = self.window.get_size()[0]
         self.height = self.window.get_size()[1]
         pygame.display.set_caption("Csotány Póker")
         self.clock: pygame.time.Clock = pygame.time.Clock()
         self.active_player_list_name: List[str] = []  # List of active player names
         self.screen: str = "loading"
-
-        self.pipa_rect = None  # Rectangle for the checkmark image
+        self.opponent_players: List[OpponentPlayer] = []
+        self.pipa_rect = None  
         self.x_rect = None
         self.IsPassed = False
         self.is_given = False
-
+        self.users = []
         self.message: str = ""  # Message to be displayed
         self.message_display_time: float = 0  # Message display duration
-
+        self.visible_player: Optional[VisiblePlayer] = None
         self.input_text: str = ""
         self.input_active: bool = False
         self.visited_players = []
@@ -49,7 +52,7 @@ class GameController:
         self.selected_room = None
 
         self.user = None
-        # Handling error messages
+
         self.login_error: str = ""
         self.error_display_time: float = 0
 
@@ -57,9 +60,9 @@ class GameController:
 
         # Network communication
         self.network: NetworkManager = NetworkManager(self)
-        self.username: str = ""
+        self.user = None
         self.room_id: Optional[str] = None
-        self.room_name: str = ""  # Current room name
+        self.room_name: str = ""  
         self.room_list = []
         self.statement = None
         self.dropdown_state = False
@@ -67,18 +70,19 @@ class GameController:
         self.loading = LoadingScreen(self)
         self.login = LoginScreen(self)
         self.rooms_screen = RoomsScreen(self)
-        # self.waiting = WaitingScreen(self)
-        # self.game = GameScreen(self)
-        # self.game_over = EndScreen(self)
-        # self.reconnect_screen = ReconnectScreen(self)
+        self.players = []
+        self.waiting = WaitingScreen(self)
+        self.game = GameScreen(self)
+        self.game_over = EndScreen(self)
+        self.reconnect_screen = ReconnectScreen(self)
 
-    # @property
-    # def game_state(self) -> GameState:
-    #     return self._game_state
+    @property
+    def game_state(self) -> ClientGameState:
+        return self._game_state
 
-    # @game_state.setter
-    # def game_state(self, value: GameState) -> None:
-    #     self._game_state = value
+    @game_state.setter
+    def game_state(self, value: ClientGameState) -> None:
+        self._game_state = value
 
     @property
     def window(self) -> pygame.Surface:
@@ -248,13 +252,13 @@ class GameController:
     def leave_button(self, value: pygame.Rect) -> None:
         self._leave_button = value
 
-    # @property
-    # def network(self) -> NetworkManager:
-    #     return self._network
+    @property
+    def network(self) -> NetworkManager:
+        return self._network
 
-    # @network.setter
-    # def network(self, value: NetworkManager) -> None:
-    #     self._network = value
+    @network.setter
+    def network(self, value: NetworkManager) -> None:
+        self._network = value
 
     @property
     def room_id(self) -> Optional[str]:
@@ -288,13 +292,13 @@ class GameController:
     def dropdown_state(self, value: bool) -> None:
         self._dropdown_state = value
 
-    # @property
-    # def login(self) -> Optional[LoginScreen]:
-    #     return self._login
+    @property
+    def login(self) -> Optional[LoginScreen]:
+        return self._login
 
-    # @login.setter
-    # def login(self, value: Optional[LoginScreen]) -> None:
-    #     self._login = value
+    @login.setter
+    def login(self, value: Optional[LoginScreen]) -> None:
+        self._login = value
 
     @property
     def yes_button(self) -> Any:
@@ -320,35 +324,30 @@ class GameController:
     def loading(self, value: Optional[LoadingScreen]) -> None:
         self._loading = value
 
-    # @property
-    # def waiting(self) -> Optional[WaitingScreen]:
-    #     return self._waiting
+    @property
+    def waiting(self) -> Optional[WaitingScreen]:
+        return self._waiting
 
-    # @waiting.setter
-    # def waiting(self, value: Optional[WaitingScreen]) -> None:
-    #     self._waiting = value
+    @waiting.setter
+    def waiting(self, value: Optional[WaitingScreen]) -> None:
+        self._waiting = value
 
-    # @property
-    # def game(self) -> Optional[GameScreen]:
-    #     return self._game
+    @property
+    def game(self) -> Optional[GameScreen]:
+        return self._game
 
-    # @game.setter
-    # def game(self, value: Optional[GameScreen]) -> None:
-    #     self._game = value
+    @game.setter
+    def game(self, value: Optional[GameScreen]) -> None:
+        self._game = value
 
-    # @property
-    # def game_over(self) -> Optional[EndScreen]:
-    #     return self._game_over
+    @property
+    def game_over(self) -> Optional[EndScreen]:
+        return self._game_over
 
-    # @game_over.setter
-    # def game_over(self, value: Optional[EndScreen]) -> None:
-    #     self._game_over = value
-    # def calculate_screen_size(self) -> Tuple[int, int]:
-    #     # a monitor alapján add meg mekkora  képernyö de ugy hogy a felsö menüsor látszódjon
-    #     info = pygame.display.Info()
-    #     screen_width, screen_height = info.current_w, info.current_h - 50
-    #     return screen_width, screen_height
-
+    @game_over.setter
+    def game_over(self, value: Optional[EndScreen]) -> None:
+        self._game_over = value
+  
     def run(self) -> None:
         """
         Handles events, updates game state, and screen rendering.
@@ -417,9 +416,8 @@ class GameController:
         if self.screen == "waiting":
             self.waiting.handle_mouse_click(pos)
 
-        # Handle player clicks during the game
         if self.screen == "game":
-            pass
+            self.game.handle_mouse_click(pos)
         if self.screen == "reconnect_screen":
             self.reconnect_screen.handle_mouse_click(pos)
         if self.screen == "game_over":
@@ -434,6 +432,8 @@ class GameController:
         """
         if self.screen == "waiting":
             self.waiting.handle_mouse_motion(pos)
+        elif self.screen == "rooms_screen":
+            self.rooms_screen.handle_mouse_motion(pos)
 
     def handle_key_press(self, event: pygame.event.Event) -> None:
         """
@@ -469,4 +469,3 @@ class GameController:
         elif self.screen == "game_over":
             self.game_over.draw()
 
-    # Minden property metódus itt marad változatlanul...

@@ -3,97 +3,131 @@ import pygame
 from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import (
     BLACK,
+    DARK_GREEN,
     FONT_MEDIUM,
     GRAY,
-    RED,
-    SCREEN_WIDTH,
+    LIGHT_GREEN,
+    MIDDLE_GREEN,
     WHITE,
 )
-from csotanypoker.client.drawing_helpers import draw_text
+from csotanypoker.client.drawing_helpers import draw_button, draw_text, load_background
 
 
 class ReconnectScreen(BaseScreen):
     def __init__(self, client):
         super().__init__(client)
 
+        self.hovered_elements = set()
+        self.pressed_elements = set()
+
         self.font_medium = pygame.font.Font(None, FONT_MEDIUM)
-        self.reconnect_button = pygame.Rect(SCREEN_WIDTH // 2 - 150, 500, 140, 50)
-        self.rooms_button = pygame.Rect(SCREEN_WIDTH // 2 + 10, 500, 140, 50)
-        self.logout_button = pygame.Rect(SCREEN_WIDTH // 3, 600, 140, 50)
-        self.reconnect_hover = False
-        self.rooms_hover = False
+        self.reconnect_button = pygame.Rect(
+            self.client.width // 2 - 250, self.client.height // 2, 240, 95
+        )
+        self.leave_button = pygame.Rect(
+            self.client.width // 2 + 30,
+            self.client.height // 2.4 + 50 + 50 + 100,
+            240,
+            95,
+        )
+        self.logout_button = pygame.Rect(20, self.client.height - 105, 220, 85)
 
     def draw(self):
-        self.client.window.fill(WHITE)
+        self.reconnect_button = pygame.Rect(
+            self.client.width // 2 - 250,
+            self.client.height // 2.4 + 50 + 50 + 100,
+            240,
+            95,
+        )
+        self.leave_button = pygame.Rect(
+            self.client.width // 2 + 30,
+            self.client.height // 2.4 + 50 + 50 + 100,
+            240,
+            95,
+        )
+        self.logout_button = pygame.Rect(20, self.client.height - 105, 220, 85)
+        load_background(self.client.width, self.client.height, self.client.window)
 
         draw_text(
             self.client.window,
             "Újracsatlakozás",
-            BLACK,
-            SCREEN_WIDTH // 2,
-            100,
+            DARK_GREEN,
+            self.client.width // 2,
+            self.client.height // 7,
             centered=True,
-            font=self.font_medium,
+            font="regular",
+            font_size=70,
         )
         for room in self.client.room_list:
             if room.room_id == self.client.previous_room_id:
                 previous_room = room
                 break
         if previous_room:
-            info_text = "Korábban a következő szobában voltál:"
             draw_text(
                 self.client.window,
-                info_text,
-                BLACK,
-                SCREEN_WIDTH // 2,
-                220,
+                f"Jelenlegi szobád: {previous_room.name}",
+                DARK_GREEN,
+                self.client.width // 2,
+                self.client.height // 2.4,
                 centered=True,
-                font=self.font_medium,
+                font="thin",
+                font_size=40,
             )
 
-            room_name = previous_room.name
-            draw_text(
-                self.client.window,
-                f'"{room_name}"',
-                BLACK,
-                SCREEN_WIDTH // 2,
-                250,
-                centered=True,
-                font=self.font_medium,
-            )
-
-            players_text = f"Játékosok: {previous_room.player_count}/{previous_room.max_player_count}"
+            players_text = f"Aktuális játékosszám: {previous_room.player_count}/{previous_room.max_player_count}"
             draw_text(
                 self.client.window,
                 players_text,
-                BLACK,
-                SCREEN_WIDTH // 2,
-                280,
+                DARK_GREEN,
+                self.client.width // 2,
+                self.client.height // 2.4 + 50,
                 centered=True,
-                font=self.font_medium,
+                font="thin",
+                font_size=40,
             )
 
-        pygame.draw.rect(self.client.window, GRAY, self.reconnect_button)
+        if self.client.message:
+            draw_text(
+                self.client.window,
+                self.client.message,
+                DARK_GREEN,
+                self.client.width // 2,
+                self.client.height // 2.4 + 50 + 50,
+                centered=True,
+                font="thin",
+                font_size=40,
+            )
 
-        draw_text(
-            self.client.window,
-            "Újracsatlakozás",
-            BLACK,
-            self.reconnect_button.centerx,
-            self.reconnect_button.centery,
-            centered=True,
-            font=self.font_medium,
+        draw_button(
+            surface=self.client.window,
+            rect=self.reconnect_button,
+            text="Újracsatlakozás",
+            text_color=WHITE,
+            background_color=MIDDLE_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered="reconnect" in self.hovered_elements,
+            is_pressed="reconnect" in self.pressed_elements,
+            hover_color=DARK_GREEN,
+            pressed_color=LIGHT_GREEN,
         )
 
-        pygame.draw.rect(self.client.window, GRAY, self.rooms_button)
-        draw_text(
-            self.client.window,
-            "Szoba elhagyása",
-            BLACK,
-            self.rooms_button.centerx,
-            self.rooms_button.centery,
-            centered=True,
-            font=self.font_medium,
+        draw_button(
+            surface=self.client.window,
+            rect=self.leave_button,
+            text="Szoba elhagyása",
+            text_color=WHITE,
+            background_color=MIDDLE_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered="leave" in self.hovered_elements,
+            is_pressed="leave" in self.pressed_elements,
+            hover_color=DARK_GREEN,
+            pressed_color=LIGHT_GREEN,
         )
         pygame.draw.rect(self.client.window, GRAY, self.logout_button)
         draw_text(
@@ -108,17 +142,7 @@ class ReconnectScreen(BaseScreen):
 
         mouse_pos = pygame.mouse.get_pos()
         self.reconnect_hover = self.reconnect_button.collidepoint(mouse_pos)
-        self.rooms_hover = self.rooms_button.collidepoint(mouse_pos)
-        if self.client.message:
-            draw_text(
-                self.client.window,
-                self.client.message,
-                RED,
-                SCREEN_WIDTH // 2,
-                500,
-                centered=True,
-                font=self.font_medium,
-            )
+        self._draw_logout_button()
 
     def handle_mouse_click(self, pos):
         for room in self.client.room_list:
@@ -130,15 +154,14 @@ class ReconnectScreen(BaseScreen):
                 room_id = self.client.previous_room_id
                 if room_id:
                     print("Újracsatlakozás a szobához:", room_id)
-                    print(f"jatek id.k{previous_room.game_ids}")
-                    if previous_room.game_ids == []:
+                    if not self.client.game_start:
                         self.client.network.rejoin_waiting_room()
                         print("UJRSCSATLAKOZÁS")
                     else:
                         print("A játék már elkezdődött")
                         self.client.network.rejoin_game()
 
-        elif self.rooms_button.collidepoint(pos):
+        elif self.leave_button.collidepoint(pos):
             self.client.network.leave_room()
             self.client.screen = "rooms_screen"
         elif self.logout_button.collidepoint(pos):
@@ -146,3 +169,21 @@ class ReconnectScreen(BaseScreen):
 
     def handle_key_press(self, event):
         pass
+
+    def _draw_logout_button(self):
+        """Kijelentkezés gomb rajzolása"""
+        draw_button(
+            surface=self.client.window,
+            rect=self.logout_button,
+            text="Kijelentkezés",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=30,
+            font_type="bold",
+            border_width=5,
+            is_hovered="logout" in self.hovered_elements,
+            is_pressed="logout" in self.pressed_elements,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )

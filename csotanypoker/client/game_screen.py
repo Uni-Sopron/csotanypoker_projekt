@@ -2,614 +2,900 @@ import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import (
-    ANIMALS,
-    BLACK,
-    FONT_MEDIUM,
-    FONT_SMALL,
-    GRAY,
+    LIGHT_GREEN,
+    LIGHT_GREEN_TRANSPARENT,
+    MIDDLE_GREEN,
+    MIDDLE_GREEN_TRANSPARENT_70,
+    MIDDLE_GREEN_TRANSPARENT_50,
+    LIGHTER_GREEN_TRANSPARENT,
+    MIDDLE_GREEN_TRANSPARENT_90,
     RED,
-    SCREEN_HEIGHT,
-    SCREEN_WIDTH,
     WHITE,
+    DARK_GREEN,
+    JATEKSZABALY,
 )
-from csotanypoker.client.drawing_helpers import draw_image, draw_text, load_image
+from csotanypoker.models.animal import Animal
+from csotanypoker.client.drawing_helpers import (
+    _draw_rounded_rect,
+    draw_button,
+    draw_image,
+    draw_image_button,
+    draw_text,
+    load_background,
+    load_image,
+    create_logout_button_rect,
+    create_rules_button_rect,
+    draw_logout_button,
+    draw_rules_button,
+    draw_rules_popup,
+    check_logout_button_interaction,
+    check_rules_button_interaction,
+    handle_logout_button_click,
+    wrap_text,
+    preload_all_images,
+)
 
 
 class GameScreen(BaseScreen):
     def __init__(self, client) -> None:
         super().__init__(client)
 
-        self.client.selected_card = None
-        self.selected_player = None
-        self.selected_player_frame = None
         self.selected_card_frame = None
-
+        self.show_rules = False
         self.frame_color = RED
         self.statement = None
-        self.dropdown_position = pygame.Rect(
-            SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT // 2 + 150, 100, 30
-        )
-        self.accept_button_position = pygame.Rect(
-            SCREEN_WIDTH // 2 + 60, SCREEN_HEIGHT // 2 + 150, 100, 30
-        )
+        self.show_leave_button = False
+
+        self.show_center_card = False
+        self.show_tipp_area = False
 
         self.checkmark_rect = None
         self.cross_rect = None
-        self.passing = False
+        # self.passing = False
         self.client.passed = False
-        self.logout_button = pygame.Rect(100, 600, 140, 50)
-        self.leave_button = pygame.Rect(100, 500, 140, 50)
+
+        self.logout_button = create_logout_button_rect(self.client.height)
+        self.rules_button = create_rules_button_rect(
+            self.client.width, self.client.height
+        )
+        self.leave_button = pygame.Rect(
+            self.logout_button.x, self.logout_button.y - 90, 200, 75
+        )
+
+        self.hovered_elements = set()
+        self.pressed_elements = set()
+
+        self.active_animal = None
+
+        self._logo_images_cache = None
+        self._images_preloaded = False
+
+    def _ensure_images_preloaded(self):
+        if not self._images_preloaded:
+            preload_all_images()
+            self._logo_images_cache = {}
+            for allat in Animal:
+                self._logo_images_cache[allat] = load_image(
+                    allat.value, image_type="logo", size=(50, 50)
+                )
+
+            self._images_preloaded = True
+
+    def _update_button_states(self):
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+
+        self.hovered_elements.clear()
+        if not mouse_pressed:
+            self.pressed_elements.clear()
+
+        is_logout_hovered, is_logout_pressed = check_logout_button_interaction(
+            mouse_pos, mouse_pressed, self.logout_button
+        )
+        if is_logout_hovered:
+            self.hovered_elements.add("logout")
+        if is_logout_pressed:
+            self.pressed_elements.add("logout")
+
+        self.show_rules = check_rules_button_interaction(mouse_pos, self.rules_button)
+
+        if self.leave_button.collidepoint(mouse_pos):
+            self.hovered_elements.add("leave")
+            if mouse_pressed:
+                self.pressed_elements.add("leave")
+
+        if hasattr(self, "oke_button") and self.oke_button.collidepoint(mouse_pos):
+            self.hovered_elements.add("ok")
+            if mouse_pressed:
+                self.pressed_elements.add("ok")
+
+        if hasattr(self, "pass_button") and self.pass_button.collidepoint(mouse_pos):
+            self.hovered_elements.add("pass")
+            if mouse_pressed:
+                self.pressed_elements.add("pass")
+
+        if (
+            hasattr(self, "cross_rect")
+            and self.cross_rect
+            and self.cross_rect.collidepoint(mouse_pos)
+        ):
+            self.hovered_elements.add("cross")
+            if mouse_pressed:
+                self.pressed_elements.add("cross")
+
+        if (
+            hasattr(self, "checkmark_rect")
+            and self.checkmark_rect
+            and self.checkmark_rect.collidepoint(mouse_pos)
+        ):
+            self.hovered_elements.add("checkmark")
+            if mouse_pressed:
+                self.pressed_elements.add("checkmark")
+
+    def draw_center_card_area(self):
+        card = load_image(
+            self.client.game_state.question_card, "card", size=(65 * 2.5, 100 * 2.5)
+        )
+        draw_image(
+            self.client.window,
+            card,
+            self.client.width // 2,
+            self.client.height // 2,
+            centered=True,
+        )
+
+    def draw_tipp_area(self):
+        self.cross_rect = draw_image_button(
+            self.client.window,
+            "x",
+            "button",
+            self.client.width // 2 - 130,
+            self.client.height // 2 + 60,
+            (70, 70),
+            border_radius=0,
+            centered=True,
+            is_hovered="cross" in self.hovered_elements,
+            is_active="cross" in self.pressed_elements,
+        )
+
+        self.checkmark_rect = draw_image_button(
+            self.client.window,
+            "pipa",
+            "button",
+            self.client.width // 2 + 130,
+            self.client.height // 2 + 60,
+            (80, 80),
+            border_radius=0,
+            centered=True,
+            is_hovered="checkmark" in self.hovered_elements,
+            is_active="checkmark" in self.pressed_elements,
+        )
+
+        if len(self.client.game_state.visited_already) < len(self.client.players):
+            draw_button(
+                surface=self.client.window,
+                rect=self.pass_button,
+                text="Tovább",
+                text_color=WHITE,
+                background_color=MIDDLE_GREEN,
+                border_color=MIDDLE_GREEN,
+                font_size=20,
+                font_type="bold",
+                border_width=5,
+                is_hovered="pass" in self.hovered_elements,
+                is_pressed="pass" in self.pressed_elements,
+                hover_color=LIGHT_GREEN,
+                pressed_color=LIGHT_GREEN,
+            )
+
+    def draw_card_in_hand(self):
+        self.kartya_poziciok = []
+
+        y_kep = self.client.height - 180
+        eltolasi_meret = 8
+
+        lap_csoportok = {}
+        for lap in self.client.visible_player.cards_in_hand:
+            if lap.value not in lap_csoportok:
+                lap_csoportok[lap.value] = []
+            lap_csoportok[lap.value].append(lap)
+
+        rendezett_allatok = [
+            animal.value for animal in Animal if animal.value in lap_csoportok
+        ]
+
+        tipus_szam = len(rendezett_allatok)
+        x_kep = self.client.width // 2
+
+        for animal_type in rendezett_allatok:
+            lapok = lap_csoportok[animal_type]
+
+            base_kartya_meret = (int(650 * 0.16), int(1000 * 0.16))
+
+            for i, lap in enumerate(lapok):
+                kartya_meret = base_kartya_meret
+                card_y = y_kep - i * eltolasi_meret
+
+                kartya_rect = pygame.Rect(
+                    x_kep - (tipus_szam * base_kartya_meret[0]) // 2,
+                    card_y,
+                    *kartya_meret,
+                )
+
+                draw_image_button(
+                    self.client.window,
+                    animal_type,
+                    "card",
+                    kartya_rect.x,
+                    kartya_rect.y,
+                    kartya_meret,
+                    border_radius=0,
+                    centered=False,
+                )
+                self.kartya_poziciok.append((kartya_rect, lap))
+
+            x_kep += base_kartya_meret[0] + 5
+
+    def draw_mini_card(self):
+        if (
+            not self.client.game_state.question_card
+            or not self.client.game_state.targeted_player
+            or self.client.game_state.active_player == self.client.user.username
+        ):
+            return
+
+        if not hasattr(self, "opponent_player_rects") or not self.opponent_player_rects:
+            return
+
+        targeted_player_rect = None
+        for rect, player_name in self.opponent_player_rects:
+            if player_name == self.client.game_state.targeted_player:
+                targeted_player_rect = rect
+                break
+
+        if not targeted_player_rect:
+            return
+
+        mini_card_size = (65 * 1.5, 100 * 1.5)
+        card_image = load_image(
+            self.client.game_state.question_card, "card", size=mini_card_size
+        )
+
+        card_x = targeted_player_rect.centerx
+        card_y = targeted_player_rect.bottom + 80
+
+        draw_image(
+            self.client.window,
+            card_image,
+            card_x,
+            card_y,
+            centered=True,
+        )
+
+    def draw_statements(self):
+        if not hasattr(self, "opponent_player_rects") or not self.opponent_player_rects:
+            return
+
+        if self.client.game_state.active_player:
+            for rect, player_name in self.opponent_player_rects:
+                if player_name == self.client.game_state.active_player:
+                    active_statement = [
+                        player.statement
+                        for player in self.client.opponent_players
+                        if player.username == self.client.game_state.active_player
+                    ]
+
+                    if active_statement[0] != None:
+                        statement_x = rect.centerx
+                        statement_y = rect.bottom + 15
+
+                        statement_text = f"Ez egy {self.translate_animal_to_hungarian(active_statement[0])}"
+                        text_width = len(statement_text) * 8
+                        statement_bg_rect = pygame.Rect(
+                            statement_x - text_width // 2 - 10,
+                            statement_y - 5,
+                            text_width + 20,
+                            30,
+                        )
+
+                        _draw_rounded_rect(
+                            self.client.window,
+                            MIDDLE_GREEN_TRANSPARENT_90,
+                            statement_bg_rect,
+                            border_radius=0.15,
+                            border_color=DARK_GREEN,
+                            border_width=1,
+                        )
+
+                        draw_text(
+                            self.client.window,
+                            statement_text,
+                            WHITE,
+                            statement_x,
+                            statement_y + 10,
+                            centered=True,
+                            font="bold",
+                            font_size=18,
+                        )
+                    break
+
+        if self.client.game_state.targeted_player:
+            for rect, player_name in self.opponent_player_rects:
+                if player_name == self.client.game_state.targeted_player:
+                    target_answer = [
+                        player.is_true
+                        for player in self.client.opponent_players
+                        if player.username == self.client.game_state.targeted_player
+                    ]
+
+                    if target_answer[0] != None:
+                        statement_x = rect.centerx
+                        statement_y = rect.bottom + 15
+
+                        if player_name == self.client.game_state.active_player:
+                            statement_y += 40
+
+                        if target_answer[0] == True:
+                            statement_text = f"Igen, hiszek neked."
+                        else:
+                            statement_text = f"Nem hiszek neked."
+                        text_width = len(statement_text) * 8
+                        statement_bg_rect = pygame.Rect(
+                            statement_x - text_width // 2 - 10,
+                            statement_y - 5,
+                            text_width + 20,
+                            30,
+                        )
+
+                        _draw_rounded_rect(
+                            self.client.window,
+                            LIGHTER_GREEN_TRANSPARENT,
+                            statement_bg_rect,
+                            border_radius=0.15,
+                            border_color=DARK_GREEN,
+                            border_width=1,
+                        )
+
+                        draw_text(
+                            self.client.window,
+                            statement_text,
+                            DARK_GREEN,
+                            statement_x,
+                            statement_y + 10,
+                            centered=True,
+                            font="bold",
+                            font_size=18,
+                        )
+                    break
+
+        main_player_statement = None
+        statement_color = WHITE
+        bg_color = MIDDLE_GREEN_TRANSPARENT_90
+
+        if self.client.game_state.active_player == self.client.user.username:
+            main_player_statement = self.client.visible_player.statement
+
+            if main_player_statement != None:
+                main_player_statement = f"Ez egy: {self.translate_animal_to_hungarian(main_player_statement)}"
+
+        if main_player_statement:
+            statement_x = self.client.width // 2
+            statement_y = self.client.height - 200
+
+            text_width = len(main_player_statement) * 8
+            statement_bg_rect = pygame.Rect(
+                statement_x - text_width // 2 - 10, statement_y - 5, text_width + 20, 30
+            )
+
+            _draw_rounded_rect(
+                self.client.window,
+                bg_color,
+                statement_bg_rect,
+                border_radius=0.15,
+                border_color=DARK_GREEN,
+                border_width=1,
+            )
+
+            draw_text(
+                self.client.window,
+                main_player_statement,
+                statement_color,
+                statement_x,
+                statement_y + 10,
+                centered=True,
+                font="bold",
+                font_size=18,
+            )
+
+    def draw_main_front_card(self):
+        table_x = self.client.width - 240 - 20
+        table_y = self.client.height // 2 - 175
+        table_width = 240
+        table_height = 350
+
+        popup_rect = pygame.Rect(table_x, table_y, table_width, table_height)
+        _draw_rounded_rect(
+            self.client.window,
+            MIDDLE_GREEN_TRANSPARENT_50,
+            popup_rect,
+            border_radius=0.15,
+        )
+
+        draw_text(
+            surface=self.client.window,
+            text=f"{self.client.visible_player.username}",
+            color=WHITE,
+            x=table_x + table_width // 2,
+            y=table_y + 20,
+            centered=True,
+            font="bold",
+            font_size=25,
+        )
+
+        pygame.draw.line(
+            surface=self.client.window,
+            color=DARK_GREEN,
+            start_pos=(table_x, table_y + 20 + 25),
+            end_pos=(table_x + table_width, table_y + 20 + 25),
+            width=3,
+        )
+
+        draw_text(
+            surface=self.client.window,
+            text="Lehelyezett lapok",
+            color=WHITE,
+            x=table_x + table_width // 2,
+            y=table_y + 20 + 25 + 20,
+            centered=True,
+            font="bold",
+            font_size=25,
+        )
+
+        cards_in_front = self.client.visible_player.cards_in_front or {}
+        if not cards_in_front:
+            return
+
+        items_per_column = max(1, (len(cards_in_front) + 1) // 2)
+
+        for i, card in enumerate(cards_in_front):
+            col = i // items_per_column
+            row = i % items_per_column
+
+            x_pos = table_x + 35 + (col * table_width // 2 - 20)
+            y_pos = table_y + 110 + (row * 55)
+
+            if card in self._logo_images_cache:
+                logo = self._logo_images_cache[card]
+                draw_image(self.client.window, logo, x_pos, y_pos, centered=False)
+
+                draw_text(
+                    self.client.window,
+                    f"{cards_in_front[card]}",
+                    DARK_GREEN,
+                    x_pos + 65,
+                    y_pos,
+                    False,
+                    font_size=40,
+                )
+
+    def draw_info_messages(self):
+        _draw_rounded_rect(
+            self.client.window,
+            MIDDLE_GREEN_TRANSPARENT_50,
+            pygame.Rect(20, 20, 300, 60),
+            border_radius=0.35,
+        )
+        draw_text(
+            surface=self.client.window,
+            text=f"Aktuális játékos: {self.client.game_state.active_player}",
+            color=DARK_GREEN,
+            x=50,
+            y=10 + 27,
+            centered=False,
+            font="regular",
+            font_size=22,
+        )
+
+        if self.client.message and self.client.message_display_time > 0:
+            message_lines = wrap_text(self.client.message, 30)
+
+            for i, line in enumerate(message_lines):
+                draw_text(
+                    self.client.window,
+                    line,
+                    RED,
+                    self.client.width - 150,
+                    50 + (i * 30),
+                    centered=True,
+                    font="thin",
+                    font_size=25,
+                )
+
+            self.client.message_display_time -= 1
+
+    def draw_leave_button(self):
+        draw_button(
+            surface=self.client.window,
+            rect=self.leave_button,
+            text="Szoba elhagyása",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=26,
+            font_type="bold",
+            border_width=5,
+            is_hovered="leave" in self.hovered_elements,
+            is_pressed="leave" in self.pressed_elements,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )
+
+    def draw_animal_table(self):
+        table_x = 25
+        table_y = self.client.height // 2 - 135
+        table_width = 200
+        table_height = 320
+
+        popup_rect = pygame.Rect(table_x, table_y, table_width, table_height)
+        _draw_rounded_rect(
+            self.client.window,
+            MIDDLE_GREEN_TRANSPARENT_50,
+            popup_rect,
+            border_radius=0.15,
+        )
+
+        margin = 15
+        start_x = table_x + margin
+        start_y = table_y + margin
+        button_spacing_x = 90
+        button_spacing_y = 65
+
+        if not hasattr(self, "animal_button_rects"):
+            self.animal_button_rects = {}
+
+        animals = list(Animal)
+        mouse_pos = pygame.mouse.get_pos()
+
+        for i, animal in enumerate(animals):
+            row = i // 2
+            col = i % 2
+
+            button_center_x = start_x + col * button_spacing_x + 35
+            button_center_y = start_y + row * button_spacing_y + 25
+
+            temp_rect = pygame.Rect(button_center_x - 30, button_center_y - 25, 60, 50)
+            is_hovered = temp_rect.collidepoint(mouse_pos)
+            is_active = self.active_animal == animal.value
+
+            button_rect = draw_image_button(
+                surface=self.client.window,
+                image_name=animal.value,
+                image_type="logo",
+                x=button_center_x,
+                y=button_center_y,
+                base_size=(58, 58),
+                border_radius=1,
+                padding=0,
+                is_hovered=is_hovered,
+                is_active=is_active,
+                hover_scale=1.1,
+                active_scale=1.2,
+                centered=True,
+            )
+
+            self.animal_button_rects[animal.value] = button_rect
+        self.oke_button = pygame.Rect(
+            table_x + table_width // 2 - 50, table_y + table_height - 40, 100, 35
+        )
+
+        draw_button(
+            surface=self.client.window,
+            rect=self.oke_button,
+            text="Rendben",
+            text_color=WHITE,
+            background_color=MIDDLE_GREEN,
+            border_color=MIDDLE_GREEN,
+            font_size=20,
+            font_type="bold",
+            border_width=5,
+            is_hovered="ok" in self.hovered_elements,
+            is_pressed="ok" in self.pressed_elements,
+            hover_color=LIGHT_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )
 
     def draw(self) -> None:
-        """
-        Draw the game screen.
-        """
-        self.client.window.fill(WHITE)
+        self._ensure_images_preloaded()
+        self.logout_button = create_logout_button_rect(self.client.height)
+        self.rules_button = create_rules_button_rect(
+            self.client.width, self.client.height
+        )
+        self.leave_button = pygame.Rect(
+            self.logout_button.x, self.logout_button.y - 90, 200, 75
+        )
+        self.pass_button = pygame.Rect(
+            self.client.width // 2 - 50, self.client.height // 2 + 130, 100, 35
+        )
 
-        small_font = pygame.font.Font(None, FONT_SMALL)
-        medium_font = pygame.font.Font(None, FONT_MEDIUM)
+        self._update_button_states()
 
-        logo_images = {}
-        for allat in ANIMALS:
-            logo_images[allat] = load_image(allat, type="logo", size=(40, 40))
+        load_background(self.client.width, self.client.height, self.client.window)
 
-        while self.client.screen == "game":
-            self.client.window.fill(WHITE)
-            font_medium = pygame.font.Font(None, FONT_MEDIUM)
-            pygame.draw.rect(self.client.window, GRAY, self.logout_button)
+        self.draw_opponent_players()
+        self.draw_card_in_hand()
+        self.draw_main_front_card()
+
+        draw_logout_button(
+            self.client.window,
+            self.logout_button,
+            is_hovered="logout" in self.hovered_elements,
+            is_pressed="logout" in self.pressed_elements,
+        )
+        if self.client.game_state.question_card and (
+            self.client.game_state.targeted_player == self.client.user.username
+            or self.client.game_state.active_player == self.client.user.username
+        ):
+            self.draw_center_card_area()
+        if self.client.game_state.active_player == self.client.user.username:
+            self.draw_animal_table()
+        if self.client.game_state.targeted_player == self.client.user.username:
+            self.draw_tipp_area()
+
+        if self.show_leave_button:
+            self.draw_leave_button()
+        self.draw_mini_card()
+
+        self.draw_statements()
+
+        self.draw_info_messages()
+        draw_rules_button(self.client.window, self.rules_button)
+
+        if self.show_rules:
+            draw_rules_popup(
+                self.client.window,
+                self.client.width,
+                self.client.height,
+                JATEKSZABALY[
+                    "2" if self.client.selected_room.max_player_count == 2 else "3-6"
+                ],
+                self.client.selected_room.max_player_count,
+            )
+
+        pygame.display.flip()
+
+    def draw_opponent_players(self) -> None:
+        if not self.client.opponent_players:
+            return
+
+        player_panel_height = 230
+        player_panel_width = 160
+        player_spacing = 10
+
+        total_players_width = (
+            player_panel_width * len(self.client.opponent_players)
+        ) + (player_spacing * (len(self.client.opponent_players) - 1))
+
+        start_x = (self.client.width - total_players_width) // 2
+        start_y = 10  # Felső margó
+
+        self.opponent_player_rects = []
+
+        for i, player in enumerate(self.client.opponent_players):
+            panel_x = start_x + i * (player_panel_width + player_spacing)
+            player_panel_rect = pygame.Rect(
+                panel_x, start_y, player_panel_width, player_panel_height
+            )
+
+            if self.client.game_state.targeted_player == player.username:
+                background_color = LIGHTER_GREEN_TRANSPARENT
+                font_color = DARK_GREEN
+
+            elif self.client.game_state.active_player == player.username:
+                background_color = MIDDLE_GREEN_TRANSPARENT_70
+                font_color = WHITE
+            else:
+                background_color = LIGHT_GREEN_TRANSPARENT
+                font_color = WHITE
+            _draw_rounded_rect(
+                self.client.window,
+                background_color,
+                player_panel_rect,
+                border_color=DARK_GREEN,
+                border_width=2,
+                border_radius=0.15,
+            )
+
             draw_text(
                 self.client.window,
-                "Kijelentkezés",
-                BLACK,
-                self.logout_button.centerx,
-                self.logout_button.centery,
+                player.username,
+                font_color,
+                player_panel_rect.centerx,
+                player_panel_rect.y + 15,
                 centered=True,
-                font=font_medium,
-            )
-            print(
-                f"A játék során aktiv játékosok: {self.client.active_player_list_name}"
+                font="bold",
+                font_size=25,
             )
 
-            if len(self.client.active_player_list_name) < len(
-                self.client.game_state.players
-            ):
-                pygame.draw.rect(self.client.window, GRAY, self.leave_button)
-                draw_text(
-                    self.client.window,
-                    "Szoba elhagyása",
-                    BLACK,
-                    self.leave_button.centerx,
-                    self.leave_button.centery,
-                    centered=True,
-                    font=font_medium,
-                )
-
-            draw_text(
+            pygame.draw.line(
                 self.client.window,
-                f"Szoba: {self.client.room_name}",
-                BLACK,
-                10,
-                10,
-                False,
-            )
-            draw_text(
-                self.client.window,
-                f"Felhasználónév: {self.client.user.name}",
-                BLACK,
-                10,
-                40,
-                False,
+                DARK_GREEN,
+                (player_panel_rect.x, player_panel_rect.y + 35),
+                (player_panel_rect.x + player_panel_width, player_panel_rect.y + 35),
+                2,
             )
 
             draw_text(
                 self.client.window,
-                f"aktiv player: {self.client.game_state.active_player.name}",
-                BLACK,
-                10,
-                70,
-                False,
-            )
-            draw_text(
-                self.client.window,
-                self.client.message,
-                BLACK,
-                SCREEN_WIDTH / 1.2,
-                30,
-                False,
-                small_font,
+                f"Lapszám: {player.card_count_int}",
+                font_color,
+                player_panel_rect.x + 10,
+                player_panel_rect.y + 40,
+                centered=False,
+                font="regular",
+                font_size=20,
             )
 
-            player_panel_height = 200
-            player_panel_width = 120
-            player_spacing = 30
-            total_players_width = (
-                player_panel_width * (len(self.client.game_state.players) - 1)
-            ) + (player_spacing * (len(self.client.game_state.players) - 1))
-            start_x = (SCREEN_WIDTH - total_players_width) / 2
-            player_panels = []
-            for i, player in enumerate(
-                j
-                for j in self.client.game_state.players
-                if j.name != self.client.user.name
-            ):
-                player_panel_rect = pygame.Rect(
-                    start_x + i * (player_panel_width + player_spacing),
-                    60,
-                    player_panel_width,
-                    player_panel_height,
-                )
+            if player.cards_in_front:
+                card_start_y = player_panel_rect.y + 75
+                col_width = 70
+                row_height = 38
 
-                pygame.draw.rect(
-                    self.client.window, GRAY, player_panel_rect, border_radius=5
-                )
-
-                draw_text(
-                    self.client.window,
-                    player.name,
-                    BLACK,
-                    player_panel_rect.x + 10,
-                    player_panel_rect.y + 10,
-                    False,
-                    medium_font,
-                )
-                draw_text(
-                    self.client.window,
-                    f"lapszam: {player.card_count}",
-                    BLACK,
-                    player_panel_rect.x + 10,
-                    player_panel_rect.y + 30,
-                    False,
-                    medium_font,
-                )
-
-                card_x = player_panel_rect.x + 10
-                card_y = player_panel_rect.y + 60
-                col_width = 60
-
-                for j, (card_type, count) in enumerate(player.cards_in_front.items()):
+                for j, (card, count) in enumerate(player.cards_in_front.items()):
                     column = j % 2
                     row = j // 2
-                    pos_x = player_panel_rect.x + 10 + (column * col_width)
-                    pos_y = player_panel_rect.y + 60 + (row * 30)
 
-                    if card_type in logo_images:
+                    pos_x = player_panel_rect.x + 15 + (column * col_width)
+                    pos_y = card_start_y + (row * row_height)
+
+                    if card in self._logo_images_cache:
+                        logo = self._logo_images_cache[card]
                         draw_image(
                             self.client.window,
-                            logo_images[card_type],
+                            logo,
                             pos_x,
                             pos_y,
-                            size=(25, 25),
+                            size=(37, 37),
                             centered=False,
                         )
 
                         draw_text(
                             self.client.window,
                             str(count),
-                            BLACK,
-                            pos_x + 30,
-                            pos_y + 5,
-                            False,
-                            medium_font,
-                        )
-
-                    else:
-                        draw_text(
-                            self.client.window,
-                            f"{card_type}: {count}",
-                            BLACK,
-                            pos_x,
-                            pos_y,
-                            False,
-                            medium_font,
-                        )
-
-                player_panels.append((player_panel_rect, player.name))
-            if self.selected_player_frame:
-                pygame.draw.rect(
-                    self.client.window,
-                    self.frame_color,
-                    self.selected_player_frame,
-                    3,
-                )
-
-            info_panel_rect = pygame.Rect(SCREEN_WIDTH - 250, 150, 230, 400)
-
-            draw_text(
-                self.client.window,
-                "Állatok száma:",
-                BLACK,
-                info_panel_rect.x + 10,
-                info_panel_rect.y + 10,
-                False,
-            )
-            col_width = 110
-
-            items_per_column = (len(self.client.user.cards_in_front or {}) + 1) // 2
-
-            for i, card_type in enumerate(self.client.user.cards_in_front or {}):
-                col = i // items_per_column
-                row = i % items_per_column
-
-                x_pos = info_panel_rect.x + 15 + (col * col_width)
-                y_pos = info_panel_rect.y + 60 + (row * 50)
-
-                if card_type in logo_images:
-                    logo = logo_images[card_type]
-
-                    draw_image(self.client.window, logo, x_pos, y_pos, centered=False)
-
-                    draw_text(
-                        self.client.window,
-                        f"{self.client.user.cards_in_front[card_type]}",
-                        BLACK,
-                        x_pos + 45,
-                        y_pos + 10,
-                        False,
-                        medium_font,
-                    )
-                else:
-                    draw_text(
-                        self.client.window,
-                        f"{card_type}: {self.client.user.cards_in_front[card_type]}",
-                        BLACK,
-                        x_pos,
-                        y_pos + 10,
-                        False,
-                        medium_font,
-                    )
-
-            kartya_poziciok = []
-
-            y_kep = SCREEN_HEIGHT - 150
-            eltolasi_meret = 10  # egymás feletti kártyák eltolása
-
-            lap_csoportok = {}
-            for lap in self.client.user.cards_in_hand:
-                if lap.type not in lap_csoportok:
-                    lap_csoportok[lap.type] = []
-                lap_csoportok[lap.type].append(lap)
-
-            tipus_szam = len(lap_csoportok)
-
-            x_kep = SCREEN_WIDTH // 2
-
-            for animal_type, lapok in lap_csoportok.items():
-                meret_arany = min(SCREEN_WIDTH / 1600, SCREEN_HEIGHT / 1600)
-                kep = load_image(animal_type, "card", scale_ratio=meret_arany)
-                kartya_meret = kep.get_size()
-
-                for i, lap in enumerate(lapok):
-                    kartya_rect = pygame.Rect(
-                        x_kep - (tipus_szam * kartya_meret[0]) // 2,
-                        y_kep - i * eltolasi_meret,
-                        *kartya_meret,
-                    )
-
-                    draw_image(
-                        self.client.window,
-                        kep,
-                        kartya_rect.x,
-                        kartya_rect.y,
-                        size=kartya_meret,
-                        centered=False,
-                    )
-                    kartya_poziciok.append((kartya_rect, lap))
-
-                x_kep += kartya_meret[0] + 5
-            if self.selected_card_frame:
-                pygame.draw.rect(
-                    self.client.window,
-                    self.frame_color,
-                    self.selected_card_frame,
-                    3,
-                )
-            if self.client.game_state.question_card != None:
-                card_width, card_height = 100, 150
-                card_x = (SCREEN_WIDTH - card_width) // 2
-                card_y = (SCREEN_HEIGHT - card_height) // 2
-                if self.client.game_state.question_card.type == "hatlap":
-                    kozepso_lap_image = load_image(
-                        self.client.game_state.question_card.type,
-                        type="card",
-                        size=(card_width, card_height),
-                    )
-                    draw_image(
-                        self.client.window,
-                        kozepso_lap_image,
-                        card_x,
-                        card_y,
-                        size=(card_width, card_height),
-                        centered=False,
-                    )
-
-                    if (
-                        self.client.game_state.targeted_player.name
-                        == self.client.user.name
-                    ):
-                        pipa_img = load_image("pipa", type="button", size=(40, 40))
-                        self.checkmark_rect = pygame.Rect(
-                            (card_x - 50, card_y + (card_height // 2) - 20),
-                            (40, 40),
-                        )
-                        draw_image(
-                            self.client.window,
-                            pipa_img,
-                            self.checkmark_rect.x,
-                            self.checkmark_rect.y,
-                            size=(40, 40),
+                            DARK_GREEN,
+                            pos_x + 45,
+                            pos_y + 2,
                             centered=False,
+                            font="regular",
+                            font_size=25,
                         )
 
-                        x_img = load_image("x", type="button", size=(40, 40))
-                        self.cross_rect = pygame.Rect(
-                            (
-                                card_x + card_width + 10,
-                                card_y + (card_height // 2) - 20,
-                            ),
-                            (40, 40),
-                        )
-                        draw_image(
-                            self.client.window,
-                            x_img,
-                            self.cross_rect.x,
-                            self.cross_rect.y,
-                            size=(40, 40),
-                            centered=False,
-                        )
-
-                        if len(
-                            self.client.game_state.question_card.visited_already
-                        ) < len(self.client.game_state.players):
-                            pass_width, pass_height = 80, 40
-                            pass_x = card_x + (card_width // 2) - (pass_width // 2)
-                            pass_y = card_y + card_height + 10
-
-                            self.pass_rect = pygame.Rect(
-                                (pass_x, pass_y), (pass_width, pass_height)
-                            )
-                            pygame.draw.rect(self.client.window, GRAY, self.pass_rect)
-
-                            draw_text(
-                                self.client.window,
-                                "Tovább",
-                                BLACK,
-                                pass_x + (pass_width / 2),
-                                pass_y + (pass_height / 2),
-                                True,
-                                medium_font,
-                            )
-
-                elif self.client.game_state.question_card:
-                    lap_img = load_image(
-                        self.client.game_state.question_card.type,
-                        "card",
-                        size=(card_width, card_height),
-                    )
-                    draw_image(
-                        self.client.window,
-                        lap_img,
-                        card_x,
-                        card_y,
-                        size=(card_width, card_height),
-                        centered=False,
-                    )
-
-                draw_text(
-                    self.client.window,
-                    self.client.game_state.active_player.statement,
-                    BLACK,
-                    card_x + card_width + 50,
-                    card_y + 10,
-                    False,
-                    small_font,
-                )
-
-            if self.selected_player != None and self.client.selected_card != None:
-                pygame.draw.rect(
-                    self.client.window, (180, 180, 180), self.dropdown_position
-                )
-                draw_text(
-                    self.client.window,
-                    self.statement,
-                    BLACK,
-                    self.dropdown_position.x + 5,
-                    self.dropdown_position.y + 5,
-                    False,
-                    small_font,
-                )
-
-                if self.client.dropdown_state:
-                    self.client.game_state.question_card = self.client.selected_card
-
-                    for i, option in enumerate(ANIMALS):
-                        option_rect = pygame.Rect(
-                            self.dropdown_position.x,
-                            self.dropdown_position.y + (i + 1) * 20,
-                            100,
-                            20,
-                        )
-                        pygame.draw.rect(self.client.window, GRAY, option_rect)
-                        draw_text(
-                            self.client.window,
-                            option,
-                            BLACK,
-                            option_rect.x + 5,
-                            option_rect.y + 5,
-                            False,
-                            small_font,
-                        )
-
-                pygame.draw.rect(
-                    self.client.window,
-                    GRAY,
-                    self.accept_button_position,
-                )
-                draw_text(
-                    self.client.window,
-                    "Valaszt",
-                    BLACK,
-                    self.accept_button_position.x + 10,
-                    self.accept_button_position.y + 5,
-                    False,
-                    small_font,
-                )
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        pygame.quit()
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    mx, my = event.pos
-                    talalt = False
-                    if self.logout_button.collidepoint(mx, my):
-                        # print("Kijelentkezés gombra kattintva!")
-                        self.client.network.logout()
-                        return
-                    if self.leave_button.collidepoint(mx, my):
-                        print("Szoba elhagyása gombra kattintva!")
-                        self.client.network.leave_room()
-                    for rect, lap in reversed(kartya_poziciok):
-                        # if (
-                        #     self.client.game_state.active_player.name
-                        #     != self.client.user.name
-                        # ):
-                        #     # print(
-                        #     #     f"Nem te vagy az aktív játékos. Aktív: {self.client.game_state.active_player.name}, Te: {self.client.user.name}"
-                        #     # )
-                        # if self.client.dropdown_state:
-                        #     print("A lenyíló ablak nyitva van.")
-                        # if self.client.passed:
-                        #     print("Már átadta a kört.")
-                        # if self.passing:
-                        #     print("Passzoltál ebben a körben.")
-                        # if talalt:
-                        #     print("Már kiválasztottál egy kártyát.")
-
-                        if (
-                            rect.collidepoint(mx, my)
-                            and self.client.game_state.active_player.name
-                            == self.client.user.name
-                            and not self.client.dropdown_state
-                            and not self.client.passed
-                            and not self.passing
-                            and not talalt
-                        ):
-                            self.client.game_state.question_card = None
-                            # print(f"Rákattintottál: {lap}")
-                            if lap != None:
-                                self.client.selected_card = lap
-                            self.selected_card_frame = rect
-                            talalt = True
-                            break
-
-                    mx, my = event.pos
-
-                    inactive_players = [
-                        p
-                        for p in self.client.game_state.players
-                        if player.name not in self.client.active_player_list_name
-                    ]
-
-                    for rect, player_name in player_panels:
-                        if (
-                            rect.collidepoint(mx, my)
-                            and self.client.game_state.active_player.name
-                            == self.client.user.name
-                            and not self.client.passed
-                        ):
-                            if inactive_players:
-                                inactive_names = ", ".join(
-                                    [p.name for p in inactive_players]
-                                )
-                                self.client.message = f"{inactive_names} inaktív"
-                                break
-
-                            player_obj = next(
-                                (
-                                    p
-                                    for p in self.client.game_state.players
-                                    if p.name == player_name
-                                ),
-                                None,
-                            )
-
-                            if player_obj is None:
-                                self.client.message = "Hiba: játékos nem található."
-                                break
-
-                            if (
-                                self.client.game_state.question_card == None
-                                or player_name
-                                not in self.client.game_state.question_card.visited_already
-                            ):
-                                self.client.game_state.question_card = None
-
-                                self.selected_player = player_name
-                                self.selected_player_frame = rect
-                            else:
-                                self.client.message = "Már volt már ennél a játékosnál"
-
-                    if self.dropdown_position.collidepoint(mx, my):
-                        self.client.dropdown_state = not self.client.dropdown_state
-                    if self.client.dropdown_state:
-                        for i, option in enumerate(ANIMALS):
-                            option_rect = pygame.Rect(
-                                self.dropdown_position.x,
-                                self.dropdown_position.y + (i + 1) * 20,
-                                100,
-                                20,
-                            )
-                            if option_rect.collidepoint(mx, my):
-                                self.statement = option
-                                self.client.dropdown_state = False
-
-                    if (
-                        self.accept_button_position.collidepoint(mx, my)
-                        and self.statement
-                    ):
-                        # print(f"Elfogadott állat: {self.statement}")
-                        if self.selected_player and self.client.selected_card:
-                            self.client.network.oke_click(
-                                self.client.room_id,
-                                self.selected_player,
-                                self.client.selected_card,
-                                self.statement,
-                                self.passing,
-                            )
-
-                            self.selected_player = None
-                            self.client.selected_card = None
-                            self.passing = False
-                            self.client.passed = True
-                            self.selected_player_frame = None
-                            self.selected_card_frame = None
-                    if (
-                        self.checkmark_rect is not None
-                        and self.checkmark_rect.collidepoint(mx, my)
-                    ):
-                        # print("Igazat mondott")
-                        self.client.game_state.question_card = None
-                        self.client.network.guess(self.client.room_id, True)
-                    if self.cross_rect is not None and self.cross_rect.collidepoint(
-                        mx, my
-                    ):
-                        # print("Hazudott")
-                        self.client.game_state.question_card = None
-
-                        self.client.network.guess(self.client.room_id, False)
-
-                    if hasattr(self, "pass_rect") and self.pass_rect.collidepoint(
-                        mx, my
-                    ):
-                        # print("PASS gombra kattintva!")
-                        self.client.network.passing(self.client.room_id)
-                        self.passing = True
-            pygame.display.flip()
+            self.opponent_player_rects.append((player_panel_rect, player.username))
 
     def handle_key_press(self, event):
         pass
 
     def handle_mouse_click(self, pos):
+        if handle_logout_button_click(pos, self.logout_button, self.client.network):
+            return True
+
+        if self.leave_button.collidepoint(pos) and self.show_leave_button:
+            self.client.network.leave_room()
+            return True
+
+        if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
+            if self.client.game_state.active_player == self.client.user.username:
+                if self.active_animal and self.client.game_state.targeted_player:
+                    self.client.passed = False
+                    self.client.network.oke_click(
+                        statement=self.active_animal, passing=self.client.passed
+                    )
+                    pass
+
+        if hasattr(self, "pass_button") and self.pass_button.collidepoint(pos):
+            if (
+                self.client.game_state.targeted_player == self.client.user.username
+                and len(self.client.game_state.visited_already)
+                < len(self.client.players)
+            ):
+                self.client.passed = True
+                self.client.network.passing()
+
+        if (
+            hasattr(self, "cross_rect")
+            and self.cross_rect
+            and self.cross_rect.collidepoint(pos)
+        ):
+            if self.client.game_state.targeted_player == self.client.user.username:
+                print("Cross button clicked - False answer")
+
+                self.client.network.guess(False)
+
+        if (
+            hasattr(self, "checkmark_rect")
+            and self.checkmark_rect
+            and self.checkmark_rect.collidepoint(pos)
+        ):
+            if self.client.game_state.targeted_player == self.client.user.username:
+                print("Checkmark button clicked - True answer")
+
+                self.client.network.guess(True)
+
+        if hasattr(self, "opponent_player_rects"):
+            for rect, player_name in self.opponent_player_rects:
+                if rect.collidepoint(pos):
+                    if (
+                        self.client.game_state.active_player
+                        == self.client.user.username
+                    ):
+                        for user in self.client.users:
+                            if user.username == player_name and user.is_active is False:
+                                self.client.message = (
+                                    "Ez a játékos nem aktiv. Válassz másik játékost."
+                                )
+                                self.client.message_display_time = 120
+                                return True
+                        if player_name in self.client.game_state.visited_already:
+                            self.client.message = (
+                                "Nála már volt ez a lap. Válassz másik játékost."
+                            )
+                            self.client.message_display_time = 120
+                            return True
+                        if self.client.game_state.targeted_player == player_name:
+                            self.client.game_state.targeted_player = None
+
+                        else:
+                            self.client.game_state.targeted_player = player_name
+
+                        return True
+                    else:
+                        self.client.message = "Nem te vagy soron"
+                        self.client.message_display_time = 120
+
+        if hasattr(self, "animal_button_rects"):
+            if self.client.game_state.active_player == self.client.user.username:
+                for animal_name, button_rect in self.animal_button_rects.items():
+                    if button_rect.collidepoint(pos):
+                        if self.active_animal == animal_name:
+                            self.active_animal = None
+
+                        else:
+                            self.active_animal = animal_name
+
+                        return True
+
+        for rect, lap in reversed(self.kartya_poziciok):
+            if self.client.passed:
+                print("Passzoltál ebben a körben.")
+                break
+
+            if rect.collidepoint(pos) and not self.client.passed:
+                if self.client.game_state.active_player == self.client.user.username:
+                    self.client.game_state.question_card = None
+                    if lap != None:
+                        self.client.game_state.question_card = lap
+                    self.selected_card_frame = rect
+                    break
+                else:
+                    self.client.message = "Nem te vagy soron"
+                    self.client.message_display_time = 120
+                    return True
+
+        return False
+
+    def translate_animal_to_hungarian(self, animal_name: str) -> str:
+        animal_translations = {
+            "cockroach": "csótány",
+            "rat": "patkány",
+            "bat": "denevér",
+            "toad": "varangy",
+            "bedbug": "poloska",
+            "spider": "pók",
+            "fly": "légy",
+            "scorpion": "skorpió",
+        }
+
+        return animal_translations.get(animal_name.lower(), animal_name)
+
+    def handle_mouse_motion(self, pos):
+        """Handle mouse motion for button hover states"""
         pass
