@@ -1,0 +1,15 @@
+ai_names = [
+    "HazugCsóti",
+    "Kamucsótány",
+    "Lapátadó",
+    "Poloskakirály",
+    "Hálócsapda",
+    "HazudósBélus",
+    "SunyiJóska",
+    "KártyásFeri",
+    "LaplopóLajos",
+    "BlöffBandi",
+    "ÁtverőPisti",
+    "ZümmZoli",
+    "CsótányKarcsi",
+]
