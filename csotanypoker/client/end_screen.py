@@ -29,7 +29,7 @@ class EndScreen(BaseScreen):
             self.client.width // 2 - 100, self.client.height // 2 + 200, 200, 75
         )
         self.auto_leave_timer = 30
-
+        self.start_time = time.time()
         self.hovered_elements = set()
         self.pressed_elements = set()
         self.auto_leave_triggered = False

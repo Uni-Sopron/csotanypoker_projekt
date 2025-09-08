@@ -5,16 +5,33 @@ from csotanypoker.models.gamestate import GameState
 
 
 class GameLogic:
-    def __init__(self, id, players, from_db=False):
-        save_dir = "csotanypoker\games_saves"
+    def __init__(self, id, players, room_id=None, from_db=False):
+        save_dir = "csotanypoker/server/games_saves"
         os.makedirs(save_dir, exist_ok=True)
-        self.state = GameState(id=id, save_path=os.path.join(save_dir, f"{id}.pkl"))
-        self.state.players = players
-        self.state.active_player = self.choose_starting_player()
-        self.deck = []
-        self.generate_deck()
-        self.shuffle_deck()
-        self.deal_cards()
+        save_path = os.path.join(save_dir, f"game_{id}.pkl")
+
+        # Create GameState with proper initialization
+        if not from_db:
+            self.state = GameState(
+                game_id=id,
+                room_id=room_id,
+                save_path=save_path,
+            )
+
+            self.state.players = players
+
+            self.state.active_player = self.choose_starting_player()
+            self.deck = []
+            self.generate_deck()
+            self.shuffle_deck()
+            self.deal_cards()
+        else:
+            self.state = GameState.load_from_file(save_path)
+            if self.state is None:
+                raise ValueError(f"Failed to load GameState from {save_path}")
+
+        # Save the initial state
+        self.state.manual_save()
 
     def generate_deck(self):
         deck_cards = []

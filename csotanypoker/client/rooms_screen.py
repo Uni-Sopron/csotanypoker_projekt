@@ -276,6 +276,7 @@ class RoomsScreen(BaseScreen):
                     self.join_password_text if selected_room.password_protected else ""
                 )
                 self.client.network.join_room(selected_room.room_id, password)
+                self.selected_room_index = None
             return
 
         if hasattr(self, "create_button") and self.create_button.collidepoint(pos):
@@ -287,6 +288,7 @@ class RoomsScreen(BaseScreen):
                     self.max_players,
                     password,
                 )
+                self.selected_room_index = None
             return
 
         room_index = self._get_room_index_at_position(pos)

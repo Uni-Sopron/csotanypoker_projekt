@@ -154,15 +154,15 @@ class ReconnectScreen(BaseScreen):
                 room_id = self.client.previous_room_id
                 if room_id:
                     print("Újracsatlakozás a szobához:", room_id)
-                    if not self.client.game_start:
-                        self.client.network.rejoin_waiting_room()
-                        print("UJRSCSATLAKOZÁS")
-                    else:
-                        print("A játék már elkezdődött")
-                        self.client.network.rejoin_game()
-
+                    self.client.network.rejoin_waiting_room()
+       
         elif self.leave_button.collidepoint(pos):
-            self.client.network.leave_room()
+            if self.client.message == "A játék elkezdődött":
+                
+                self.client.network.all_players_leave_room(self.client.room_id)
+            else:
+                
+                self.client.network.leave_room()
             self.client.screen = "rooms_screen"
         elif self.logout_button.collidepoint(pos):
             self.client.network.logout()

@@ -1,4 +1,5 @@
 import atexit
+import os
 import time
 import signal
 import sys
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from csotanypoker.models.animal import Animal
 from csotanypoker.models.player import VisiblePlayer, OpponentPlayer
 from csotanypoker.server.game_background import GameLogic
-from csotanypoker.models.gamestate import ClientGameState
+from csotanypoker.models.gamestate import ClientGameState, GameState
 from csotanypoker.models.room import Room
 from csotanypoker.models.user import Client_User
 from csotanypoker.server.database import (
@@ -134,15 +135,15 @@ def handle_register(data: dict) -> None:
     handle_login({"username": username, "password": password})
 
 
-@socketio.on("rejoin_waiting_room")
-def handle_start_new_game(data: dict):
+@socketio.on("rejoin_game")
+def handle_rejoin_game() -> None:
     username = session.get("username")
 
     if not username:
         print("Nincs bejelentkezett felhasználó a session-ben")
         return
     if username not in sockets:
-        print(f"Nincs aktív socket kapcsolat {username} felhasználóhoz")
+        print(f"Nincs aktí­v socket kapcsolat {username} felhasználóhoz")
         return
 
     db: Session = get_db_session()
@@ -155,7 +156,7 @@ def handle_start_new_game(data: dict):
         )
 
         if not db_user or not db_user.current_room_id:
-            print(f"Felhasználó nem aktív vagy nincs szobája: {username}")
+            print(f"Felhasználó nem aktí­v vagy nincs szobája: {username}")
             return
 
         room_id = db_user.current_room_id
@@ -182,16 +183,85 @@ def handle_start_new_game(data: dict):
             for r_u in room_users
         ]
 
-        socketio.emit(
-            "rejoin_waiting_success",
-            {
-                "room_id": room_id,
-                "room_name": target_room.name,
-                "players": [u.model_dump() for u in users],
-                "max_player_count": target_room.max_player_count,
-            },
-            to=request.sid,
+        print("JATEKOSSZAM", len(room_users))
+        if len(room_users) >= target_room.max_player_count:
+            player_usernames = [user.username for user in room_users]
+
+            socketio.emit(
+                "start_game",
+                {"players": player_usernames},
+                room=room_id,
+            )
+            print("rejoin_waiting_room: Játék indul a szobában:", room_id)
+            start_game(player_usernames, room_id, reconnect=True)
+
+    finally:
+        db.close()
+
+
+@socketio.on("rejoin_waiting_room")
+def handle_start_new_game(data: dict):
+    username = session.get("username")
+
+    if not username:
+        print("Nincs bejelentkezett felhasználó a session-ben")
+        return
+    if username not in sockets:
+        print(f"Nincs aktív socket kapcsolat {username} felhasználóhoz")
+        return
+
+    db: Session = get_db_session()
+
+    try:
+        db_user: Optional[DBUser] = (
+            db.query(DBUser)
+            .filter(DBUser.username == username, DBUser.is_active == True)
+            .first()
         )
+
+        if not db_user or not db_user.current_room_id:
+            print(f"Felhasználó nem aktív vagy nincs szobája: {username}")
+            return
+
+        room_id = db_user.current_room_id
+        target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
+        target_game = (
+            db.query(DBGame)
+            .filter(DBGame.room_id == room_id, DBGame.game_status == "run")
+            .first()
+        )
+        if not target_room:
+            print(f"Szoba nem található: {room_id}")
+            return
+
+        sockets[username] = request.sid
+
+        if db_user.current_room_id != room_id:
+            db_user.current_room_id = room_id
+            db.commit()
+
+        join_room(room_id)
+        update_room_player_count(room_id)
+
+        print(f"szoba id: {room_id}, szoba neve: {target_room.name}")
+
+        room_users = get_room_users(room_id)
+        users = [
+            Client_User(username=r_u.username, is_active=r_u.is_active)
+            for r_u in room_users
+        ]
+
+        if target_game is None:
+            socketio.emit(
+                "rejoin_waiting_success",
+                {
+                    "room_id": room_id,
+                    "room_name": target_room.name,
+                    "players": [u.model_dump() for u in users],
+                    "max_player_count": target_room.max_player_count,
+                },
+                to=request.sid,
+            )
 
         socketio.emit(
             "player_rejoined",
@@ -200,6 +270,16 @@ def handle_start_new_game(data: dict):
             },
             room=room_id,
         )
+
+        player_usernames = [user.username for user in room_users]
+
+        if target_game:
+            game_instance = get_game_instance(room_id)
+            if game_instance:
+                send_game_state_to_players(
+                    game_instance, room_id, hide_card_for_unvisited=True
+                )
+            return
 
         print("JATEKOSSZAM", len(room_users))
         if len(room_users) >= target_room.max_player_count:
@@ -287,7 +367,10 @@ def handle_login(data: dict) -> None:
 
     try:
         if not username or not password:
-            emit("login_error", {"message": "Felhasználónév és jelszó nem lehet üres."})
+            emit(
+                "login_error",
+                {"message": "Felhasználónév és jelszó nem lehet üres."},
+            )
             return
 
         dbuser: Optional[DBUser] = (
@@ -303,12 +386,18 @@ def handle_login(data: dict) -> None:
             return
 
         if dbuser.is_active:
-            emit("login_error", {"message": "Ez a felhasználó már be van jelentkezve."})
+            emit(
+                "login_error",
+                {"message": "Ez a felhasználó már be van jelentkezve."},
+            )
             return
 
         dbuser.is_active = True
         db.commit()
 
+        if username in sockets:
+            print(f"Törlöm a meglévÅ‘ socket id-t: {username}")
+            sockets.pop(username, None)
         session["socket_id"] = request.sid
         session["username"] = username
         sockets[username] = request.sid
@@ -805,20 +894,6 @@ def handle_oke_click(data: dict) -> None:
 
         game_instance.make_statement(statement)
 
-        if not passing and game_instance.has_cards_in_hand():
-            game_end(room_id, db)
-            return
-
-        if (
-            game_instance.state.targeted_player
-            and game_instance.state.question_card
-            and game_instance.state.targeted_player.username
-            not in game_instance.state.visited_already
-        ):
-            game_instance.state.visited_already.append(
-                game_instance.state.active_player.username
-            )
-
         send_game_state_to_players(game_instance, room_id, hide_card_for_unvisited=True)
 
     finally:
@@ -844,12 +919,8 @@ def handle_guess(data: dict) -> None:
         else:
             nextplayer = game_instance.place_card(game_instance.state.targeted_player)
 
-        if game_instance.has_4_cards_in_front():
-            game_end(room_id, db)
-            return
-
         game_instance.state.visited_already = list(
-            set([player.username for player in game_instance.state.players])
+            player.username for player in game_instance.state.players
         )
 
         send_game_state_to_all_players_sync(game_instance, room_id)
@@ -862,10 +933,12 @@ def handle_guess(data: dict) -> None:
             game_instance.state.active_player = nextplayer
 
             if game_instance.has_cards_in_hand():
+                print("ez")
                 game_end(room_id, db)
                 return
 
             if game_instance.has_4_cards_in_front():
+                print("ez2")
                 game_end(room_id, db)
                 return
 
@@ -931,9 +1004,10 @@ def _send_game_state_to_single_player(
             hide_card_for_unvisited
             and game_instance.state.question_card
             and player.username not in game_instance.state.visited_already
+            and game_instance.state.targeted_player is not None
         ):
             client_game_state["question_card"] = "card_back"
-            print(f"Player {player.username} sees card_back")
+            print(f"Player {player.username} sees card_back (not visited yet)")
         else:
             print(f"Player {player.username} sees actual card")
 
@@ -1004,11 +1078,8 @@ def handle_pass() -> None:
             game_instance.state.active_player = game_instance.state.targeted_player
             game_instance.state.targeted_player = None
 
-        if len(game_instance.state.active_player.cards_in_hand) == 0:
-            game_end(room_id, db)
-            return
-
         if game_instance.has_4_cards_in_front():
+            print("ez3")
             game_end(room_id, db)
             return
 
@@ -1066,8 +1137,46 @@ def start_game(players: list, room_id: str, reconnect: bool = False) -> None:
 
         if reconnect:
             print("RECONNECT JÁTÉK INDÍTÁSA")
-            return
-        else:
+            if room_id in game_instances:
+                game_instance = game_instances[room_id]
+                send_game_state_to_players(
+                    game_instance, room_id, hide_card_for_unvisited=True
+                )
+            else:
+                try:
+                    existing_game = None
+                    for game in db_room.games:
+                        if game.game_status == "run":
+                            existing_game = game
+                            break
+
+                    if existing_game:
+                        save_path = f"csotanypoker/server/games_saves/game_{existing_game.game_id}.pkl"
+                        loaded_state = GameState.load_from_file(save_path)
+
+                        if loaded_state:
+                            game_logic = GameLogic(
+                                existing_game.game_id,
+                                list(loaded_state.players),
+                                room_id=room_id,
+                            )
+                            game_logic.state = loaded_state
+                            game_instances[room_id] = game_logic
+
+                            send_game_state_to_players(
+                                game_logic, room_id, hide_card_for_unvisited=True
+                            )
+                        else:
+                            print(f"Failed to load game state, creating new game")
+                            reconnect = False
+                except Exception as e:
+                    print(f"Error during reconnect: {e}")
+                    reconnect = False
+
+            if reconnect:
+                return
+
+        if not reconnect:
             print("ÚJ JÁTÉK INDUL")
 
             existing_game = None
@@ -1081,24 +1190,54 @@ def start_game(players: list, room_id: str, reconnect: bool = False) -> None:
                 return
 
             unique_game_id = str(uuid.uuid4())
-            game_instances[room_id] = GameLogic(
-                unique_game_id,
-                [VisiblePlayer(username=str(user["username"])) for user in players],
-            )
-            game_instance = game_instances[room_id]
 
-            db_game = DBGame(
-                game_id=unique_game_id,
-                game_status="run",
-                loser_username=None,
-                room_id=room_id,
-            )
-            db.add(db_game)
-            db.commit()
+            try:
+                game_instances[room_id] = GameLogic(
+                    unique_game_id,
+                    [VisiblePlayer(username=str(user["username"])) for user in players],
+                    room_id=room_id,
+                )
+                game_instance = game_instances[room_id]
 
-            send_game_state_to_players(
-                game_instance, room_id, hide_card_for_unvisited=False
-            )
+                db_game = DBGame(
+                    game_id=unique_game_id,
+                    game_status="run",
+                    loser_username=None,
+                    room_id=room_id,
+                )
+                db.add(db_game)
+                db.commit()
+
+                for player in players:
+                    username = (
+                        player["username"] if isinstance(player, dict) else player
+                    )
+                    db_user = (
+                        db.query(DBUser).filter(DBUser.username == username).first()
+                    )
+                    if db_user:
+                        db_game.players.append(db_user)
+
+                db.commit()
+                print(
+                    f"Players added to game: {[p['username'] if isinstance(p, dict) else p for p in players]}"
+                )
+
+                save_success = game_instance.state.manual_save()
+                if save_success:
+                    print(f"Game state pickle file created successfully")
+                else:
+                    print(f"Warning: Failed to create pickle file")
+
+                send_game_state_to_players(
+                    game_instance, room_id, hide_card_for_unvisited=False
+                )
+
+            except Exception as e:
+                print(f"Error creating new game: {e}")
+                import traceback
+
+                traceback.print_exc()
 
     finally:
         db.close()
@@ -1159,7 +1298,143 @@ def send_opponent_player(player_data):
     return opponent_player.model_dump()
 
 
-if __name__ == "__main__":
-    reset_database()
+def load_existing_games():
+    global game_instances
+    db = get_db_session()
+
+    try:
+        running_games = db.query(DBGame).filter(DBGame.game_status == "run").all()
+
+        print(f"Talált {len(running_games)} futó játék az adatbázisban")
+
+        for db_game in running_games:
+            try:
+                save_path = (
+                    f"csotanypoker/server/games_saves/game_{db_game.game_id}.pkl"
+                )
+
+                if not os.path.exists(save_path):
+                    print(f"Pickle fájl nem található: {save_path}")
+
+                    db_game.game_status = "error"
+                    db.commit()
+                    continue
+
+                loaded_state = GameState.load_from_file(save_path)
+
+                if loaded_state:
+                    db_players = db_game.players
+                    players = []
+                    for db_player in db_players:
+                        loaded_player = None
+                        for p in loaded_state.players:
+                            if p.username == db_player.username:
+                                loaded_player = p
+                                break
+
+                        if loaded_player:
+                            players.append(loaded_player)
+                        else:
+                            print(
+                                f"Játékos nem található a mentett állapotban: {db_player.username}"
+                            )
+                            players.append(VisiblePlayer(username=db_player.username))
+
+                    game_logic = GameLogic(
+                        db_game.game_id,
+                        players,
+                        room_id=db_game.room_id,
+                        from_db=True,
+                    )
+
+                    game_instances[db_game.room_id] = game_logic
+                    # print(f"game.logic.gamesatet{game_logic.state.game_id}")
+                    # print(f"game.logic.gamesatet{game_logic.state.room_id}")
+                    # print(f"game.logic.gamesatet{game_logic.state.active_player}")
+                    # print(
+                    #     f"Játék sikeresen betöltve: {db_game.game_id} (szoba: {db_game.room_id})"
+                    # )
+
+                    # print(
+                    #     f"Betöltött játékosok: {[p.username for p in loaded_state.players]}"
+                    # )
+                    # print(
+                    #     f"Aktív játékos: {loaded_state.active_player.username if loaded_state.active_player else 'Nincs'}"
+                    # )
+
+                else:
+                    print(f"Nem sikerült betölteni a GameState-et: {db_game.game_id}")
+
+                    db_game.game_status = "error"
+                    db.commit()
+
+            except Exception as game_error:
+                print(f"Hiba a játék betöltése során ({db_game.game_id}): {game_error}")
+                import traceback
+
+                traceback.print_exc()
+
+                try:
+                    db_game.game_status = "error"
+                    db.commit()
+                except:
+                    pass
+
+        if game_instances:
+            for room_id, game_instance in game_instances.items():
+                player_count = len(game_instance.state.players)
+                active_player = (
+                    game_instance.state.active_player.username
+                    if game_instance.state.active_player
+                    else "Nincs"
+                )
+                print(
+                    f"  Szoba {room_id}: {player_count} játékos, aktív: {active_player}"
+                )
+
+    except Exception as e:
+        print(f"Általános hiba a játékok betöltése során: {e}")
+        import traceback
+
+        traceback.print_exc()
+    finally:
+        db.close()
+
+
+def initialize_server_data():
+    """Szerver inicializálása - adatbázis és játékok betöltése"""
+    print("Szerver inicializálása...")
+
     create_tables()
+    print("Adatbázis táblák létrehozva/ellenőrizve")
+
+    load_existing_games()
+    print("Játékállapotok betöltése befejezve")
+
+    cleanup_inactive_users()
+    print("Szerver inicializálás befejezve")
+
+
+def cleanup_inactive_users():
+    """Tisztítja az inaktív felhasználókat szerver újraindítás után"""
+    db = get_db_session()
+    try:
+        inactive_count = db.query(DBUser).filter(DBUser.is_active == True).count()
+        if inactive_count > 0:
+            db.query(DBUser).filter(DBUser.is_active == True).update(
+                {DBUser.is_active: False}
+            )
+            db.commit()
+            print(f"{inactive_count} felhasználó állapota inaktívra állítva")
+    except Exception as e:
+        print(f"Hiba a felhasználók tisztítása során: {e}")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    # reset_database()
+
+    initialize_server_data()
+
     socketio.run(app, debug=False, host="0.0.0.0")

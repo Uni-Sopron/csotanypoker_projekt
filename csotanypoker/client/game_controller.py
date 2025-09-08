@@ -36,7 +36,7 @@ class GameController:
         self.active_player_list_name: List[str] = []  # List of active player names
         self.screen: str = "loading"
         self.opponent_players: List[OpponentPlayer] = []
-        self.pipa_rect = None  
+        self.pipa_rect = None
         self.x_rect = None
         self.IsPassed = False
         self.is_given = False
@@ -62,7 +62,7 @@ class GameController:
         self.network: NetworkManager = NetworkManager(self)
         self.user = None
         self.room_id: Optional[str] = None
-        self.room_name: str = ""  
+        self.room_name: str = ""
         self.room_list = []
         self.statement = None
         self.dropdown_state = False
@@ -347,7 +347,7 @@ class GameController:
     @game_over.setter
     def game_over(self, value: Optional[EndScreen]) -> None:
         self._game_over = value
-  
+
     def run(self) -> None:
         """
         Handles events, updates game state, and screen rendering.
@@ -363,7 +363,7 @@ class GameController:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                # abalak méretezés:
+
                 elif event.type == pygame.VIDEORESIZE:
                     self.width = event.w
                     self.height = event.h
@@ -396,7 +396,7 @@ class GameController:
             pygame.display.update()
             self.clock.tick(FPS)
 
-        # self.network.disconnect()
+        self.network.disconnect()
         pygame.quit()
 
     def handle_mouse_click(self, pos: Tuple) -> None:
@@ -468,4 +468,3 @@ class GameController:
             self.reconnect_screen.draw()
         elif self.screen == "game_over":
             self.game_over.draw()
-

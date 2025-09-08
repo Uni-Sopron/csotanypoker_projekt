@@ -10,6 +10,7 @@ from csotanypoker.client.constans import (
     LIGHTER_GREEN_TRANSPARENT,
     MIDDLE_GREEN_TRANSPARENT_90,
     RED,
+    RED_TRANSPARENT,
     WHITE,
     DARK_GREEN,
     JATEKSZABALY,
@@ -45,13 +46,12 @@ class GameScreen(BaseScreen):
         self.frame_color = RED
         self.statement = None
         self.show_leave_button = False
-
+        self.adott = False
         self.show_center_card = False
         self.show_tipp_area = False
 
         self.checkmark_rect = None
         self.cross_rect = None
-        # self.passing = False
         self.client.passed = False
 
         self.logout_button = create_logout_button_rect(self.client.height)
@@ -171,7 +171,9 @@ class GameScreen(BaseScreen):
             is_active="checkmark" in self.pressed_elements,
         )
 
-        if len(self.client.game_state.visited_already) < len(self.client.players):
+        print("eddig meglátogatottak száma: ", self.client.game_state.visited_already)
+        print("playerek száma: ", len(self.client.players))
+        if len(self.client.game_state.visited_already) < (len(self.client.players) - 1):
             draw_button(
                 surface=self.client.window,
                 rect=self.pass_button,
@@ -285,11 +287,11 @@ class GameScreen(BaseScreen):
                         if player.username == self.client.game_state.active_player
                     ]
 
-                    if active_statement[0] != None:
+                    if active_statement != [] and active_statement[0] is not None:
                         statement_x = rect.centerx
                         statement_y = rect.bottom + 15
 
-                        statement_text = f"Ez egy {self.translate_animal_to_hungarian(active_statement[0])}"
+                        statement_text = f"Ez egy {self.translate_animal_to_hungarian(str(active_statement[0]))}"
                         text_width = len(statement_text) * 8
                         statement_bg_rect = pygame.Rect(
                             statement_x - text_width // 2 - 10,
@@ -606,10 +608,16 @@ class GameScreen(BaseScreen):
 
     def draw(self) -> None:
         self._ensure_images_preloaded()
+        self.show_leave_button_setting()
         self.logout_button = create_logout_button_rect(self.client.height)
         self.rules_button = create_rules_button_rect(
             self.client.width, self.client.height
         )
+
+        if self.adott and not self.client.game_state.targeted_player:
+            self.adott = False
+            self.active_animal = None  
+
         self.leave_button = pygame.Rect(
             self.logout_button.x, self.logout_button.y - 90, 200, 75
         )
@@ -696,6 +704,7 @@ class GameScreen(BaseScreen):
             else:
                 background_color = LIGHT_GREEN_TRANSPARENT
                 font_color = WHITE
+                
             _draw_rounded_rect(
                 self.client.window,
                 background_color,
@@ -769,26 +778,54 @@ class GameScreen(BaseScreen):
                             font_size=25,
                         )
 
-            self.opponent_player_rects.append((player_panel_rect, player.username))
+            player_is_active = True
+            for user in self.client.users:
+                if user.username == player.username and user.is_active is False:
+                    player_is_active = False
+                    break
+                    
+            if not player_is_active:
+                
+                _draw_rounded_rect(
+                    self.client.window,
+                    RED_TRANSPARENT,  
+                    player_panel_rect,
+                    border_color=RED,  
+                    border_width=3,
+                    border_radius=0.15,
+                )
 
+            self.opponent_player_rects.append((player_panel_rect, player.username))
     def handle_key_press(self, event):
         pass
+
+    def show_leave_button_setting(self):
+        for user in self.client.users:
+            if user.is_active is False:
+                self.show_leave_button = True
+                return
+        self.show_leave_button = False
 
     def handle_mouse_click(self, pos):
         if handle_logout_button_click(pos, self.logout_button, self.client.network):
             return True
 
         if self.leave_button.collidepoint(pos) and self.show_leave_button:
-            self.client.network.leave_room()
+            self.client.network.all_players_leave_room(self.client.room_id)
             return True
 
         if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
             if self.client.game_state.active_player == self.client.user.username:
-                if self.active_animal and self.client.game_state.targeted_player:
-                    self.client.passed = False
+                if (
+                    self.active_animal
+                    and self.client.game_state.targeted_player
+                    and self.adott == False
+                ):
                     self.client.network.oke_click(
                         statement=self.active_animal, passing=self.client.passed
                     )
+                    self.client.passed = False
+                    self.adott = True
                     pass
 
         if hasattr(self, "pass_button") and self.pass_button.collidepoint(pos):
@@ -822,17 +859,20 @@ class GameScreen(BaseScreen):
 
         if hasattr(self, "opponent_player_rects"):
             for rect, player_name in self.opponent_player_rects:
-                if rect.collidepoint(pos):
+                if rect.collidepoint(pos) and self.adott == False:
                     if (
                         self.client.game_state.active_player
                         == self.client.user.username
                     ):
-                        for user in self.client.users:
-                            if user.username == player_name and user.is_active is False:
-                                self.client.message = (
-                                    "Ez a játékos nem aktiv. Válassz másik játékost."
-                                )
-                                self.client.message_display_time = 120
+                        if self.show_leave_button is True:
+                            for user in self.client.users:
+                                if (
+                                    user.username == player_name
+                                    and user.is_active is False
+                                ):
+                                    username = user.username
+                                    self.client.message = f"{username} játékos nem aktiv. Várd meg amig vissza tér!"
+                                    self.client.message_display_time = 120
                                 return True
                         if player_name in self.client.game_state.visited_already:
                             self.client.message = (
@@ -854,7 +894,7 @@ class GameScreen(BaseScreen):
         if hasattr(self, "animal_button_rects"):
             if self.client.game_state.active_player == self.client.user.username:
                 for animal_name, button_rect in self.animal_button_rects.items():
-                    if button_rect.collidepoint(pos):
+                    if button_rect.collidepoint(pos) and self.adott == False:
                         if self.active_animal == animal_name:
                             self.active_animal = None
 
@@ -866,6 +906,9 @@ class GameScreen(BaseScreen):
         for rect, lap in reversed(self.kartya_poziciok):
             if self.client.passed:
                 print("Passzoltál ebben a körben.")
+                break
+            if self.adott:
+                print("Már adtál lapot ebben a körben.")
                 break
 
             if rect.collidepoint(pos) and not self.client.passed:
