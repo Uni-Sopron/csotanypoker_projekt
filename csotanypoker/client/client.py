@@ -16,9 +16,9 @@ class NetworkManager:
         """
         self.sio: socketio.Client = socketio.Client()
         self.game_client = game_client
-    
+
         self._data_lock = threading.RLock()
-       
+
         self._update_in_progress = False
 
         @self.sio.event
@@ -37,9 +37,9 @@ class NetworkManager:
         @self.sio.on("reconnect_offer")
         def on_reconnect_offer(data: Dict[str, Any]) -> None:
             print("BELEPETT AZ UJRA_csatlakozasba")
+            self.game_client.message = None
             with self._data_lock:
                 try:
-                  
                     if self.game_client.user is None:
                         self.game_client.user = Client_User(
                             username=data.get("username", ""),
@@ -49,7 +49,6 @@ class NetworkManager:
                         self.game_client.user.username = data.get("username", "")
                         self.game_client.user.is_active = True
 
-                   
                     if (
                         not hasattr(self.game_client, "room_list")
                         or self.game_client.room_list is None
@@ -59,9 +58,21 @@ class NetworkManager:
                         self.game_client.room_list.clear()
 
                     rooms_data = data.get("rooms", {})
+                    previos_room_data = data["previous_room"]
+                    self.game_client.previous_room = Room(
+                        room_id=previos_room_data["room_id"],
+                        name=previos_room_data["name"],
+                        max_player_count=previos_room_data["player_count"],
+                    )
+                    self.game_client.previous_room.player_count = previos_room_data[
+                        "actual_player_count"
+                    ]
+                    self.game_client.previous_room.password_protected = (
+                        previos_room_data["password_protected"]
+                    )
+
                     for room_id, room_info in rooms_data.items():
                         try:
-                          
                             name = room_info.get("name", "Unknown Room")
                             player_count = room_info.get("player_count", 4)
                             actual_player_count = room_info.get(
@@ -71,7 +82,6 @@ class NetworkManager:
                                 "password_protected", False
                             )
 
-                          
                             if not isinstance(name, str):
                                 name = str(name)
                             if not isinstance(player_count, int) or player_count <= 0:
@@ -96,7 +106,6 @@ class NetworkManager:
                             print(f"Error creating room in reconnect_offer: {e}")
                             continue
 
-                  
                     self.game_client.previous_room_id = data.get("previous_room_id")
                     self.game_client.room_id = data.get("previous_room_id")
                     self.game_client.screen = "reconnect_screen"
@@ -109,9 +118,8 @@ class NetworkManager:
 
                 except Exception as e:
                     print(f"Critical error in reconnect_offer handler: {e}")
-                   
+                    self.game_client.message = None
                     self.game_client.screen = "login"
-                    self.game_client.message = f"Újracsatlakozási hiba: {e}"
                     if not hasattr(self.game_client, "room_list"):
                         self.game_client.room_list = []
 
@@ -159,13 +167,13 @@ class NetworkManager:
         def on_login_error(data: Dict[str, str]) -> None:
             """Handle login error."""
             with self._data_lock:
-                self.game_client.login_error = data.get("message", "Ismeretlen hiba")
+                self.game_client.message = data.get("message", "Ismeretlen hiba")
                 self.game_client.error_display_time = 30.0
 
         @self.sio.on("register_error")
         def on_register_error(data: Dict[str, str]) -> None:
             with self._data_lock:
-                self.game_client.login_error = data.get("message", "Regisztrációs hiba")
+                self.game_client.message = data.get("message", "Regisztrációs hiba")
                 self.game_client.error_display_time = 30.0
 
         @self.sio.on("joined_room")
@@ -204,11 +212,9 @@ class NetworkManager:
                 try:
                     player_list = data.get("players", [])
 
-                   
                     self.game_client.visible_player = None
                     self.game_client.opponent_players = []
 
-                   
                     if not self.game_client.user or not self.game_client.user.username:
                         print("Error: No valid user found during game start")
                         return
@@ -233,7 +239,6 @@ class NetworkManager:
                                 )
                             )
 
-              
                     if self.game_client.visible_player:
                         self.game_client.players = [
                             self.game_client.visible_player
@@ -269,7 +274,6 @@ class NetworkManager:
 
                 self._update_in_progress = True
                 try:
-              
                     game_state = data.get("game_state", {})
                     visible_player_data = data.get("visible_player_data", {})
                     opponent_players_data = data.get("opponent_players_data", [])
@@ -300,7 +304,7 @@ class NetworkManager:
                             "a szerver visited_already:",
                             game_state.get("visited_already"),
                         )
-                   
+
                         self.game_client.game_state.visited_already = list(
                             game_state.get("visited_already", [])
                         )
@@ -341,7 +345,6 @@ class NetworkManager:
                                             f"Warning: Unknown animal in front: {animal_name} - {e}"
                                         )
 
-                    
                         username = visible_player_data.get("username", "")
                         if username:
                             self.game_client.visible_player = VisiblePlayer(
@@ -354,7 +357,6 @@ class NetworkManager:
                         else:
                             print("Warning: No username in visible_player_data")
 
-                  
                     new_opponent_players = []
                     if isinstance(opponent_players_data, list):
                         for opponent_data in opponent_players_data:
@@ -414,10 +416,8 @@ class NetworkManager:
                                 )
                                 continue
 
-
                     self.game_client.opponent_players = new_opponent_players
 
-                 
                     if (
                         self.game_client.visible_player
                         and hasattr(self.game_client, "game_state")
@@ -496,12 +496,10 @@ class NetworkManager:
                                 break
 
                     if rooms_changed:
-                     
                         new_room_list = []
 
                         for room_id, room_info in new_rooms_data.items():
                             try:
-                             
                                 name = room_info.get("name", "Unknown Room")
                                 max_player_count = room_info.get("max_player_count", 4)
                                 player_count = room_info.get("player_count", 0)
@@ -509,7 +507,6 @@ class NetworkManager:
                                     "password_protected", False
                                 )
 
-                                
                                 if not isinstance(name, str):
                                     name = str(name)
                                 if (
@@ -546,7 +543,7 @@ class NetworkManager:
 
                 except Exception as e:
                     print(f"Critical error in rooms_updated handler: {e}")
-                  
+
                     if (
                         not hasattr(self.game_client, "room_list")
                         or self.game_client.room_list is None
@@ -592,7 +589,14 @@ class NetworkManager:
         def on_left_room(data: Dict[str, str]) -> None:
             print("Left room event received")
             with self._data_lock:
-                self.game_client.message = data.get("message", "Szoba elhagyva")
+                if self.game_client.screen == "reconnect_screen":
+                    self.game_client.message = (
+                        "A szoba közben megszünt. Szoba elhagyása"
+                    )
+
+                else:
+                    self.game_client.message = data.get("message", "Szoba elhagyva")
+
                 self.game_client.message_display_time = 30.0
 
                 self.game_client.selected_room = None
@@ -664,10 +668,7 @@ class NetworkManager:
             print("BELEPETT a rematch_vote_received eseménybe")
             with self._data_lock:
                 try:
-                    if (
-                        hasattr(self.game_client, "game_state")
-                        and self.game_client.game_state
-                    ):
+                    if self.game_client.game_state:
                         voters_data = data.get("voters", [])
                         if isinstance(voters_data, list):
                             self.game_client.game_state.voters = set(voters_data)
@@ -694,9 +695,7 @@ class NetworkManager:
                             self.game_client.users
                         )
 
-                    self.game_client.message = (
-                        f"{username} újra csatlakozott a játékhoz."
-                    )
+                    self.game_client.message = f"{username} vissza csatlakozott."
                     self.game_client.message_display_time = 30.0
                 except Exception as e:
                     print(f"Error in player_rejoined: {e}")
@@ -715,7 +714,7 @@ class NetworkManager:
         with self._data_lock:
             if self.game_client.user and hasattr(self.game_client.user, "username"):
                 self._safe_emit("logout", {"username": self.game_client.user.username})
-
+            self.game_client.message = None
             self.game_client.screen = "login"
             if hasattr(self.game_client, "room_list"):
                 self.game_client.room_list.clear()
@@ -727,6 +726,7 @@ class NetworkManager:
         self.sio.disconnect()
 
     def vote_rematch(self, room_id: str, username: str) -> None:
+        print("Visszavágóra szavazás")
         self.sio.emit("vote_rematch", {"room_id": room_id, "username": username})
 
     def all_players_leave_room(self, room_id) -> None:
@@ -757,9 +757,8 @@ class NetworkManager:
         """
         try:
             self.sio.connect(server_url)
-            
+
         except Exception as e:
-        
             self.game_client.message = f"Kapcsolódási hiba: {e}"
             self.game_client.message_display_time = 30.0
 
@@ -830,8 +829,6 @@ class NetworkManager:
                 "pass": passing,
             },
         )
-
- 
 
     def passing(self) -> None:
         self.sio.emit("pass")

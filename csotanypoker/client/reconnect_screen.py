@@ -58,14 +58,11 @@ class ReconnectScreen(BaseScreen):
             font="regular",
             font_size=70,
         )
-        for room in self.client.room_list:
-            if room.room_id == self.client.previous_room_id:
-                previous_room = room
-                break
-        if previous_room:
+
+        if self.client.previous_room:
             draw_text(
                 self.client.window,
-                f"Jelenlegi szobád: {previous_room.name}",
+                f"Jelenlegi szobád: {self.client.previous_room.name}",
                 DARK_GREEN,
                 self.client.width // 2,
                 self.client.height // 2.4,
@@ -74,7 +71,7 @@ class ReconnectScreen(BaseScreen):
                 font_size=40,
             )
 
-            players_text = f"Aktuális játékosszám: {previous_room.player_count}/{previous_room.max_player_count}"
+            players_text = f"Aktuális játékosszám: {self.client.previous_room.player_count}/{self.client.previous_room.max_player_count}"
             draw_text(
                 self.client.window,
                 players_text,
@@ -145,23 +142,20 @@ class ReconnectScreen(BaseScreen):
         self._draw_logout_button()
 
     def handle_mouse_click(self, pos):
-        for room in self.client.room_list:
-            if room.room_id == self.client.previous_room_id:
-                previous_room = room
-                break
         if self.reconnect_button.collidepoint(pos):
-            if self.client.previous_room_id:
-                room_id = self.client.previous_room_id
+            if self.client.previous_room:
+                room_id = self.client.previous_room.room_id
                 if room_id:
                     print("Újracsatlakozás a szobához:", room_id)
+                    self.client.selected_room = self.client.previous_room
                     self.client.network.rejoin_waiting_room()
-       
+
         elif self.leave_button.collidepoint(pos):
             if self.client.message == "A játék elkezdődött":
-                
-                self.client.network.all_players_leave_room(self.client.room_id)
+                self.client.network.all_players_leave_room(
+                    self.client.previous_room.room_id
+                )
             else:
-                
                 self.client.network.leave_room()
             self.client.screen = "rooms_screen"
         elif self.logout_button.collidepoint(pos):

@@ -251,17 +251,17 @@ def handle_start_new_game(data: dict):
             for r_u in room_users
         ]
 
-        if target_game is None:
-            socketio.emit(
-                "rejoin_waiting_success",
-                {
-                    "room_id": room_id,
-                    "room_name": target_room.name,
-                    "players": [u.model_dump() for u in users],
-                    "max_player_count": target_room.max_player_count,
-                },
-                to=request.sid,
-            )
+     
+        socketio.emit(
+            "rejoin_waiting_success",
+            {
+                "room_id": room_id,
+                "room_name": target_room.name,
+                "players": [u.model_dump() for u in users],
+                "max_player_count": target_room.max_player_count,
+            },
+            to=request.sid,
+        )
 
         socketio.emit(
             "player_rejoined",
@@ -413,29 +413,32 @@ def handle_login(data: dict) -> None:
         user = Client_User(username=username, is_active=True)
 
         if previous_room and previous_room_id:
-            rooms_data_for_reconnect = {}
+            previous_room_data = {}
             all_rooms = db.query(DBRoom).all()
             for room in all_rooms:
-                room_player_count = user_counter(room.room_id)
-                rooms_data_for_reconnect[room.room_id] = {
-                    "name": room.name,
-                    "player_count": room.max_player_count,
-                    "password_protected": True if room.password else False,
-                    "actual_player_count": room_player_count,
-                }
+                if room.room_id == previous_room_id:
+                    room_player_count = user_counter(room.room_id)
+                    previous_room_data = {
+                        "room_id": room.room_id,
+                        "name": room.name,
+                        "player_count": room.max_player_count,
+                        "password_protected": True if room.password else False,
+                        "actual_player_count": room_player_count,
+                    }
 
-            game_is_start(previous_room_id)
+   
 
             emit(
                 "reconnect_offer",
                 {
                     "username": username,
-                    "rooms": rooms_data_for_reconnect,
-                    "previous_room_id": previous_room.room_id,
+                    "rooms": rooms_data,
+                    "previous_room": previous_room_data,
                     "game_start": game_is_start(previous_room_id),
                 },
                 to=sockets[username],
             )
+
             return
         else:
             emit("login_success", {"user": user.model_dump(), "rooms": rooms_data})
@@ -455,22 +458,21 @@ def user_counter(room_id) -> int:
 
 def get_rooms_data():
     db = get_db_session()
-
     rooms_data = {}
-
     rooms = db.query(DBRoom).all()
 
-    for room in rooms:  # TODO
+    for room in rooms:
         player_count = user_counter(room.room_id)
-        game = game_is_start(room_id=room.room_id)
+        has_running_game = game_is_start(room_id=room.room_id)
 
-        if player_count != 0 and not game:
+        if not has_running_game and 0 != player_count:
             rooms_data[room.room_id] = {
                 "name": room.name,
                 "max_player_count": room.max_player_count,
                 "password_protected": True if room.password else False,
                 "player_count": player_count,
             }
+
     db.close()
     return rooms_data
 
@@ -478,11 +480,12 @@ def get_rooms_data():
 def game_is_start(room_id: int) -> bool:
     db = get_db_session()
     try:
-        game = db.query(DBGame).filter(DBGame.room_id == room_id).all()
-        if game:
-            return True
-        else:
-            return False
+        running_game = (
+            db.query(DBGame)
+            .filter(DBGame.room_id == room_id, DBGame.game_status == "run")
+            .first()
+        )
+        return running_game is not None
     finally:
         db.close()
 
@@ -501,7 +504,6 @@ def broadcast_room_list_update():
         for user in users_not_in_room:
             if user.username in sockets:
                 user_socket_id = sockets[user.username]
-
                 try:
                     socketio.emit(
                         "rooms_updated", {"rooms": rooms_data}, to=user_socket_id
@@ -537,16 +539,18 @@ def handle_logout(data) -> None:
                 ]
                 room = get_room_by_id(room_id)
                 if room:
-                    socketio.emit(
-                        "player_left_room",
-                        {
-                            "message": f"{username} elhagyta a szobát",
-                            "left_player": username,
-                            "players": [u.model_dump() for u in users],
-                            "max_player_count": room.max_player_count,
-                        },
-                        room=room_id,
-                    )
+                    for user in users:
+                        if user.username != username:
+                            socketio.emit(
+                                "player_left_room",
+                                {
+                                    "message": f"{username} elhagyta a szobát",
+                                    "left_player": username,
+                                    "players": [u.model_dump() for u in users],
+                                    "max_player_count": room.max_player_count,
+                                },
+                                to=sockets[user.username],
+                            )
 
                     update_room_player_count(room_id)
                     broadcast_room_list_update()
@@ -662,7 +666,6 @@ def handle_leave_room(data: dict) -> None:
 
         leave_room(room_id)
         emit("left_room", {"message": "Szoba elhagyás"})
-
         room_users = get_room_users(room_id)
         users = [
             Client_User(username=r_u.username, is_active=r_u.is_active)
@@ -884,7 +887,13 @@ def handle_oke_click(data: dict) -> None:
                 game_instance.select_card(card, passing)
 
         game_instance.select_target_player(client_game_state["targeted_player"])
-
+        if (
+            game_instance.state.active_player.username
+            not in game_instance.state.visited_already
+        ):
+            game_instance.state.visited_already.append(
+                game_instance.state.active_player.username
+            )
         if "active_player" in client_game_state and client_game_state["active_player"]:
             active_player_name = client_game_state["active_player"]
             for player in game_instance.state.players:
@@ -895,7 +904,8 @@ def handle_oke_click(data: dict) -> None:
         game_instance.make_statement(statement)
 
         send_game_state_to_players(game_instance, room_id, hide_card_for_unvisited=True)
-
+    except Exception as e:
+        print(f"Error in handle_oke_click: {e}")
     finally:
         db.close()
 

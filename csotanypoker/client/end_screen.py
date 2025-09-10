@@ -178,16 +178,21 @@ class EndScreen(BaseScreen):
         )
 
     def auto_leave(self) -> None:
-        self.client.network.all_players_leave_room(self.client.room_id)
+        self.client.network.all_players_leave_room(self.client.selected_room.room_id)
 
     def handle_mouse_click(self, pos):
         if self.leave_button.collidepoint(pos):
-            self.client.network.all_players_leave_room(self.client.room_id)
+            self.client.network.all_players_leave_room(
+                self.client.selected_room.room_id
+            )
 
             pass
         elif self.rematch_button.collidepoint(pos):
+            print("Visszavágóra szavazás")
+            print(self.client.selected_room.room_id, self.client.user.username)
+
             self.client.network.vote_rematch(
-                self.client.room_id, self.client.user.username
+                self.client.selected_room.room_id, self.client.user.username
             )
 
     def handle_key_press(self, event):

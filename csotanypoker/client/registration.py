@@ -69,11 +69,11 @@ class LoginScreen(BaseScreen):
         self.register_button_pressed = self.register_button_hovered and mouse_pressed
 
     def _draw_error_message(self):
-        if self.client.login_error and self.client.error_display_time > 0:
+        if self.client.message and self.client.error_display_time > 0:
             error_y = self.register_button.bottom + 150
             draw_text(
                 self.client.window,
-                self.client.login_error,
+                self.client.message,
                 RED,
                 self.client.width // 2,
                 error_y,
@@ -251,11 +251,11 @@ class LoginScreen(BaseScreen):
         self.client.network.register(self.username_text.strip(), self.password_text)
 
     def set_error(self, message):
-        self.client.login_error = message#TODO ez itt nem jo le kell cserélni a message_display_time-ra
+        self.client.message = message
         self.client.error_display_time = 30
 
     def clear_error(self):
-        self.client.login_error = ""
+        self.client.message = ""
         self.client.error_display_time = 0
 
     def clear_fields(self):

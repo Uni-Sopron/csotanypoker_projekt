@@ -172,8 +172,8 @@ class GameScreen(BaseScreen):
         )
 
         print("eddig meglátogatottak száma: ", self.client.game_state.visited_already)
-        print("playerek száma: ", len(self.client.players))
-        if len(self.client.game_state.visited_already) < (len(self.client.players) - 1):
+        print("playerek száma: ", len(self.client.users))
+        if len(self.client.game_state.visited_already) < (len(self.client.users) - 1):
             draw_button(
                 surface=self.client.window,
                 rect=self.pass_button,
@@ -489,7 +489,7 @@ class GameScreen(BaseScreen):
         )
         draw_text(
             surface=self.client.window,
-            text=f"Aktuális játékos: {self.client.game_state.active_player}",
+            text=f"AktuÃ¡lis jÃ¡tÃ©kos: {self.client.game_state.active_player}",
             color=DARK_GREEN,
             x=50,
             y=10 + 27,
@@ -497,6 +497,8 @@ class GameScreen(BaseScreen):
             font="regular",
             font_size=22,
         )
+
+        self._set_contextual_message()
 
         if self.client.message and self.client.message_display_time > 0:
             message_lines = wrap_text(self.client.message, 30)
@@ -514,6 +516,43 @@ class GameScreen(BaseScreen):
                 )
 
             self.client.message_display_time -= 1
+
+    def _set_contextual_message(self):
+   
+        if (
+            not hasattr(self.client, "message")
+            or self.client.message is None
+            or getattr(self.client, "message_display_time", 0) <= 0
+        ):
+            if self.client.game_state and self.client.user:
+                if self.client.game_state.active_player == self.client.user.username:
+                    if self.client.passed:
+                        self.client.message = (
+                            "Válassz másik játékost és állíts valamit a lapról"
+                        )
+                        self.client.message_display_time = 1
+                    else:
+                        self.client.message = (
+                            "Válassz kártyát és játékost, majd állíts valamit"
+                        )
+                        self.client.message_display_time = 1
+
+                elif (
+                    self.client.game_state.targeted_player == self.client.user.username
+                ):
+                    self.client.message = "Igaz vagy hamis az állítás?"
+                    self.client.message_display_time = 1
+                elif (
+                    self.client.game_state.active_player != self.client.user.username
+                    and self.client.game_state.targeted_player is None
+                ):
+                    self.client.message = (
+                        f"Várj az {self.client.game_state.active_player} lépésére"
+                    )
+                    self.client.message_display_time = 1
+                else:
+                    self.client.message = f"{self.client.game_state.targeted_player} játékos lapot kapott {self.client.game_state.active_player}-től"
+                    self.client.message_display_time = 1
 
     def draw_leave_button(self):
         draw_button(
@@ -616,7 +655,7 @@ class GameScreen(BaseScreen):
 
         if self.adott and not self.client.game_state.targeted_player:
             self.adott = False
-            self.active_animal = None  
+            self.active_animal = None
 
         self.leave_button = pygame.Rect(
             self.logout_button.x, self.logout_button.y - 90, 200, 75
@@ -704,7 +743,7 @@ class GameScreen(BaseScreen):
             else:
                 background_color = LIGHT_GREEN_TRANSPARENT
                 font_color = WHITE
-                
+
             _draw_rounded_rect(
                 self.client.window,
                 background_color,
@@ -783,19 +822,19 @@ class GameScreen(BaseScreen):
                 if user.username == player.username and user.is_active is False:
                     player_is_active = False
                     break
-                    
+
             if not player_is_active:
-                
                 _draw_rounded_rect(
                     self.client.window,
-                    RED_TRANSPARENT,  
+                    RED_TRANSPARENT,
                     player_panel_rect,
-                    border_color=RED,  
+                    border_color=RED,
                     border_width=3,
                     border_radius=0.15,
                 )
 
             self.opponent_player_rects.append((player_panel_rect, player.username))
+
     def handle_key_press(self, event):
         pass
 
@@ -811,28 +850,41 @@ class GameScreen(BaseScreen):
             return True
 
         if self.leave_button.collidepoint(pos) and self.show_leave_button:
-            self.client.network.all_players_leave_room(self.client.room_id)
+            self.client.network.all_players_leave_room(
+                self.client.selected_room.room_id
+            )
             return True
 
         if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
             if self.client.game_state.active_player == self.client.user.username:
-                if (
-                    self.active_animal
-                    and self.client.game_state.targeted_player
-                    and self.adott == False
-                ):
+              
+                if not self.client.game_state.question_card:
+                    self.client.message = "Nincs kártya kiválasztva!"
+                    self.client.message_display_time = 30
+                    return True
+
+                if not self.client.game_state.targeted_player:
+                    self.client.message = "Válassz egy játékost!"
+                    self.client.message_display_time = 30
+                    return True
+
+                if not self.active_animal:
+                    self.client.message = "Válassz egy állatot!"
+                    self.client.message_display_time = 30
+                    return True
+
+                
+                if self.adott == False:
                     self.client.network.oke_click(
                         statement=self.active_animal, passing=self.client.passed
                     )
                     self.client.passed = False
                     self.adott = True
-                    pass
 
         if hasattr(self, "pass_button") and self.pass_button.collidepoint(pos):
             if (
                 self.client.game_state.targeted_player == self.client.user.username
-                and len(self.client.game_state.visited_already)
-                < len(self.client.players)
+                and len(self.client.game_state.visited_already) < len(self.client.users)
             ):
                 self.client.passed = True
                 self.client.network.passing()
@@ -872,13 +924,13 @@ class GameScreen(BaseScreen):
                                 ):
                                     username = user.username
                                     self.client.message = f"{username} játékos nem aktiv. Várd meg amig vissza tér!"
-                                    self.client.message_display_time = 120
+                                    self.client.message_display_time = 30
                                 return True
                         if player_name in self.client.game_state.visited_already:
                             self.client.message = (
                                 "Nála már volt ez a lap. Válassz másik játékost."
                             )
-                            self.client.message_display_time = 120
+                            self.client.message_display_time = 30
                             return True
                         if self.client.game_state.targeted_player == player_name:
                             self.client.game_state.targeted_player = None
@@ -889,7 +941,7 @@ class GameScreen(BaseScreen):
                         return True
                     else:
                         self.client.message = "Nem te vagy soron"
-                        self.client.message_display_time = 120
+                        self.client.message_display_time = 30
 
         if hasattr(self, "animal_button_rects"):
             if self.client.game_state.active_player == self.client.user.username:
@@ -920,7 +972,7 @@ class GameScreen(BaseScreen):
                     break
                 else:
                     self.client.message = "Nem te vagy soron"
-                    self.client.message_display_time = 120
+                    self.client.message_display_time = 30
                     return True
 
         return False
