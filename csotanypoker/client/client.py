@@ -721,6 +721,10 @@ class NetworkManager:
             self.game_client.selected_room = None
             self.game_client.room_id = None
             self.game_client.room_name = None
+        
+    def add_ai_player(self) -> None:
+        if self.game_client.selected_room.room_id:
+            self.sio.emit("add_ai_player", {"room_id": self.game_client.selected_room.room_id})
 
     def disconnect(self) -> None:
         self.sio.disconnect()

@@ -489,7 +489,7 @@ class GameScreen(BaseScreen):
         )
         draw_text(
             surface=self.client.window,
-            text=f"AktuÃ¡lis jÃ¡tÃ©kos: {self.client.game_state.active_player}",
+            text=f"Aktuális játékos: {self.client.game_state.active_player}",
             color=DARK_GREEN,
             x=50,
             y=10 + 27,

@@ -249,7 +249,7 @@ class WaitingScreen(BaseScreen):
         ):
             if len(self.client.users) < self.client.selected_room.max_player_count:
                 print("AI hozzáadás")
-
+                self.client.network.add_ai_player()
                 return True
         elif hasattr(self, "plus_button") and self.plus_button.collidepoint(pos):
             if len(self.client.users) < self.client.selected_room.max_player_count:
