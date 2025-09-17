@@ -32,6 +32,7 @@ from csotanypoker.client.drawing_helpers import (
     check_logout_button_interaction,
     check_rules_button_interaction,
     handle_logout_button_click,
+    this_is_ai_name,
     wrap_text,
     preload_all_images,
 )
@@ -431,7 +432,7 @@ class GameScreen(BaseScreen):
             y=table_y + 20,
             centered=True,
             font="bold",
-            font_size=25,
+            font_size=20,
         )
 
         pygame.draw.line(
@@ -484,18 +485,18 @@ class GameScreen(BaseScreen):
         _draw_rounded_rect(
             self.client.window,
             MIDDLE_GREEN_TRANSPARENT_50,
-            pygame.Rect(20, 20, 300, 60),
+            pygame.Rect(20, 20, 330, 60),
             border_radius=0.35,
         )
         draw_text(
             surface=self.client.window,
-            text=f"Aktuális játékos: {self.client.game_state.active_player}",
+            text=f"Aktuális játékos: {this_is_ai_name(self.client.game_state.active_player)}",
             color=DARK_GREEN,
             x=50,
             y=10 + 27,
             centered=False,
             font="regular",
-            font_size=22,
+            font_size=20,
         )
 
         self._set_contextual_message()
@@ -518,7 +519,6 @@ class GameScreen(BaseScreen):
             self.client.message_display_time -= 1
 
     def _set_contextual_message(self):
-   
         if (
             not hasattr(self.client, "message")
             or self.client.message is None
@@ -546,12 +546,10 @@ class GameScreen(BaseScreen):
                     self.client.game_state.active_player != self.client.user.username
                     and self.client.game_state.targeted_player is None
                 ):
-                    self.client.message = (
-                        f"Várj az {self.client.game_state.active_player} lépésére"
-                    )
+                    self.client.message = f"Várj az {this_is_ai_name(self.client.game_state.active_player)} lépésére"
                     self.client.message_display_time = 1
                 else:
-                    self.client.message = f"{self.client.game_state.targeted_player} játékos lapot kapott {self.client.game_state.active_player}-től"
+                    self.client.message = f"{this_is_ai_name(self.client.game_state.targeted_player)} játékos lapot kapott {this_is_ai_name(self.client.game_state.active_player)}-től"
                     self.client.message_display_time = 1
 
     def draw_leave_button(self):
@@ -697,7 +695,7 @@ class GameScreen(BaseScreen):
         self.draw_info_messages()
         draw_rules_button(self.client.window, self.rules_button)
 
-        if self.show_rules:
+        if self.show_rules :
             draw_rules_popup(
                 self.client.window,
                 self.client.width,
@@ -755,13 +753,13 @@ class GameScreen(BaseScreen):
 
             draw_text(
                 self.client.window,
-                player.username,
+                this_is_ai_name(player.username),
                 font_color,
                 player_panel_rect.centerx,
                 player_panel_rect.y + 15,
                 centered=True,
                 font="bold",
-                font_size=25,
+                font_size=20,
             )
 
             pygame.draw.line(
@@ -857,7 +855,6 @@ class GameScreen(BaseScreen):
 
         if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
             if self.client.game_state.active_player == self.client.user.username:
-              
                 if not self.client.game_state.question_card:
                     self.client.message = "Nincs kártya kiválasztva!"
                     self.client.message_display_time = 30
@@ -873,7 +870,6 @@ class GameScreen(BaseScreen):
                     self.client.message_display_time = 30
                     return True
 
-                
                 if self.adott == False:
                     self.client.network.oke_click(
                         statement=self.active_animal, passing=self.client.passed
@@ -893,20 +889,22 @@ class GameScreen(BaseScreen):
             hasattr(self, "cross_rect")
             and self.cross_rect
             and self.cross_rect.collidepoint(pos)
+            and self.adott is False
         ):
             if self.client.game_state.targeted_player == self.client.user.username:
                 print("Cross button clicked - False answer")
-
+                self.adott = True
                 self.client.network.guess(False)
 
         if (
             hasattr(self, "checkmark_rect")
             and self.checkmark_rect
             and self.checkmark_rect.collidepoint(pos)
+            and self.adott is False
         ):
             if self.client.game_state.targeted_player == self.client.user.username:
                 print("Checkmark button clicked - True answer")
-
+                self.adott = True
                 self.client.network.guess(True)
 
         if hasattr(self, "opponent_player_rects"):
@@ -923,7 +921,7 @@ class GameScreen(BaseScreen):
                                     and user.is_active is False
                                 ):
                                     username = user.username
-                                    self.client.message = f"{username} játékos nem aktiv. Várd meg amig vissza tér!"
+                                    self.client.message = f"{this_is_ai_name(username)} játékos nem aktiv. Várd meg amig vissza tér!"
                                     self.client.message_display_time = 30
                                 return True
                         if player_name in self.client.game_state.visited_already:

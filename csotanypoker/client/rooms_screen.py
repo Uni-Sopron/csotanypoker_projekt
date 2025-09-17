@@ -111,17 +111,25 @@ class RoomsScreen(BaseScreen):
 
     def apply_filters(self):
         filtered_rooms = self.original_rooms.copy()
-
+        filtered_rooms_name = []
+        filtered_rooms_id = []
         if self.search_text.strip():
             search_text = self.search_text.lower().strip()
-            filtered_rooms = [
-                room
-                for room in filtered_rooms
-                if (
-                    search_text in room.name.lower()
-                    or search_text in room.room_id.lower()
-                )
-            ]
+
+            if "id:" in search_text:
+                search_text = search_text[3:].strip()
+                filtered_rooms_id = [
+                    room
+                    for room in filtered_rooms
+                    if search_text in room.room_id.lower()
+                ]
+            else:
+                filtered_rooms_name = [
+                    room
+                    for room in filtered_rooms
+                    if (search_text in room.name.lower())
+                ]
+            filtered_rooms = filtered_rooms_name + filtered_rooms_id
 
         if self.filter_state == 1:
             filtered_rooms = [
@@ -190,11 +198,6 @@ class RoomsScreen(BaseScreen):
 
     def _is_create_enabled(self, show_error=False):
         """Ellenőrzi, hogy a létrehozás gomb engedélyezett-e"""
-        if not self.room_name_text.strip():
-            if show_error:
-                self.client.message = "Szoba név megadása szükséges"
-                self.client.message_display_time = 60
-            return False
 
         if self.password_protected and not self.password_text_input.strip():
             if show_error:
@@ -208,6 +211,7 @@ class RoomsScreen(BaseScreen):
 
     def handle_mouse_click(self, pos):
         if handle_logout_button_click(pos, self.logout_button, self.client.network):
+            self.room_name_text = ""
             return True
 
         if hasattr(self, "search_input") and self.search_input.collidepoint(pos):
@@ -276,19 +280,24 @@ class RoomsScreen(BaseScreen):
                     self.join_password_text if selected_room.password_protected else ""
                 )
                 self.client.network.join_room(selected_room.room_id, password)
-                self.selected_room_index = None
+                self.reset_create_room_form()
             return
 
         if hasattr(self, "create_button") and self.create_button.collidepoint(pos):
             if self._is_create_enabled(show_error=True):
                 password = self.password_text_input if self.password_protected else ""
+
+                room_name = (
+                    self.room_name_text.strip()
+                    or f"{self.client.user.username} szobája"
+                )
                 self.client.network.create_room(
-                    self.room_name_text,
+                    room_name,
                     self.password_protected,
                     self.max_players,
                     password,
                 )
-                self.selected_room_index = None
+                self.reset_create_room_form()
             return
 
         room_index = self._get_room_index_at_position(pos)
@@ -301,6 +310,13 @@ class RoomsScreen(BaseScreen):
         self._handle_scroll_click(pos)
 
         self._deactivate_inputs()
+
+    def reset_create_room_form(self):
+        self.room_name_text = ""
+        self.password_text_input = ""
+        self.password_protected = False
+        self.max_players = 4
+        self.max_players_text = ""
 
     def _get_room_index_at_position(self, pos):
         if not hasattr(
@@ -801,9 +817,6 @@ class RoomsScreen(BaseScreen):
     def _draw_room_name_section(self, y_pos):
         self.room_name_input = pygame.Rect(260, y_pos - 17, 230, 35)
 
-        if not self._is_input_active("room_name") and not self.room_name_text:
-            self.room_name_text = f"{self.client.user.username} szobája"
-
         draw_text(
             self.client.window,
             "Szoba neve:",
@@ -827,6 +840,8 @@ class RoomsScreen(BaseScreen):
             font_size=20,
             is_active=self._is_input_active("room_name"),
             cursor_color=WHITE,
+            placeholder=f"{self.client.user.username} szobája",
+            placeholder_color=MIDDLE_GREEN,
         )
 
     def _draw_max_players_section(self, y_pos):

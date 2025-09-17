@@ -47,8 +47,8 @@ class AbstractGameState(BaseModel):
     game_id: Optional[str] = Field(None, description="Játék egyedi azonosítója")
     room_id: Optional[str] = Field(None, description="Szoba azonosítója")
     question_card: Optional[Animal] = Field(None, description="Kérdéses kártya")
-    visited_already: Optional[List[str]] = Field(
-        list(), description="Azoknak a neve akiknél már volt a kérdéses kártya"
+    visited_already: Optional[Set[str]] = Field(
+        set(), description="Azoknak a neve akiknél már volt a kérdéses kártya"
     )
     voters: Optional[Set[str]] = Field(set(), description="Szavazók nevei")
 
@@ -61,7 +61,7 @@ class GameState(AbstractGameState):
     targeted_player: Optional[VisiblePlayer] = Field(
         None, description="Célzott játékos"
     )
-    players: Optional[Set[VisiblePlayer]] = Field(
+    players: Optional[List[VisiblePlayer]] = Field(
         None, description="Összes játékos a játékban"
     )
 
@@ -69,11 +69,18 @@ class GameState(AbstractGameState):
         save_path = data.get("save_path")
         super().__init__(**data)
 
-        if self.voters is not None:
+        if self.visited_already is None:
+            self.visited_already = AutoSavingSet([], self._save)
+        else:
+            self.visited_already = AutoSavingSet(self.visited_already, self._save)
+
+        if self.voters is None:
+            self.voters = AutoSavingSet([], self._save)
+        else:
             self.voters = AutoSavingSet(self.voters, self._save)
 
         if self.players is None:
-            self.players = set()
+            self.players = []
 
         if save_path:
             directory = os.path.dirname(save_path)
@@ -95,7 +102,7 @@ class GameState(AbstractGameState):
             return
 
         try:
-            # Ensure directory exists
+    
             directory = os.path.dirname(self.save_path)
             if directory and not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)
@@ -121,7 +128,12 @@ class GameState(AbstractGameState):
             if not isinstance(game_state, cls):
                 print(f"Loaded object is not a GameState instance: {type(game_state)}")
                 return None
+
             game_state.save_path = file_path
+            if game_state.visited_already is not None:
+                game_state.visited_already = AutoSavingSet(
+                    game_state.visited_already, game_state._save
+                )
 
             if game_state.voters is not None:
                 game_state.voters = AutoSavingSet(game_state.voters, game_state._save)
@@ -172,6 +184,12 @@ class ClientGameState(AbstractGameState):
 
     @field_serializer("voters")
     def serialize_voters(self, value):
+        if value is None:
+            return None
+        return list(value)
+
+    @field_serializer("visited_already")
+    def serialize_visited_already(self, value):
         if value is None:
             return None
         return list(value)

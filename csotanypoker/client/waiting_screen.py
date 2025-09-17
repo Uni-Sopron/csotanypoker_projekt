@@ -28,6 +28,7 @@ from csotanypoker.client.drawing_helpers import (
     check_logout_button_interaction,
     check_rules_button_interaction,
     handle_logout_button_click,
+    this_is_ai_name,
     wrap_text,
 )
 
@@ -148,7 +149,7 @@ class WaitingScreen(BaseScreen):
 
             draw_text(
                 self.client.window,
-                player.username,
+                this_is_ai_name(player.username),
                 DARK_GREEN,
                 start_x,
                 start_y,

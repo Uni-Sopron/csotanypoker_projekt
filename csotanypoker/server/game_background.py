@@ -10,7 +10,6 @@ class GameLogic:
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, f"game_{id}.pkl")
 
-        # Create GameState with proper initialization
         if not from_db:
             self.state = GameState(
                 game_id=id,
@@ -30,7 +29,6 @@ class GameLogic:
             if self.state is None:
                 raise ValueError(f"Failed to load GameState from {save_path}")
 
-        # Save the initial state
         self.state.manual_save()
 
     def generate_deck(self):
@@ -104,7 +102,7 @@ class GameLogic:
                 )
 
                 if self.state.active_player.username not in self.state.visited_already:
-                    self.state.visited_already.append(self.state.active_player.username)
+                    self.state.visited_already.add(self.state.active_player.username)
                 return
 
     def make_statement(self, statement=None):

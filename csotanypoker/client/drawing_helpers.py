@@ -12,9 +12,18 @@ from csotanypoker.client.constans import (
     LIGHT_GREEN_TRANSPARENT,
     MIDDLE_GREEN,
     LIGHT_GREEN,
+    LEGVILAGOS_ZOLD,
 
-    LEGVILÁGOS_ZÖLD,
 )
+from csotanypoker.models.user import  AI_NAMES
+
+
+def this_is_ai_name(name: str) -> str:
+    for ai_name in AI_NAMES:
+        if name.startswith(ai_name):
+            return ai_name
+
+    return name
 
 
 _font_cache = {}
@@ -31,24 +40,21 @@ _FONT_PATHS = {
 
 def preload_all_images():
     from csotanypoker.models.animal import Animal
-   
+
     for animal in Animal:
-  
         _get_cached_image(animal.value, "logo")
-     
+
         _get_cached_scaled_image(animal.value, "logo", (50, 50))
         _get_cached_scaled_image(animal.value, "logo", (58, 58))
         _get_cached_scaled_image(animal.value, "logo", (64, 64))  # hover
         _get_cached_scaled_image(animal.value, "logo", (70, 70))  # active
 
-    
     for animal in Animal:
         _get_cached_image(animal.value, "card")
-      
+
         card_size = (int(650 * 0.17), int(1000 * 0.17))
         _get_cached_scaled_image(animal.value, "card", card_size)
 
-   
     ui_elements = [
         "question_mark",
         "search_symbol",
@@ -59,7 +65,7 @@ def preload_all_images():
     ]
     for element in ui_elements:
         _get_cached_image(element, "button")
-       
+
         _get_cached_scaled_image(element, "button", (35, 35))
         _get_cached_scaled_image(element, "button", (40, 40))
         _get_cached_scaled_image(element, "button", (50, 50))
@@ -71,7 +77,6 @@ def preload_all_images():
     for bg_type in background_types:
         _get_cached_image(bg_type, "background")
 
-   
 
 def _get_cached_image(name: str, image_type: str) -> pygame.Surface:
     """Alapkép betöltése cache-ből vagy fájlból"""
@@ -95,15 +100,12 @@ def _get_cached_image(name: str, image_type: str) -> pygame.Surface:
             image = pygame.image.load(path).convert_alpha()
             _image_cache[cache_key] = image
         except pygame.error as e:
-
-           
             _image_cache[cache_key] = pygame.Surface((50, 50), pygame.SRCALPHA)
 
     return _image_cache[cache_key]
 
 
 def _get_cached_scaled_image(name: str, image_type: str, size: tuple) -> pygame.Surface:
-
     scale_key = (image_type, name, size)
 
     if scale_key not in _scaled_image_cache:
@@ -115,7 +117,6 @@ def _get_cached_scaled_image(name: str, image_type: str, size: tuple) -> pygame.
 
 
 def load_image(name, image_type=None, type=None, scale_ratio=None, size=None):
-
     if type is not None and image_type is None:
         image_type = type
 
@@ -140,18 +141,15 @@ def load_image(name, image_type=None, type=None, scale_ratio=None, size=None):
 
 
 def clear_image_cache():
-
     global _image_cache, _scaled_image_cache
     _image_cache.clear()
     _scaled_image_cache.clear()
     print("Kép cache törölve")
 
 
-
 def load_background(
     screen_width, screen_height, surface, type: str = "light_background"
 ):
-
     bg_image = _get_cached_image(type, "background")
 
     scaled_bg = _scale_image_to_cover(bg_image, screen_width, screen_height)
@@ -320,7 +318,6 @@ def draw_input_box(
             surface, text, rect, text_color, font_size, padding, is_password
         )
     else:
-     
         text_surface = _render_text_surface("", font_size, text_color)
         text_x = rect.x + rect.width // 2
         text_y = rect.y + (rect.height - text_surface.get_height()) // 2
@@ -338,7 +335,6 @@ def draw_input_box(
             padding,
             cursor_color,
         )
-
 
     elif not text and placeholder:
         _draw_text_with_clipping(
@@ -373,14 +369,9 @@ def _scale_image_to_cover(image, target_width, target_height):
     return pygame.transform.scale(image, new_size)
 
 
-def _get_button_color(
-    is_hovered,
-    is_pressed,
-    normal_color=DARK_GREEN,
-    hover_color=MIDDLE_GREEN,
-    pressed_color=LIGHT_GREEN_TRANSPARENT,
-):
-    """Get button color based on state"""
+
+def _get_button_color(is_hovered, is_pressed, normal_color, hover_color, pressed_color):
+    """Gomb színének meghatározása állapot alapján"""
     if is_pressed:
         return pressed_color
     elif is_hovered:
@@ -435,11 +426,11 @@ def draw_image(surface, image, x, y, size=None, centered=False):
 
 def draw_image_button(
     surface,
-    image_name,  
-    image_type,  
+    image_name,
+    image_type,
     x,
     y,
-    base_size=(58, 58), 
+    base_size=(58, 58),
     border_radius=0.15,
     padding=10,
     is_hovered=False,
@@ -448,7 +439,6 @@ def draw_image_button(
     active_scale=1.2,
     centered=True,
 ):
-
     scale = 1.0
     if is_active:
         scale = active_scale
@@ -473,7 +463,6 @@ def draw_image_button(
 
     _draw_rounded_rect(surface, None, button_rect, None, 0, border_radius)
 
-
     image_x = button_rect.centerx - scaled_image.get_width() // 2
     image_y = button_rect.centery - scaled_image.get_height() // 2
     surface.blit(scaled_image, (image_x, image_y))
@@ -482,17 +471,14 @@ def draw_image_button(
 
 
 def create_logout_button_rect(screen_height):
-
     return pygame.Rect(20, screen_height - 95, 200, 75)
 
 
 def create_rules_button_rect(screen_width, screen_height):
- 
     return pygame.Rect(screen_width - 120, screen_height - 130, 100, 100)
 
 
 def draw_logout_button(surface, rect, is_hovered=False, is_pressed=False):
-
     draw_button(
         surface=surface,
         rect=rect,
@@ -511,7 +497,6 @@ def draw_logout_button(surface, rect, is_hovered=False, is_pressed=False):
 
 
 def draw_rules_button(surface, rect):
-
     rules_image = load_image(
         "question_mark",
         "button",
@@ -521,7 +506,7 @@ def draw_rules_button(surface, rect):
 
 
 def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_players):
-    """Draw rules popup with text wrapping"""
+    """Szabályok popup rajzolása szöveg tördeléssel"""
     popup_width = int(screen_width * 0.8)
     popup_height = int(screen_height * 0.8)
     popup_x = (screen_width - popup_width) // 2
@@ -529,111 +514,119 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
 
     popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
 
-    
-    _draw_rounded_rect(surface, LEGVILÁGOS_ZÖLD, popup_rect, LIGHT_GREEN, 5, 0.05)
+
+    _draw_rounded_rect(surface, LEGVILAGOS_ZOLD, popup_rect, LIGHT_GREEN, 5, 0.05)
+
 
     rules_key = "2" if max_players == 2 else "3-6"
     title = f"Játékszabály ({rules_key} játékos)"
 
-    title_font = _get_font("bold", 40)
-    content_font = _get_font("regular", 30)
-
     margin = popup_height // 6
-
-    
-    title_height = title_font.get_height() + 20  
-    available_width = popup_width - 2 * margin  
-    available_height = popup_height - 2 * margin  
-    content_height = (
-        available_height - title_height
-    )  
-
-    lines = []
-    raw_lines = rules_text.strip().split("\n")
-
-   
-    for raw_line in raw_lines:
-        raw_line = raw_line.strip()
-
-        if not raw_line:
-            lines.append("")
-            continue
-
-        words = raw_line.split()
-        current_line = ""
-
-        for word in words:
-            test_line = current_line + " " + word if current_line else word
-            text_width = content_font.size(test_line)[0]
-
-            if text_width <= available_width:
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line)
-                    current_line = word
-                else:
-                    
-                    while len(word) > 0:
-                        for i in range(len(word), 0, -1):
-                            test_word = word[:i]
-                            if i < len(word):
-                                test_word += "-"
-
-                            if content_font.size(test_word)[0] <= available_width:
-                                lines.append(test_word)
-                                word = word[i:]
-                                break
-
-        if current_line:
-            lines.append(current_line)
-
-    title_x = popup_x + popup_width // 2
-    title_y = popup_y + popup_height // 6
-
-    text_x = popup_x + margin
-    text_start_y = title_y + title_height
-
-   
-    line_height = content_font.get_height() + 5
-    total_text_height = len(lines) * line_height
-
-    if total_text_height > content_height:
-        actual_line_height = (
-            content_height // len(lines) if len(lines) > 0 else line_height
-        )
-    else:
-        actual_line_height = line_height
-
+    title_y = popup_y + margin
 
     draw_text(
         surface,
         title,
         MIDDLE_GREEN,
-        title_x,
+        popup_x + popup_width // 2,
         title_y,
         centered=True,
         font="bold",
         font_size=40,
     )
 
-    for i, line in enumerate(lines):
-        line_y = text_start_y + i * actual_line_height
 
-        if (
-            line
-            and line_y + content_font.get_height() <= popup_y + popup_height - margin
-        ):
-            draw_text(
-                surface,
-                line,
-                MIDDLE_GREEN,
-                text_x,
-                line_y,
-                centered=False,
-                font="regular",
-                font_size=30,
-            )
+    content_y = title_y + 80
+    available_width = popup_width - 2 * margin
+
+    lines = _wrap_text_for_popup(rules_text, available_width, 30)
+
+    line_height = 40
+    for i, line in enumerate(lines):
+        if line.strip():  
+            y_pos = content_y + i * line_height
+            if y_pos < popup_y + popup_height - margin:
+                draw_text(
+                    surface,
+                    line,
+                    MIDDLE_GREEN,
+                    popup_x + margin,
+                    y_pos,
+                    centered=False,
+                    font="regular",
+                    font_size=30,
+                )
+
+def draw_multiline_text(surface, text_lines, color, x, y, centered=False, font=None, font_size=None, line_spacing=5):
+    """
+    Draw multiple lines of text with proper line spacing
+    """
+    if isinstance(text_lines, str):
+        text_lines = [text_lines]
+    
+    font_obj = _get_font(font, font_size)
+    
+    total_height = len(text_lines) * font_obj.get_height() + (len(text_lines) - 1) * line_spacing
+    
+    for i, line in enumerate(text_lines):
+        line_y = y + i * (font_obj.get_height() + line_spacing)
+        if centered:
+            line_y = y - total_height // 2 + i * (font_obj.get_height() + line_spacing)
+        
+        draw_text(surface, line, color, x, line_y, centered=centered, font=font, font_size=font_size)
+
+
+def format_username_for_display(username: str, max_length: int = 10):
+    """
+    Format username for display, returns list of lines if wrapping needed
+    """
+    if len(username) <= max_length:
+        return [username]
+ 
+    return wrap_text(username, max_length)
+
+
+
+
+def _wrap_text_for_popup(text, max_width, font_size):
+    """Szöveg tördelése popup ablakhoz"""
+    font = _get_font("regular", font_size)
+    lines = []
+
+    for paragraph in text.strip().split("\n"):
+        if not paragraph.strip():
+            lines.append("")
+            continue
+
+        words = paragraph.split()
+        current_line = ""
+
+        for word in words:
+            test_line = f"{current_line} {word}" if current_line else word
+
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+                    current_line = word
+                else:
+
+                    while word:
+                        for i in range(len(word), 0, -1):
+                            test_word = word[:i] + ("-" if i < len(word) else "")
+                            if font.size(test_word)[0] <= max_width:
+                                lines.append(test_word)
+                                word = word[i:]
+                                break
+                        else:
+                            lines.append(word[:1])
+                            word = word[1:]
+
+        if current_line:
+            lines.append(current_line)
+
+    return lines
 
 
 def check_logout_button_interaction(mouse_pos, mouse_pressed, logout_rect):
@@ -658,9 +651,7 @@ def handle_logout_button_click(pos, logout_rect, network_client):
 
 
 def wrap_text(text, max_length=30):
-    """
-    Szöveg tördelése a megadott hosszúságnál, lehetőleg szóköznél
-    """
+    """Szöveg tördelése a megadott hosszúságnál"""
     if len(text) <= max_length:
         return [text]
 
@@ -669,15 +660,17 @@ def wrap_text(text, max_length=30):
     current_line = ""
 
     for word in words:
-        if len(current_line + " " + word if current_line else word) > max_length:
+        test_line = f"{current_line} {word}" if current_line else word
+
+        if len(test_line) <= max_length:
+            current_line = test_line
+        else:
             if current_line:
                 lines.append(current_line)
                 current_line = word
             else:
                 lines.append(word[:max_length])
                 current_line = word[max_length:]
-        else:
-            current_line = current_line + " " + word if current_line else word
 
     if current_line:
         lines.append(current_line)

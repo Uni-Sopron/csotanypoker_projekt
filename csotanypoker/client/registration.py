@@ -16,7 +16,10 @@ from csotanypoker.client.drawing_helpers import (
     draw_input_box,
     validate_text_input,
     draw_button,
+    this_is_ai_name,
 )
+from csotanypoker.models.user import  AI_NAMES
+
 
 
 class LoginScreen(BaseScreen):
@@ -69,7 +72,7 @@ class LoginScreen(BaseScreen):
         self.register_button_pressed = self.register_button_hovered and mouse_pressed
 
     def _draw_error_message(self):
-        if self.client.message and self.client.error_display_time > 0:
+        if self.client.message and self.client.message_display_time > 0:
             error_y = self.register_button.bottom + 150
             draw_text(
                 self.client.window,
@@ -80,12 +83,10 @@ class LoginScreen(BaseScreen):
                 True,
                 font="bold",
                 font_size=40,
-                
             )
-            self.client.error_display_time -= 1
+            self.client.message_display_time -= 1
 
     def draw(self):
-
         self._calculate_ui_rects()
         self._update_button_states()
 
@@ -211,7 +212,7 @@ class LoginScreen(BaseScreen):
                         self.username_text,
                         event.unicode,
                         self.username_box,
-                        20,
+                        13,
                         False,
                         font_size=27,
                         padding=self.input_padding,
@@ -237,6 +238,9 @@ class LoginScreen(BaseScreen):
         if not self.password_text.strip():
             self.set_error("A jelszó nem lehet üres!")
             return
+        if this_is_ai_name(self.username_text.strip()) in AI_NAMES:
+            self.set_error("Az AI nevek nem használhatók felhasználónévként!")
+            return
 
         self.client.network.login(self.username_text.strip(), self.password_text)
 
@@ -252,11 +256,11 @@ class LoginScreen(BaseScreen):
 
     def set_error(self, message):
         self.client.message = message
-        self.client.error_display_time = 30
+        self.client.message_display_time = 30
 
     def clear_error(self):
         self.client.message = ""
-        self.client.error_display_time = 0
+        self.client.message_display_time = 0
 
     def clear_fields(self):
         self.username_text = ""
