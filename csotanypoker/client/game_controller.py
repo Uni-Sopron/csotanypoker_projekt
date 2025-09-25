@@ -1,4 +1,7 @@
 from typing import Any, List, Optional, Tuple, Dict
+import socket
+import subprocess
+import platform
 
 import pygame
 
@@ -14,6 +17,8 @@ from csotanypoker.client.rooms_screen import RoomsScreen
 from csotanypoker.client.waiting_screen import WaitingScreen
 from csotanypoker.models.gamestate import ClientGameState
 from csotanypoker.models.player import OpponentPlayer, VisiblePlayer
+from csotanypoker.client.drawing_helpers import create_volume_button_rect
+from csotanypoker.client.music_managger import MusicManager
 
 
 class GameController:
@@ -29,33 +34,97 @@ class GameController:
         self._height = self._window.get_size()[1]
         pygame.display.set_caption("Csotány Póker")
         self._clock: pygame.time.Clock = pygame.time.Clock()
- 
+
         self._screen: str = "loading"
         self.opponent_players: List[OpponentPlayer] = []
 
         self.users = []
-        self._message: str = ""  
-        self._message_display_time: float = 0  
+        self._message: str = ""
+        self._message_display_time: float = 0
         self.visible_player: Optional[VisiblePlayer] = None
         self._selected_room = None
         self._user = None
-        
+
         self._network: NetworkManager = NetworkManager(self)
         self._screens = self._initialize_screens()
-        
+        self.volume_level = 1 
         self.input_active = False
+        
+        self._music_manager = MusicManager()
+        self._music_manager.start_background_music()
+
+    def get_local_ip(self) -> str:
+        """
+        Automatikusan meghatározza a helyi IP címet több módszerrel
+        """
+        try:
+
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+              
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                print(f"Socket módszerrel talált IP: {local_ip}")
+                return local_ip
+        except Exception as e:
+            print(f"Socket módszer sikertelen: {e}")
+
+        try:
+          
+            system = platform.system().lower()
+            
+            if system == "windows":
+             
+                result = subprocess.run(['ipconfig'], capture_output=True, text=True, shell=True)
+                lines = result.stdout.split('\n')
+                
+                for i, line in enumerate(lines):
+                    if 'Wireless LAN adapter' in line or 'Wi-Fi' in line:
+                       
+                        for j in range(i, min(i + 10, len(lines))):
+                            if 'IPv4' in lines[j] and '192.168.' in lines[j]:
+                                ip = lines[j].split(':')[-1].strip()
+                                if ip.startswith('192.168.'):
+                                    print(f"Windows ipconfig módszerrel talált IP: {ip}")
+                                    return ip
+            
+            elif system in ["linux", "darwin"]: 
+             
+                try:
+                    result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        ips = result.stdout.strip().split()
+                        for ip in ips:
+                            if ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.'):
+                                print(f"hostname -I módszerrel talált IP: {ip}")
+                                return ip
+                except:
+                    pass
+                
+        except Exception as e:
+            print(f"Platform specifikus módszer sikertelen: {e}")
+
+        try:
+            
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            if not local_ip.startswith('127.'):
+                print(f"gethostbyname módszerrel talált IP: {local_ip}")
+                return local_ip
+        except Exception as e:
+            print(f"  {e}")
+
+        return "127.0.0.1"
 
     def _initialize_screens(self) -> Dict[str, Any]:
         return {
-            'loading': LoadingScreen(self),
-            'login': LoginScreen(self),
-            'rooms_screen': RoomsScreen(self),
-            'waiting': WaitingScreen(self),
-            'game': GameScreen(self),
-            'game_over': EndScreen(self),
-            'reconnect_screen': ReconnectScreen(self)
+            "loading": LoadingScreen(self),
+            "login": LoginScreen(self),
+            "rooms_screen": RoomsScreen(self),
+            "waiting": WaitingScreen(self),
+            "game": GameScreen(self),
+            "game_over": EndScreen(self),
+            "reconnect_screen": ReconnectScreen(self),
         }
-
 
     @property
     def game_state(self) -> ClientGameState:
@@ -139,58 +208,89 @@ class GameController:
 
     @property
     def loading(self):
-        return self._screens['loading']
-    
+        return self._screens["loading"]
+
     @property
     def login(self):
-        return self._screens['login']
-    
+        return self._screens["login"]
+
     @property
     def rooms_screen(self):
-        return self._screens['rooms_screen']
-    
+        return self._screens["rooms_screen"]
+
     @property
     def waiting(self):
-        return self._screens['waiting']
-    
+        return self._screens["waiting"]
+
     @property
     def game(self):
-        return self._screens['game']
-    
+        return self._screens["game"]
+
     @property
     def game_over(self):
-        return self._screens['game_over']
-    
+        return self._screens["game_over"]
+
     @property
     def reconnect_screen(self):
-        return self._screens['reconnect_screen']
+        return self._screens["reconnect_screen"]
 
     def _update_window_size(self) -> None:
         self._width, self._height = self._window.get_size()
 
+    def _enforce_minimum_size(self, new_width: int, new_height: int) -> Tuple[int, int]:
+        """Enforce minimum window size based on constants"""
+        width = max(new_width, SCREEN_WIDTH)
+        height = max(new_height, SCREEN_HEIGHT)
+        return width, height
+
     def _handle_window_events(self, event: pygame.event.Event) -> None:
         if event.type == pygame.VIDEORESIZE:
-            self._width = event.w
-            self._height = event.h
-           
             
+            width, height = self._enforce_minimum_size(event.w, event.h)
+
+        
+            if width != event.w or height != event.h:
+                self._window = pygame.display.set_mode(
+                    (width, height), pygame.RESIZABLE
+                )
+
+            self._width = width
+            self._height = height
+
         elif event.type in [pygame.WINDOWMAXIMIZED, pygame.WINDOWRESTORED]:
             self._update_window_size()
-           
-      
+
+            current_width, current_height = self._window.get_size()
+            width, height = self._enforce_minimum_size(current_width, current_height)
+
+            if width != current_width or height != current_height:
+                self._window = pygame.display.set_mode(
+                    (width, height), pygame.RESIZABLE
+                )
+                self._width = width
+                self._height = height
 
     def run(self) -> None:
         self.draw_screen()
         pygame.display.update()
-        self._network.connect()
+
+        local_ip = self.get_local_ip()
+        server_url = f"http://{local_ip}:5000"
+        print(f"Csatlakozás a szerverhez: {server_url}")
+        
+        self._network.connect(server_url)
 
         running: bool = True
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type in [pygame.VIDEORESIZE, pygame.WINDOWMINIMIZED, 
-                                   pygame.WINDOWMAXIMIZED, pygame.WINDOWRESTORED]:
+                elif event.type in [
+                    pygame.VIDEORESIZE,
+                    pygame.WINDOWMINIMIZED,
+                    pygame.WINDOWMAXIMIZED,
+                    pygame.WINDOWRESTORED,
+                ]:
                     self._handle_window_events(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button in [1, 3]:
                     self.handle_mouse_click(event.pos)
@@ -210,17 +310,46 @@ class GameController:
 
     def handle_mouse_click(self, pos: Tuple) -> None:
         screen_handlers = {
-            'login': lambda: setattr(self, 'input_active', self.login.handle_mouse_click(pos)),
-            'rooms_screen': lambda: self.rooms_screen.handle_mouse_click(pos),
-            'waiting': lambda: self.waiting.handle_mouse_click(pos),
-            'game': lambda: self.game.handle_mouse_click(pos),
-            'reconnect_screen': lambda: self.reconnect_screen.handle_mouse_click(pos),
-            'game_over': lambda: self.game_over.handle_mouse_click(pos)
+            "login": lambda: setattr(
+                self, "input_active", self.login.handle_mouse_click(pos)
+            ),
+            "rooms_screen": lambda: self.rooms_screen.handle_mouse_click(pos),
+            "waiting": lambda: self.waiting.handle_mouse_click(pos),
+            "game": lambda: self.game.handle_mouse_click(pos),
+            "reconnect_screen": lambda: self.reconnect_screen.handle_mouse_click(pos),
+            "game_over": lambda: self.game_over.handle_mouse_click(pos),
         }
-        
+
         handler = screen_handlers.get(self._screen)
         if handler:
             handler()
+        volume_rect = None
+        if self._screen not in ["loading", "login", "game_screen"]:
+            if self.screen in ["rooms_screen", "reconnect_screen", "game_over"]:
+                volume_rect = create_volume_button_rect(
+                    self._width - 40, self._height - 40
+                )
+            elif self.screen == "waiting":
+                volume_rect = create_volume_button_rect(50, 50)
+
+            if volume_rect and volume_rect.collidepoint(pos):
+                self.cycle_volume()
+                return
+
+    def cycle_volume(self) -> None:
+        """Hangerő ciklikus váltása"""
+        self.volume_level = (self.volume_level + 1) % 4
+
+        volume_values = {
+            0: 0.0, 
+            1: 0.02, 
+            2: 0.05, 
+            3: 0.1, 
+        }
+
+        
+        if hasattr(self, "_music_manager"):
+            self._music_manager.set_volume(volume_values[self.volume_level])
 
     def handle_mouse_motion(self, pos: Tuple) -> None:
         if self._screen == "waiting":
@@ -236,5 +365,5 @@ class GameController:
 
     def draw_screen(self) -> None:
         current_screen = self._screens.get(self._screen)
-        if current_screen and hasattr(current_screen, 'draw'):
+        if current_screen and hasattr(current_screen, "draw"):
             current_screen.draw()

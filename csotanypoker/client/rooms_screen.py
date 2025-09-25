@@ -25,6 +25,8 @@ from csotanypoker.client.drawing_helpers import (
     draw_logout_button,
     check_logout_button_interaction,
     handle_logout_button_click,
+    create_volume_button_rect,  
+    draw_music_volume,  
 )
 
 
@@ -60,6 +62,7 @@ class RoomsScreen(BaseScreen):
         self.SCROLL_BAR_WIDTH = 20
         self.BUTTON_PADDING = 35
         self.PADDING = 10
+        self.stats_requested = False
 
     @property
     def rooms(self):
@@ -111,25 +114,18 @@ class RoomsScreen(BaseScreen):
 
     def apply_filters(self):
         filtered_rooms = self.original_rooms.copy()
-        filtered_rooms_name = []
-        filtered_rooms_id = []
         if self.search_text.strip():
             search_text = self.search_text.lower().strip()
 
-            if "id:" in search_text:
-                search_text = search_text[3:].strip()
-                filtered_rooms_id = [
-                    room
-                    for room in filtered_rooms
-                    if search_text in room.room_id.lower()
-                ]
-            else:
-                filtered_rooms_name = [
-                    room
-                    for room in filtered_rooms
-                    if (search_text in room.name.lower())
-                ]
-            filtered_rooms = filtered_rooms_name + filtered_rooms_id
+            filtered_rooms = [
+                room
+                for room in filtered_rooms
+                if (
+                    search_text in room.name.lower()
+                    or search_text in room.room_id.lower()
+                )
+            ]
+            filtered_rooms = filtered_rooms
 
         if self.filter_state == 1:
             filtered_rooms = [
@@ -316,6 +312,8 @@ class RoomsScreen(BaseScreen):
         self.password_text_input = ""
         self.password_protected = False
         self.max_players = 4
+        self.join_password_text = ""
+        self.selected_room_index = None
         self.max_players_text = ""
 
     def _get_room_index_at_position(self, pos):
@@ -483,6 +481,8 @@ class RoomsScreen(BaseScreen):
 
         load_background(self.client.width, self.client.height, self.client.window)
 
+        self._draw_user_stats()
+
         draw_text(
             self.client.window,
             "Szobák",
@@ -526,6 +526,15 @@ class RoomsScreen(BaseScreen):
                 font_size=25,
             )
             self.client.message_display_time -= 1
+        volume_rect = create_volume_button_rect(
+            self.client.width - 40, self.client.height - 40
+        )
+        draw_music_volume(
+            self.client.window,
+            volume_rect.centerx,
+            volume_rect.centery,
+            self.client.volume_level,
+        )
 
     def _setup_rects(self):
         self.logout_button = create_logout_button_rect(self.client.height)
@@ -546,6 +555,75 @@ class RoomsScreen(BaseScreen):
             300,
             40,
         )
+
+    def _draw_user_stats(self):
+        """Felhasználói statisztikák megjelenítése a bal felső sarokban"""
+        if not self.client.user:
+            return
+
+        stats_x = 20
+        stats_y = 10
+
+     
+        draw_text(
+            self.client.window,
+            f"{self.client.user.username}",
+            DARK_GREEN,
+            stats_x,
+            stats_y,
+            False,
+            "Regular",
+            27,
+        )
+
+        if hasattr(self.client, "user_stats") and self.client.user_stats:
+            total_games = self.client.user_stats.get("total_games", 0)
+            won_games = self.client.user_stats.get("won_games", 0)
+
+            draw_text(
+                self.client.window,
+                f"Játékok száma: {total_games}",
+                DARK_GREEN,
+                stats_x,
+                stats_y + 35,
+                False,
+                "Regular",
+                20,
+            )
+
+            draw_text(
+                self.client.window,
+                f"Nyert játékok: {won_games}",
+                DARK_GREEN,
+                stats_x,
+                stats_y + 55,
+                False,
+                "Regular",
+                20,
+            )
+        else:
+          
+            draw_text(
+                self.client.window,
+                "Játékok száma: ...",
+                DARK_GREEN,
+                stats_x,
+                stats_y + 35,
+                False,
+                "Regular",
+                20,
+            )
+
+            draw_text(
+                self.client.window,
+                "Nyert játékok: ...",
+                DARK_GREEN,
+                stats_x,
+                stats_y + 55,
+                False,
+                "Regular",
+                20,
+            )
 
     def _draw_menu(self):
         menu_font_size = 38
@@ -698,9 +776,9 @@ class RoomsScreen(BaseScreen):
         )
 
         name_text = room.name
-        same_name_rooms = [r for r in self.rooms if r.name == room.name]
-        if len(same_name_rooms) > 1:
-            name_text = f"{room.name} ID: {room.room_id}"
+       
+
+        name_text = f"{room.name} ID: {room.room_id}"
 
         draw_text(
             self.client.window,
@@ -766,7 +844,7 @@ class RoomsScreen(BaseScreen):
         draw_button(
             surface=self.client.window,
             rect=self.join_button,
-            text="Csatlakozás:",
+            text="Csatlakozás",
             text_color=WHITE,
             background_color=join_bg_color,
             border_color=DARK_GREEN,
@@ -808,25 +886,24 @@ class RoomsScreen(BaseScreen):
 
     def _draw_room_creation(self):
         creation_title_y = self.client.height // 1.4
-        creation_start_y = creation_title_y + 60
+        creation_start_y = creation_title_y + 70
         self._draw_room_name_section(creation_start_y)
         self._draw_max_players_section(creation_start_y)
         self._draw_password_section(creation_start_y)
         self._draw_create_button(creation_start_y)
 
     def _draw_room_name_section(self, y_pos):
-        self.room_name_input = pygame.Rect(260, y_pos - 17, 230, 35)
+        self.room_name_input = pygame.Rect(250, y_pos - 20, 230, 50)
 
         draw_text(
             self.client.window,
             "Szoba neve:",
             DARK_GREEN,
             100,
-            y_pos,
+            y_pos - 15,
             False,
             "regular",
             30,
-            vcenter_rect=self.room_name_input,
         )
 
         draw_input_box(
@@ -837,7 +914,7 @@ class RoomsScreen(BaseScreen):
             background_color=LIGHT_GREEN_TRANSPARENT,
             border_color=None,
             border_radius=0.50,
-            font_size=20,
+            font_size=23,
             is_active=self._is_input_active("room_name"),
             cursor_color=WHITE,
             placeholder=f"{self.client.user.username} szobája",
@@ -847,16 +924,16 @@ class RoomsScreen(BaseScreen):
     def _draw_max_players_section(self, y_pos):
         max_players_label_rect = pygame.Rect(
             self.room_name_input.x + self.room_name_input.width + 20,
-            y_pos - 17,
-            140,
-            35,
+            y_pos - 20,
+            150,
+            55,
         )
 
         self.max_count = pygame.Rect(
-            max_players_label_rect.x + max_players_label_rect.width + 15,
-            y_pos - 17,
-            50,
-            35,
+            max_players_label_rect.x + max_players_label_rect.width + 10,
+            y_pos - 20,
+            70,
+            55,
         )
 
         display_text = (
@@ -885,35 +962,35 @@ class RoomsScreen(BaseScreen):
             background_color=LIGHT_GREEN_TRANSPARENT,
             border_color=MIDDLE_GREEN,
             border_radius=0.25,
-            font_size=22,
+            font_size=30,
             is_active=self._is_input_active("max_count"),
             cursor_color=DARK_GREEN,
         )
 
         arrows_x = self.max_count.x + self.max_count.width + 5
-        arrows_y = self.max_count.y
+        arrows_y = self.max_count.y - 8
 
-        up_and_down_buttons = load_image("fel_le_nyilak", "button", size=(50, 35))
+        up_and_down_buttons = load_image("fel_le_nyilak", "button", size=(80, 65))
         draw_image(self.client.window, up_and_down_buttons, arrows_x, arrows_y, False)
 
-        self.max_players_up = pygame.Rect(arrows_x, arrows_y, 50, 17)  # Felső fél
-        self.max_players_down = pygame.Rect(arrows_x, arrows_y + 18, 50, 17)  # Alsó fél
+        self.max_players_up = pygame.Rect(arrows_x, arrows_y, 80, 33)  # Felső fél
+        self.max_players_down = pygame.Rect(arrows_x, arrows_y + 33, 80, 33)  # Alsó fél
 
     def _draw_password_section(self, y_pos):
         self.create_password_input = pygame.Rect(
-            self.client.width // 1.5, y_pos - 17, 200, 35
+            self.client.width // 2 + 200, y_pos - 20, 250, 50
         )
 
-        checkbox_x = self.create_password_input.x - 45
+        checkbox_x = self.create_password_input.x - 60
         checkbox_y = self.create_password_input.y
 
         padlock_image = load_image(
             "padlock" if self.password_protected else "unlock_padlock",
             "button",
-            size=(35, 35),
+            size=(50, 50),
         )
 
-        self.password_checkbox = pygame.Rect(checkbox_x, checkbox_y, 35, 35)
+        self.password_checkbox = pygame.Rect(checkbox_x, checkbox_y, 50, 50)
         draw_image(
             self.client.window,
             padlock_image,
@@ -930,7 +1007,7 @@ class RoomsScreen(BaseScreen):
                 background_color=LIGHT_GREEN_TRANSPARENT,
                 border_color=None,
                 border_radius=0.50,
-                font_size=20,
+                font_size=23,
                 is_active=self._is_input_active("password"),
                 is_password=True,
                 placeholder="Jelszó",

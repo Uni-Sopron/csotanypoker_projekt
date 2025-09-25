@@ -17,6 +17,8 @@ from csotanypoker.client.drawing_helpers import (
     draw_text,
     load_background,
     this_is_ai_name,
+    create_volume_button_rect,  
+    draw_music_volume,
 )
 
 
@@ -176,6 +178,13 @@ class EndScreen(BaseScreen):
         )
         self._draw_voters()
         self._draw_timer()
+        volume_rect = create_volume_button_rect(self.client.width - 40, self.client.height - 40)        
+        draw_music_volume(
+            self.client.window,
+            volume_rect.centerx,
+            volume_rect.centery,
+            self.client.volume_level,
+        )
 
     def auto_leave(self) -> None:
         """Automatikus kilépés"""

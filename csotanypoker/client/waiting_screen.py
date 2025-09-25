@@ -30,6 +30,8 @@ from csotanypoker.client.drawing_helpers import (
     handle_logout_button_click,
     this_is_ai_name,
     wrap_text,
+    create_volume_button_rect,
+    draw_music_volume,
 )
 
 
@@ -49,6 +51,13 @@ class WaitingScreen(BaseScreen):
         self.margin = 30
         self.hovered_elements = set()
         self.pressed_elements = set()
+        self.player_stats = {}  
+        self.stats_requested = set()  
+
+    def _is_ai_player(self, username: str) -> bool:
+        """Ellenőrzi, hogy AI játékosról van-e szó"""
+        ai_name = this_is_ai_name(username)
+        return ai_name != username  
 
     def _update_button_states(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -80,6 +89,7 @@ class WaitingScreen(BaseScreen):
             if mouse_pressed:
                 self.pressed_elements.add("ai_player")
 
+
     def draw(self) -> None:
         """
         Draw the waiting screen.
@@ -92,6 +102,8 @@ class WaitingScreen(BaseScreen):
         self.rules_button = create_rules_button_rect(
             self.client.width, self.client.height
         )
+
+        self._request_player_stats()
 
         self._update_button_states()
 
@@ -147,13 +159,32 @@ class WaitingScreen(BaseScreen):
                 17,
             )
 
+        
+            player_name = this_is_ai_name(player.username)
+
+            if self._is_ai_player(player.username):
+               
+                player_display = player_name
+            else:
+             
+                if (
+                    hasattr(self.client, "all_player_stats")
+                    and player.username in self.client.all_player_stats
+                ):
+                    stats = self.client.all_player_stats[player.username]
+                    won = stats["won_games"]
+                    total = stats["total_games"]
+                    player_display = f"{player_name} {won}/{total}"
+                else:
+                    player_display = f"{player_name} -/-"
+
             draw_text(
                 self.client.window,
-                this_is_ai_name(player.username),
+                player_display,
                 DARK_GREEN,
                 start_x,
                 start_y,
-                font_size=55,
+                font_size=50,
             )
             start_y += 70
             if (
@@ -237,6 +268,33 @@ class WaitingScreen(BaseScreen):
                 ],
                 self.client.selected_room.max_player_count,
             )
+        volume_rect = create_volume_button_rect(50, 50)
+        draw_music_volume(
+            self.client.window,
+            volume_rect.centerx,
+            volume_rect.centery,
+            self.client.volume_level,
+        )
+
+    def _request_player_stats(self):
+        """Lekéri a játékosok statisztikáit - csak emberi játékosoknak"""
+        if not hasattr(self.client, "users") or not self.client.users:
+            return
+
+        for user in self.client.users:
+           
+            if not self._is_ai_player(user.username):
+                
+
+                self.client.network.get_user_stats(user.username)
+                self.stats_requested.add(user.username)
+
+    def update_player_stats(self, username, total_games, won_games):
+        """Frissíti egy játékos statisztikáit"""
+        self.player_stats[username] = {
+            "total_games": total_games,
+            "won_games": won_games,
+        }
 
     def handle_mouse_click(self, pos):
         if self.leave_button.collidepoint(pos):

@@ -18,8 +18,7 @@ from csotanypoker.client.drawing_helpers import (
     draw_button,
     this_is_ai_name,
 )
-from csotanypoker.models.user import  AI_NAMES
-
+from csotanypoker.models.user import AI_NAMES
 
 
 class LoginScreen(BaseScreen):
@@ -119,7 +118,7 @@ class LoginScreen(BaseScreen):
             font_size=27,
             padding=self.input_padding,
             placeholder="Felhasználónév",
-            placeholder_color=DARK_GREEN,
+            placeholder_color=WHITE,
         )
 
         draw_input_box(
@@ -136,7 +135,7 @@ class LoginScreen(BaseScreen):
             font_size=27,
             padding=self.input_padding,
             placeholder="Jelszó",
-            placeholder_color=DARK_GREEN,
+            placeholder_color=WHITE,
         )
 
         draw_button(

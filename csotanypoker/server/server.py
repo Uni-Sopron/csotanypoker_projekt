@@ -27,6 +27,328 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 sockets = {}
 game_instances = {}
+ai_memory = {}
+
+
+def calculate_target_weights(game_instance, room_id):
+    print("calculate_target_weights")
+    weights = {}
+
+    other_players = [
+        p
+        for p in game_instance.state.players
+        if p.username != game_instance.state.active_player.username
+    ]
+
+    for player in other_players:
+        weight = 1.0
+
+        # Ha keves kártya van a kezében, nagyobb eséllyel adjunk neki
+        card_count = len(player.cards_in_hand)
+        if card_count <= 2:
+            weight *= 3.0
+        elif card_count <= 4:
+            weight *= 2.0
+        elif card_count <= 6:
+            weight *= 1.5
+
+        # Ha már van nála sok ugyanolyan kártya, nagyobb eséllyel adjunk neki
+        max_same_cards = (
+            max(player.cards_in_front.values()) if player.cards_in_front else 0
+        )
+        if max_same_cards >= 3:
+            weight *= 5.0
+        elif max_same_cards >= 2:
+            weight *= 2.5
+        elif max_same_cards >= 1:
+            weight *= 1.8
+
+        weights[player.username] = weight
+
+    return weights
+
+
+def calculate_card_weights(game_instance, target_player):
+    """Kártyák súlyozásának kiszámítása - javított saját védelemmel"""
+    print("calculate_card_weights")
+
+    weights = {}
+    active_player = game_instance.state.active_player
+
+    target_player_obj = None
+    for player in game_instance.state.players:
+        if player.username == target_player:
+            target_player_obj = player
+            break
+
+    if not target_player_obj:
+        for card in active_player.cards_in_hand:
+            weights[card] = 1.0
+        return weights
+
+    for card in active_player.cards_in_hand:
+        weight = 1.0
+
+        # A target playernek ha több kártyája van ugyan abbol nagyobb esélyek azt adjuk neki
+        cards_in_front = target_player_obj.cards_in_front.get(card, 0)
+        if cards_in_front >= 3:
+            weight *= 8.0
+        elif cards_in_front >= 2:
+            weight *= 5.0
+        elif cards_in_front >= 1:
+            weight *= 3.0
+
+        # Ha nekünk már van sok ugyanolyan kártya előttünk, csökkentsük az esélyét hogy odaadjuk
+        our_cards_in_front = active_player.cards_in_front.get(card, 0)
+        if our_cards_in_front >= 3:
+            weight *= 0.30
+        elif our_cards_in_front >= 2:
+            weight *= 0.50
+
+        weights[card] = weight
+
+    return weights
+
+
+def weighted_random_choice(choices_weights):
+    if not choices_weights:
+        return None
+
+    import random
+
+    choices = list(choices_weights.keys())
+    weights = list(choices_weights.values())
+    weights = [max(0.1, w) for w in weights]
+    return random.choices(choices, weights=weights)[0]
+
+
+def calculate_statement_strategy(
+    selected_card, target_player_obj, activ_player, memory
+):
+    """Állítás stratégiájának kiszámítása"""
+    print("calculate_statement_strategy")
+    weights = {}
+    truth_weight = 2.0
+
+    for animal in Animal:
+        if animal != selected_card:
+            lie_weight = 1.0
+
+            card_in_hand = 0
+            for card in activ_player.cards_in_hand:
+                if card == animal:
+                    card_in_hand += 1
+
+            seen_count = memory["seen_cards"].get(animal, 0) + card_in_hand
+            remaining_cards = 8 - seen_count
+
+            if (
+                remaining_cards == 0
+            ):  # lehetetlen hogy 8 nál tobb kártya legyen játékban
+                lie_weight *= 0
+            elif remaining_cards <= 2:
+                lie_weight *= 0.3
+            elif remaining_cards >= 6:
+                lie_weight *= 1.5
+
+            weights[animal.value] = lie_weight
+
+    if (
+        "guess_patterns" in memory
+        and target_player_obj.username in memory["guess_patterns"]
+    ):
+        pattern = memory["guess_patterns"][target_player_obj.username]
+
+        if pattern["total_guesses"] >= 3:
+            true_ratio = pattern["true_guesses"] / pattern["total_guesses"]
+
+            # ha sokat tippelt igazat akkor  hazudjunk többet
+            if true_ratio >= 0.7:
+                for animal_value in weights:
+                    weights[animal_value] *= 4.0
+                truth_weight *= 0.3
+
+            # ha sokat tippelt hamisat akkor mondjunk igazat többet
+            elif true_ratio <= 0.3:
+                for animal_value in weights:
+                    weights[animal_value] *= 0.3
+                truth_weight *= 3.0
+
+    weights[selected_card.value] = truth_weight
+    return weighted_random_choice(weights)
+
+
+def update_guess_patterns(memory, guesser_name, guess):
+    """Frissíti a játékos tippelési mintáját részletesebb követéssel"""
+    if "guess_patterns" not in memory:
+        memory["guess_patterns"] = {}
+
+    if guesser_name not in memory["guess_patterns"]:
+        memory["guess_patterns"][guesser_name] = {
+            "true_guesses": 0,
+            "false_guesses": 0,
+            "total_guesses": 0,
+            "recent_guesses": [],
+            "consecutive_true": 0,
+            "consecutive_false": 0,
+            "max_consecutive_true": 0,
+            "max_consecutive_false": 0,
+        }
+
+    pattern = memory["guess_patterns"][guesser_name]
+
+    pattern["total_guesses"] += 1
+    if guess:
+        pattern["true_guesses"] += 1
+        pattern["consecutive_true"] += 1
+        pattern["consecutive_false"] = 0
+        pattern["max_consecutive_true"] = max(
+            pattern["max_consecutive_true"], pattern["consecutive_true"]
+        )
+    else:
+        pattern["false_guesses"] += 1
+        pattern["consecutive_false"] += 1
+        pattern["consecutive_true"] = 0
+        pattern["max_consecutive_false"] = max(
+            pattern["max_consecutive_false"], pattern["consecutive_false"]
+        )
+
+    pattern["recent_guesses"].append(guess)
+    if len(pattern["recent_guesses"]) > 10:
+        pattern["recent_guesses"].pop(0)
+
+
+def update_truth_statement_memory(memory, player_name, was_truthful):
+    """Frissíti a játékos igazmondási/hazugságmondási statisztikáját"""
+    if "trust_statement" not in memory:
+        memory["trust_statement"] = {}
+
+    if player_name not in memory["trust_statement"]:
+        memory["trust_statement"][player_name] = {
+            "truth_statements": 0,
+            "false_statements": 0,
+            "total_statements": 0,
+            "recent_statements": [],
+            "consecutive_truth": 0,
+            "consecutive_false": 0,
+            "max_consecutive_truth": 0,
+            "max_consecutive_false": 0,
+        }
+
+    pattern = memory["trust_statement"][player_name]
+
+    pattern["total_statements"] += 1
+    if was_truthful:
+        pattern["truth_statements"] += 1
+        pattern["consecutive_truth"] += 1
+        pattern["consecutive_false"] = 0
+        pattern["max_consecutive_truth"] = max(
+            pattern["max_consecutive_truth"], pattern["consecutive_truth"]
+        )
+    else:
+        pattern["false_statements"] += 1
+        pattern["consecutive_false"] += 1
+        pattern["consecutive_truth"] = 0
+        pattern["max_consecutive_false"] = max(
+            pattern["max_consecutive_false"], pattern["consecutive_false"]
+        )
+
+    pattern["recent_statements"].append(was_truthful)
+    if len(pattern["recent_statements"]) > 10:
+        pattern["recent_statements"].pop(0)
+
+
+def calculate_trust_based_guess(memory, active_player_name):
+    """Kiszámítja a találgatási valószínűségeket a játékos korábbi igazmondási mintája alapján"""
+    if (
+        "trust_statement" not in memory
+        or active_player_name not in memory["trust_statement"]
+    ):
+        return {"true": 1.0, "false": 1.0}
+
+    pattern = memory["trust_statement"][active_player_name]
+
+    if pattern["total_statements"] < 2:
+        return {"true": 1.0, "false": 1.0}
+
+    truth_ratio = pattern["truth_statements"] / pattern["total_statements"]
+    weights = {"true": 1.0, "false": 1.0}
+
+    if truth_ratio >= 0.85:
+        weights["true"] *= 4.0
+        weights["false"] *= 0.2
+
+    elif truth_ratio >= 0.75:
+        weights["true"] *= 3.0
+        weights["false"] *= 0.3
+
+    elif truth_ratio >= 0.65:
+        weights["true"] *= 2.0
+        weights["false"] *= 0.5
+
+    elif truth_ratio <= 0.15:
+        weights["false"] *= 4.0
+        weights["true"] *= 0.2
+
+    elif truth_ratio <= 0.25:
+        weights["false"] *= 3.0
+        weights["true"] *= 0.3
+
+    elif truth_ratio <= 0.35:
+        weights["false"] *= 2.0
+        weights["true"] *= 0.5
+
+    if "recent_statements" in pattern:
+        recent = pattern["recent_statements"][-5:]
+
+        if len(recent) >= 3:
+            if all(recent[-3:]):
+                weights["true"] *= 2.5
+                weights["false"] *= 0.3
+            elif not any(recent[-3:]):
+                weights["false"] *= 2.5
+                weights["true"] *= 0.3
+
+        if len(recent) >= 4:
+            if all(recent[-4:]):
+                weights["true"] *= 3.0
+                weights["false"] *= 0.2
+            elif not any(recent[-4:]):
+                weights["false"] *= 3.0
+                weights["true"] *= 0.2
+
+    if pattern["consecutive_truth"] >= 3:
+        weights["true"] *= 1.5 + (pattern["consecutive_truth"] * 0.5)
+        weights["false"] *= 0.4
+    elif pattern["consecutive_false"] >= 3:
+        weights["false"] *= 1.5 + (pattern["consecutive_false"] * 0.5)
+        weights["true"] *= 0.4
+
+    return weights
+
+
+def get_ai_memory(room_id, game_instance=None):
+    """AI memória lekérése GameState-ből"""
+    if not game_instance:
+        return {
+            "seen_cards": {},
+            "player_risks": {},
+            "guess_patterns": {},
+            "trust_statement": {},
+        }
+
+    if (
+        not hasattr(game_instance.state, "ai_memory")
+        or game_instance.state.ai_memory is None
+    ):
+        game_instance.state.ai_memory = {
+            "seen_cards": {},
+            "player_risks": {},
+            "guess_patterns": {},
+            "trust_statement": {},
+        }
+
+    return game_instance.state.ai_memory
 
 
 def all_players_active_in_room(room_id: str) -> bool:
@@ -37,7 +359,6 @@ def all_players_active_in_room(room_id: str) -> bool:
             return False
 
         for user in room_users:
-          
             db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
             if not db_user or not db_user.is_active:
                 print(f"Player {user.username} is not active")
@@ -254,7 +575,7 @@ def handle_start_new_game(data: dict):
 @socketio.on("all_players_leave_room")
 def handle_all_players_leave_room(data) -> None:
     room_id = data["room_id"]
-    remove_all_users_from_room(room_id)
+    remove_all_users_from_room(room_id, data.get("reconnecting", False))
 
 
 @socketio.on("vote_rematch")
@@ -493,16 +814,17 @@ def handle_logout(data) -> None:
                 if room:
                     for user in users:
                         if user.username != username:
-                            socketio.emit(
-                                "player_left_room",
-                                {
-                                    "message": f"{this_is_ai_name(username)} elhagyta a szobát",
-                                    "left_player": username,
-                                    "players": [u.model_dump() for u in users],
-                                    "max_player_count": room.max_player_count,
-                                },
-                                to=sockets[user.username],
-                            )
+                            if user.username in sockets:
+                                socketio.emit(
+                                    "player_left_room",
+                                    {
+                                        "message": f"{this_is_ai_name(username)} elhagyta a szobát",
+                                        "left_player": username,
+                                        "players": [u.model_dump() for u in users],
+                                        "max_player_count": room.max_player_count,
+                                    },
+                                    to=sockets[user.username],
+                                )
 
                     update_room_player_count(room_id)
                     broadcast_room_list_update()
@@ -554,7 +876,7 @@ def handle_disconnect() -> None:
     session.pop("socket_id", None)
 
 
-def remove_all_users_from_room(room_id: str) -> None:
+def remove_all_users_from_room(room_id: str, reconnecting: bool = False) -> None:
     with get_db_session() as db:
         target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
 
@@ -565,19 +887,23 @@ def remove_all_users_from_room(room_id: str) -> None:
 
         for user in room_users:
             dbuser = db.query(DBUser).filter(DBUser.username == user.username).first()
-            dbuser.is_active = True
-            db.commit()
+            if reconnecting and dbuser.username == session.get("username"):
+                dbuser.is_active = True
+                db.commit()
             if dbuser:
                 dbuser.current_room_id = None
 
-                if user.username in sockets and dbuser.is_active:
+                if user.username in sockets:
                     try:
-                        socketio.emit(
-                            "left_room",
-                            {"message": "Szoba elhagyás"},
-                            to=sockets[user.username],
-                        )
-                        leave_room(room_id)
+                        if dbuser.is_active or not dbuser.is_active:
+                            socketio.emit(
+                                "left_room",
+                                {"message": "Szoba elhagyás"},
+                                to=sockets[user.username],
+                            )
+                            dbuser.is_active = True
+                            db.commit()
+                            leave_room(room_id)
                     except Exception as e:
                         print(e)
                         sockets.pop(user.username, None)
@@ -587,14 +913,56 @@ def remove_all_users_from_room(room_id: str) -> None:
         broadcast_room_list_update()
 
 
+@socketio.on("get_user_stats")
+def handle_get_user_stats(data: dict) -> None:
+    """Request user statistics"""
+    username = data.get("username")
+    if not username:
+        return
+
+    with get_db_session() as db:
+        try:
+            total_games = (
+                db.query(DBGame)
+                .join(DBGame.players)
+                .filter(DBUser.username == username, DBGame.game_status == "end")
+                .count()
+            )
+
+            won_games = (
+                db.query(DBGame)
+                .join(DBGame.players)
+                .filter(
+                    DBUser.username == username,
+                    DBGame.game_status == "end",
+                    DBGame.loser_username != username,
+                )
+                .count()
+            )
+
+            emit(
+                "user_stats",
+                {
+                    "username": username,
+                    "total_games": total_games,
+                    "won_games": won_games,
+                },
+            )
+
+        except Exception as e:
+            print(f"Error getting user stats: {e}")
+            emit("user_stats", {"username": username, "total_games": 0, "won_games": 0})
+
+
 @socketio.on("leave_room")
 def handle_leave_room(data: dict) -> None:
     print(f"LEAVE ROOM{data['username']}")
     username = session.get("username")
     with get_db_session() as db:
         db_user = db.query(DBUser).filter(DBUser.username == username).first()
-        db_user.is_active = True
-        db.commit()
+        if data.get("reconnecting", False):
+            db_user.is_active = True
+            db.commit()
         if not db_user or not db_user.current_room_id:
             return
 
@@ -813,7 +1181,7 @@ def handle_oke_click(data: dict) -> None:
                     game_instance.select_card(card, passing)
 
             game_instance.select_target_player(client_game_state["targeted_player"])
-            
+
             if (
                 game_instance.state.active_player.username
                 not in game_instance.state.visited_already
@@ -821,7 +1189,7 @@ def handle_oke_click(data: dict) -> None:
                 game_instance.state.visited_already.add(
                     game_instance.state.active_player.username
                 )
-            
+
             if (
                 "active_player" in client_game_state
                 and client_game_state["active_player"]
@@ -841,22 +1209,34 @@ def handle_oke_click(data: dict) -> None:
                 ai_guess(game_instance, room_id)
         except Exception as e:
             print(f"Error in handle_oke_click: {e}")
-            
-            
+
+
 def reset_callback(nextplayer, game_instance=None, room_id=None, db=None):
+    memory = get_ai_memory(room_id, game_instance)
+
+    if game_instance.state.question_card:
+        print("Adding seen card:", game_instance.state.question_card)
+        card = game_instance.state.question_card
+        if card not in memory["seen_cards"]:
+            memory["seen_cards"][card] = 0
+        memory["seen_cards"][card] += 1
+    print("Seen cards:", memory["seen_cards"])
+
     for player in game_instance.state.players:
         player.statement = None
         player.is_true = None
+        max_same_cards = (
+            max(player.cards_in_front.values()) if player.cards_in_front else 0
+        )
+        memory["player_risks"][player.username] = max_same_cards
 
     game_instance.state.active_player = nextplayer
 
     if game_instance.has_cards_in_hand():
-        print("Game ended - no cards in hand")
         game_end(room_id, db)
         return
 
     if game_instance.has_4_cards_in_front():
-        print("Game ended - 4 cards in front")
         game_end(room_id, db)
         return
 
@@ -865,8 +1245,8 @@ def reset_callback(nextplayer, game_instance=None, room_id=None, db=None):
     game_instance.state.visited_already = set()
 
     send_game_state_to_all_players_sync(game_instance, room_id)
-
     ai_activity(game_instance, room_id)
+
 
 @socketio.on("guess")
 def handle_guess(data: dict) -> None:
@@ -986,37 +1366,66 @@ def handle_pass() -> None:
     if not game_instance:
         return
 
-    ai_pass_internal(game_instance, room_id)
+    with get_db_session() as db:
+        if game_instance.state.targeted_player is not None:
+            next_player = game_instance.state.targeted_player
+            game_instance.state.active_player = next_player
+            game_instance.state.targeted_player = None
+
+        if game_instance.has_4_cards_in_front():
+            game_end(room_id, db)
+            return
+
+        send_game_state_to_players(
+            game_instance, room_id, hide_card_for_unvisited=False
+        )
+
+        if all_players_active_in_room(room_id):
+            active_player_name = game_instance.state.active_player.username
+            base_name = this_is_ai_name(active_player_name)
+
+            if base_name in AI_NAMES:
+                ai_activity(game_instance, room_id, True)
 
 
 @socketio.on("add_ai_player")
 def add_ai_player(data: dict) -> None:
     room_id = data.get("room_id")
     if not room_id:
-        emit("error", {"message": "Room ID required"})
+        emit("join_room_error", {"message": "Szoba ID hiányzik"}, to=request.sid)
         return
 
     with get_db_session() as db:
         try:
             target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
             if not target_room:
-                emit("error", {"message": "Room not found"})
+                emit(
+                    "join_room_error",
+                    {"message": "Szoba nem található"},
+                    to=request.sid,
+                )
                 return
 
             room_users = get_room_users(room_id)
             existing_names = {user.username for user in room_users}
 
             if len(room_users) >= target_room.max_player_count:
-                emit("error", {"message": "Room is full"})
+                emit("join_room_error", {"message": "A szoba megtelt"}, to=request.sid)
                 return
 
             ai_username = get_available_ai_name(existing_names, room_id)
             create_ai_user_in_db(ai_username)
+            print(f"AI player added: {ai_username}")
             join_user_to_room(room_id, ai_username, skip_password_check=True)
             broadcast_room_list_update()
 
         except Exception as e:
             print(f"Error adding AI player: {e}")
+            emit(
+                "join_room_error",
+                {"message": "AI játékos hozzáadása sikertelen"},
+                to=request.sid,
+            )
 
 
 def game_end(room_id: str, db: Session = None) -> None:
@@ -1044,12 +1453,13 @@ def game_end(room_id: str, db: Session = None) -> None:
 
         if running_game:
             running_game.loser_username = loser_name
-            running_game.game_status = "end"  
+            running_game.game_status = "end"
             print(f"Game {running_game.game_id} ended. Loser saved: {loser_name}")
         else:
             print(f"Warning: No running game found in room {room_id}")
 
         db.commit()
+        socketio.sleep(3.0)
 
         socketio.emit(
             "game_over",
@@ -1183,7 +1593,17 @@ def execute_ai_move(game_instance, ai_game_state, statement, passing):
     if not all_players_active_in_room(room_id):
         return
 
-    socketio.sleep(2.0)
+    if not passing:
+        message = f"{this_is_ai_name(game_instance.state.active_player.username)} új kört kezd..."
+    else:
+        message = f"{this_is_ai_name(game_instance.state.active_player.username)} folytatja..."
+
+    send_game_state_to_players(
+        game_instance, room_id, hide_card_for_unvisited=True, message=message
+    )
+
+    socketio.sleep(1.0)
+
     with app.test_request_context():
         session["username"] = game_instance.state.active_player.username
         handle_oke_click(
@@ -1235,7 +1655,6 @@ def send_client_game_state(game_instance):
     return ClientGameState(
         game_id=game_instance.state.game_id,
         room_id=game_instance.state.room_id,
-    
         visited_already=game_instance.state.visited_already,
         voters=game_instance.state.voters,
         active_player=game_instance.state.active_player.username,
@@ -1245,10 +1664,22 @@ def send_client_game_state(game_instance):
         question_card=game_instance.state.question_card,
     ).model_dump()
 
+
 def ai_handle_guess_internal(guess, game_instance, room_id):
     with get_db_session() as db:
         try:
+            memory = get_ai_memory(room_id, game_instance)
+            guesser_name = game_instance.state.targeted_player.username
+            active_player_name = game_instance.state.active_player.username
+
+            update_guess_patterns(memory, guesser_name, guess)
+
             result = game_instance.check_truth(guess)
+
+            was_truthful = (guess == True and result == True) or (
+                guess == False and result == False
+            )
+            update_truth_statement_memory(memory, active_player_name, was_truthful)
 
             if result:
                 nextplayer = game_instance.place_card(game_instance.state.active_player)
@@ -1257,7 +1688,6 @@ def ai_handle_guess_internal(guess, game_instance, room_id):
                     game_instance.state.targeted_player
                 )
 
-        
             game_instance.state.visited_already = set(
                 player.username for player in game_instance.state.players
             )
@@ -1272,7 +1702,7 @@ def ai_handle_guess_internal(guess, game_instance, room_id):
             )
 
         except Exception as e:
-            print(f"Error in ai_handle_guess_internal: {e}")
+            print(f"Error in ai_handle_guess_internal_with_trust: {e}")
 
 
 def ai_pass(game_instance=None, room_id=None):
@@ -1280,39 +1710,96 @@ def ai_pass(game_instance=None, room_id=None):
 
 
 def ai_guess(game_instance=None, room_id=None):
+    """AI tippelés logika"""
+    print("AI TIPPLES")
     if not all_players_active_in_room(room_id):
         return
 
-    if len(game_instance.state.visited_already) < (
-        len(game_instance.state.players) - 1
-    ):
-        tipp = random.choice([True, False, "pass"])
-    else:
-        tipp = random.choice([True, False])
+    memory = get_ai_memory(room_id, game_instance)
+    active_player = game_instance.state.active_player
+    targeted_player = game_instance.state.targeted_player
+    statement = active_player.statement
+    card_in_hand = 0
+    weights = {"true": 1.0, "false": 2.0, "pass": 1.5}
+    for card in targeted_player.cards_in_hand:
+        if card.value == statement:
+            card_in_hand += 1
 
-    socketio.sleep(3.0)
-    if tipp == "pass":
+    seen_count = 0
+    for card in memory["seen_cards"]:
+        if card.value == statement:
+            seen_count += memory["seen_cards"][card] + card_in_hand
+
+    print(card_in_hand)
+    print(f"ai tippelése: {seen_count}")
+    remaining_cards = 8 - seen_count
+
+    if remaining_cards == 0:
+        weights["false"] *= 10.0
+        weights["true"] *= 0
+    elif remaining_cards <= 2:
+        weights["false"] *= 3.0
+        weights["true"] *= 0.5
+    elif remaining_cards >= 6:
+        weights["true"] *= 1.5
+
+    if (
+        "trust_statement" in memory
+        and active_player.username in memory["trust_statement"]
+    ):
+        trust_pattern = memory["trust_statement"][active_player.username]
+        if trust_pattern["total_statements"] >= 2:
+            truth_ratio = (
+                trust_pattern["truth_statements"] / trust_pattern["total_statements"]
+            )
+
+            if truth_ratio <= 0.3:  # Gyakran hazudó
+                weights["false"] *= 2.0
+                weights["true"] *= 0.5
+            elif truth_ratio >= 0.7:  # Gyakran igazat mondó
+                weights["true"] *= 2.0
+                weights["false"] *= 0.5
+
+    choice = weighted_random_choice(weights)
+
+    if choice == "pass":
         ai_pass_internal(game_instance, room_id)
-    else:
-        ai_handle_guess_internal(tipp, game_instance, room_id)
+        return
+
+    tipp = choice == "true"
+    socketio.sleep(3.0)
+    ai_handle_guess_internal(tipp, game_instance, room_id)
 
 
 def ai_pass_internal(game_instance, room_id):
+    """AI passzolás logika"""
     with get_db_session() as db:
+        send_game_state_to_players(
+            game_instance,
+            room_id,
+            hide_card_for_unvisited=True,
+            message=f"{this_is_ai_name(game_instance.state.active_player.username)} passzolt.",
+        )
+
         if game_instance.state.targeted_player is not None:
-            game_instance.state.active_player = game_instance.state.targeted_player
+            next_player = game_instance.state.targeted_player
+            game_instance.state.active_player = next_player
             game_instance.state.targeted_player = None
 
         if game_instance.has_4_cards_in_front():
             game_end(room_id, db)
             return
 
+        socketio.sleep(3.0)
         send_game_state_to_players(
             game_instance, room_id, hide_card_for_unvisited=False
         )
 
         if all_players_active_in_room(room_id):
-            ai_activity(game_instance, room_id, True)
+            active_player_name = game_instance.state.active_player.username
+            base_name = this_is_ai_name(active_player_name)
+            if base_name in AI_NAMES:
+                ai_activity(game_instance, room_id, True)
 
 
 def this_is_ai_name(name: str) -> str:
@@ -1324,58 +1811,99 @@ def this_is_ai_name(name: str) -> str:
 
 
 def ai_activity(game_instance, room_id, passing=False):
+    """AI aktivitás logika"""
     if not game_instance.state.active_player:
         return
 
     active_player_name = game_instance.state.active_player.username
     base_name = this_is_ai_name(active_player_name)
 
-    if base_name not in AI_NAMES:
-        return
-
-    if not all_players_active_in_room(room_id):
+    if base_name not in AI_NAMES or not all_players_active_in_room(room_id):
         return
 
     try:
+        memory = get_ai_memory(room_id, game_instance)
+
+        if not passing:
+            safe_cards = []
+            for card in game_instance.state.active_player.cards_in_hand:
+                our_cards_in_front = (
+                    game_instance.state.active_player.cards_in_front.get(card, 0)
+                )
+                if our_cards_in_front < 3:
+                    safe_cards.append(card)
+
+            if not safe_cards and game_instance.state.targeted_player:
+                ai_pass_internal(game_instance, room_id)
+                return
+
         if not passing:
             if not game_instance.state.active_player.cards_in_hand:
                 return
 
-            selected_card = random.choice(
-                game_instance.state.active_player.cards_in_hand
-            )
+            target_weights = calculate_target_weights(game_instance, room_id)
+            available_targets = {
+                name: weight
+                for name, weight in target_weights.items()
+                if name not in game_instance.state.visited_already
+            }
+
+            if not available_targets:
+                available_targets = target_weights
+
+            if not available_targets:
+                return
+
+            target_player_name = weighted_random_choice(available_targets)
+            card_weights = calculate_card_weights(game_instance, target_player_name)
+
+            if max(card_weights.values()) < 0.1:
+                ai_pass_internal(game_instance, room_id)
+                return
+
+            selected_card = weighted_random_choice(card_weights)
         else:
             selected_card = game_instance.state.question_card
+            if not selected_card:
+                return
 
-        other_players = [
-            p
-            for p in game_instance.state.players
-            if p.username != game_instance.state.active_player.username
-        ]
+            target_weights = calculate_target_weights(game_instance, room_id)
+            available_targets = {
+                name: weight
+                for name, weight in target_weights.items()
+                if name not in game_instance.state.visited_already
+            }
 
-        available_targets = [
-            p
-            for p in other_players
-            if p.username not in game_instance.state.visited_already
-        ]
+            if not available_targets:
+                ai_pass_internal(game_instance, room_id)
+                return
 
-        if not available_targets:
-            available_targets = other_players
+            target_player_name = weighted_random_choice(available_targets)
 
-        if not available_targets:
+        target_player_obj = None
+        for player in game_instance.state.players:
+            if player.username == target_player_name:
+                target_player_obj = player
+                break
+
+        if not target_player_obj:
             return
 
-        target_player = random.choice(available_targets)
-        statement = random.choice(list(Animal)).value
+        statement = calculate_statement_strategy(
+            selected_card, target_player_obj, game_instance.state.active_player, memory
+        )
 
         ai_game_state = {
             "question_card": selected_card.value,
-            "targeted_player": target_player.username,
+            "targeted_player": target_player_name,
             "active_player": game_instance.state.active_player.username,
         }
 
         socketio.start_background_task(
-            execute_ai_move, game_instance, ai_game_state, statement, passing
+            lambda: (
+                socketio.sleep(3.0),
+                execute_ai_move(game_instance, ai_game_state, statement, passing),
+            )
         )
 
     except Exception as e:
@@ -1489,9 +2017,16 @@ def create_ai_user_in_db(ai_username: str) -> DBUser:
 
 
 def get_available_ai_name(existing_players: Set[str], room_id) -> str:
-    available_names = [name for name in AI_NAMES if name not in existing_players]
-    base_name = f"{random.choice(available_names)}_{room_id}"
-    return base_name
+    used_base_names = set()
+    for player_name in existing_players:
+        base_name = this_is_ai_name(player_name)
+        if base_name in AI_NAMES:
+            used_base_names.add(base_name)
+
+    available_names = [name for name in AI_NAMES if name not in used_base_names]
+
+    base_name = random.choice(available_names)
+    return f"{base_name}_{room_id}"
 
 
 def is_ai_player(username: str) -> bool:

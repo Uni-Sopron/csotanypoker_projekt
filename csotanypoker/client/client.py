@@ -31,6 +31,12 @@ class NetworkManager:
             """Disconnection event handler."""
             print("Disconnected from server")
 
+        @self.sio.on("ai_player_add_error")
+        def on_ai_player_add_error(data: Dict[str, Any]) -> None:
+            with self._data_lock:
+                self.game_client.message = data.get("message", "AI hozzáadási hiba")
+                self.game_client.message_display_time = 30.0
+
         @self.sio.on("reconnect_offer")
         def on_reconnect_offer(data: Dict[str, Any]) -> None:
             with self._data_lock:
@@ -107,6 +113,7 @@ class NetworkManager:
                     self.game_client.screen = "reconnect_screen"
                     self.game_client.game_start = data.get("game_start", False)
 
+                    self.get_user_stats(self.game_client.user.username)
                     if data.get("game_start"):
                         self.game_client.message = "A játék elkezdődött"
                     else:
@@ -131,6 +138,9 @@ class NetworkManager:
                         username=user_data.get("username", ""),
                         is_active=user_data.get("is_active", True),
                     )
+
+                    self.get_user_stats(self.game_client.user.username)
+
                     time.sleep(0.5)
                     if (
                         not hasattr(self.game_client, "room_list")
@@ -158,6 +168,7 @@ class NetworkManager:
                             continue
 
                     self.game_client.screen = "rooms_screen"
+
                 except Exception as e:
                     print(f"Error in login_success: {e}")
 
@@ -423,6 +434,8 @@ class NetworkManager:
                         and self.game_client.game_state
                     ):
                         self.game_client.screen = "game"
+                        # if self.game_client._screens["game"]:
+                        #     self.game_client._screens["game"]._reset_local_selections()
                     else:
                         print(
                             "Warning: Not switching to game screen due to missing data"
@@ -438,6 +451,7 @@ class NetworkManager:
 
         @self.sio.on("rooms_updated")
         def on_rooms_updated(data: Dict[str, Any]) -> None:
+            self.get_user_stats(self.game_client.user.username)
             with self._data_lock:
                 try:
                     new_rooms_data = data.get("rooms", {})
@@ -603,7 +617,8 @@ class NetworkManager:
                 self.game_client.room_id = None
                 self.game_client.room_name = None
                 self.game_client.users = []
-
+                if self.game_client._screens["game"]:
+                    self.game_client._screens["game"]._reset_local_selections()
                 self.game_client.screen = "rooms_screen"
 
         @self.sio.on("player_left_room")
@@ -704,6 +719,42 @@ class NetworkManager:
                 except Exception as e:
                     print(f"Error in player_rejoined: {e}")
 
+        @self.sio.on("ai_player_add_success")
+        def on_ai_player_added(data: Dict[str, Any]) -> None:
+            with self._data_lock:
+                self.game_client.message = "AI játékos sikeresen hozzáadva"
+            self.game_client.message_display_time = 30.0
+
+        @self.sio.on("user_stats")
+        def on_user_stats(data: Dict[str, Any]) -> None:
+            """Handle user statistics received from server"""
+            with self._data_lock:
+                try:
+                    username = data.get("username")
+                    total_games = data.get("total_games", 0)
+                    won_games = data.get("won_games", 0)
+
+                    if not hasattr(self.game_client, "all_player_stats"):
+                        self.game_client.all_player_stats = {}
+
+                    self.game_client.all_player_stats[username] = {
+                        "total_games": total_games,
+                        "won_games": won_games,
+                    }
+
+                    if username == self.game_client.user.username:
+                        self.game_client.user_stats = {
+                            "total_games": total_games,
+                            "won_games": won_games,
+                        }
+
+                except Exception as e:
+                    print(f"Error in user_stats handler: {e}")
+
+    def get_user_stats(self, username: str) -> None:
+        """Felhasználó statisztikáinak lekérése"""
+        self.sio.emit("get_user_stats", {"username": username})
+
     def logout(self) -> None:
         with self._data_lock:
             if self.game_client.user and hasattr(self.game_client.user, "username"):
@@ -729,8 +780,10 @@ class NetworkManager:
     def vote_rematch(self, room_id: str, username: str) -> None:
         self.sio.emit("vote_rematch", {"room_id": room_id, "username": username})
 
-    def all_players_leave_room(self, room_id) -> None:
-        self.sio.emit("all_players_leave_room", {"room_id": room_id})
+    def all_players_leave_room(self, room_id, reconnecting=False) -> None:
+        self.sio.emit(
+            "all_players_leave_room", {"room_id": room_id, "reconnecting": reconnecting}
+        )
 
     def rejoin_waiting_room(self) -> None:
         """
@@ -745,8 +798,11 @@ class NetworkManager:
             },
         )
 
-    def leave_room(self) -> None:
-        self.sio.emit("leave_room", {"username": self.game_client.user.username})
+    def leave_room(self, reconnecting=False) -> None:
+        self.sio.emit(
+            "leave_room",
+            {"username": self.game_client.user.username, "reconnecting": reconnecting},
+        )
 
     def connect(self, server_url: str = "http://localhost:5000") -> None:
         """
@@ -755,12 +811,16 @@ class NetworkManager:
         Args:
             server_url (str, optional): The server URL. Default is "http://localhost:5000".
         """
-        try:
-            self.sio.connect(server_url)
 
-        except Exception as e:
-            self.game_client.message = f"Kapcsolódási hiba: {e}"
-            self.game_client.message_display_time = 30.0
+        while self.game_client.screen == "loading":
+            try:
+                print(f"Connecting to server at {server_url}...")
+                self.sio.connect(server_url)
+                print("Connected to server")
+                break
+            except Exception as e:
+                print(f"Error connecting to server: {e}")
+                time.sleep(0.5)
 
     def login(self, username: str, password: str) -> None:
         self.sio.emit("login", {"username": username, "password": password})

@@ -13,9 +13,8 @@ from csotanypoker.client.constans import (
     MIDDLE_GREEN,
     LIGHT_GREEN,
     LEGVILAGOS_ZOLD,
-
 )
-from csotanypoker.models.user import  AI_NAMES
+from csotanypoker.models.user import AI_NAMES
 
 
 def this_is_ai_name(name: str) -> str:
@@ -174,6 +173,27 @@ def _get_font(
     if cache_key not in _font_cache:
         _font_cache[cache_key] = pygame.font.Font(font_path, font_size)
     return _font_cache[cache_key]
+
+
+
+
+
+def draw_music_volume(surface, x, y, volume_level):
+    volume_images = {
+        0: "volume0",  
+        1: "volume1",  
+        2: "volume2", 
+        3: "volume3",  
+    }
+
+    volume_image = load_image(volume_images[volume_level], "button", size=(50, 50))
+
+
+    draw_image(surface, volume_image, x, y, centered=True)
+
+
+def create_volume_button_rect(x, y):
+    return pygame.Rect(x - 25, y - 25, 50, 50)
 
 
 def draw_text(
@@ -369,7 +389,6 @@ def _scale_image_to_cover(image, target_width, target_height):
     return pygame.transform.scale(image, new_size)
 
 
-
 def _get_button_color(is_hovered, is_pressed, normal_color, hover_color, pressed_color):
     """Gomb színének meghatározása állapot alapján"""
     if is_pressed:
@@ -514,9 +533,7 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
 
     popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
 
-
     _draw_rounded_rect(surface, LEGVILAGOS_ZOLD, popup_rect, LIGHT_GREEN, 5, 0.05)
-
 
     rules_key = "2" if max_players == 2 else "3-6"
     title = f"Játékszabály ({rules_key} játékos)"
@@ -535,7 +552,6 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
         font_size=40,
     )
 
-
     content_y = title_y + 80
     available_width = popup_width - 2 * margin
 
@@ -543,7 +559,7 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
 
     line_height = 40
     for i, line in enumerate(lines):
-        if line.strip():  
+        if line.strip():
             y_pos = content_y + i * line_height
             if y_pos < popup_y + popup_height - margin:
                 draw_text(
@@ -557,23 +573,45 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
                     font_size=30,
                 )
 
-def draw_multiline_text(surface, text_lines, color, x, y, centered=False, font=None, font_size=None, line_spacing=5):
+
+def draw_multiline_text(
+    surface,
+    text_lines,
+    color,
+    x,
+    y,
+    centered=False,
+    font=None,
+    font_size=None,
+    line_spacing=5,
+):
     """
     Draw multiple lines of text with proper line spacing
     """
     if isinstance(text_lines, str):
         text_lines = [text_lines]
-    
+
     font_obj = _get_font(font, font_size)
-    
-    total_height = len(text_lines) * font_obj.get_height() + (len(text_lines) - 1) * line_spacing
-    
+
+    total_height = (
+        len(text_lines) * font_obj.get_height() + (len(text_lines) - 1) * line_spacing
+    )
+
     for i, line in enumerate(text_lines):
         line_y = y + i * (font_obj.get_height() + line_spacing)
         if centered:
             line_y = y - total_height // 2 + i * (font_obj.get_height() + line_spacing)
-        
-        draw_text(surface, line, color, x, line_y, centered=centered, font=font, font_size=font_size)
+
+        draw_text(
+            surface,
+            line,
+            color,
+            x,
+            line_y,
+            centered=centered,
+            font=font,
+            font_size=font_size,
+        )
 
 
 def format_username_for_display(username: str, max_length: int = 10):
@@ -582,10 +620,8 @@ def format_username_for_display(username: str, max_length: int = 10):
     """
     if len(username) <= max_length:
         return [username]
- 
+
     return wrap_text(username, max_length)
-
-
 
 
 def _wrap_text_for_popup(text, max_width, font_size):
@@ -611,7 +647,6 @@ def _wrap_text_for_popup(text, max_width, font_size):
                     lines.append(current_line)
                     current_line = word
                 else:
-
                     while word:
                         for i in range(len(word), 0, -1):
                             test_word = word[:i] + ("-" if i < len(word) else "")

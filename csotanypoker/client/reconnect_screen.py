@@ -2,7 +2,7 @@ import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import DARK_GREEN, LIGHT_GREEN, MIDDLE_GREEN, WHITE
-from csotanypoker.client.drawing_helpers import draw_button, draw_text, load_background
+from csotanypoker.client.drawing_helpers import draw_button, draw_text, load_background, create_volume_button_rect, draw_music_volume 
 
 
 class ReconnectScreen(BaseScreen):
@@ -68,7 +68,6 @@ class ReconnectScreen(BaseScreen):
         center_x = self.client.width // 2
         base_y = self.client.height // 2.4
 
-   
         draw_text(
             self.client.window,
             f"Jelenlegi szobád: {self.client.previous_room.name}",
@@ -79,7 +78,6 @@ class ReconnectScreen(BaseScreen):
             font="thin",
             font_size=40,
         )
-
 
         players_text = (
             f"Aktuális játékosszám: {self.client.previous_room.player_count}/"
@@ -97,12 +95,10 @@ class ReconnectScreen(BaseScreen):
         )
 
     def draw(self):
- 
         self._init_buttons()
         self._update_button_states()
 
         load_background(self.client.width, self.client.height, self.client.window)
-
 
         draw_text(
             self.client.window,
@@ -114,10 +110,16 @@ class ReconnectScreen(BaseScreen):
             font="regular",
             font_size=70,
         )
+        
 
-      
         self._draw_room_info()
-
+        volume_rect = create_volume_button_rect(self.client.width - 40, self.client.height - 40)
+        draw_music_volume(
+            self.client.window,
+            volume_rect.centerx,
+            volume_rect.centery,
+            self.client.volume_level,
+        )
         if self.client.message:
             draw_text(
                 self.client.window,
@@ -130,7 +132,6 @@ class ReconnectScreen(BaseScreen):
                 font_size=40,
             )
 
-
         self._draw_button_with_state(
             "reconnect", self.reconnect_button, "Újracsatlakozás"
         )
@@ -138,7 +139,6 @@ class ReconnectScreen(BaseScreen):
         self._draw_button_with_state("logout", self.logout_button, "Kijelentkezés")
 
     def handle_mouse_click(self, pos):
-
         if self.reconnect_button.collidepoint(pos):
             self._handle_reconnect()
         elif self.leave_button.collidepoint(pos):
@@ -147,19 +147,17 @@ class ReconnectScreen(BaseScreen):
             self.client.network.logout()
 
     def _handle_reconnect(self):
-
         if self.client.previous_room and self.client.previous_room.room_id:
             self.client.selected_room = self.client.previous_room
             self.client.network.rejoin_waiting_room()
 
     def _handle_leave_room(self):
-
         if self.client.message == "A játék elkezdődött":
             self.client.network.all_players_leave_room(
-                self.client.previous_room.room_id
+                self.client.previous_room.room_id, reconnecting=True
             )
         else:
-            self.client.network.leave_room()
+            self.client.network.leave_room(reconnecting=True)
         self.client.screen = "rooms_screen"
 
     def handle_key_press(self, event):

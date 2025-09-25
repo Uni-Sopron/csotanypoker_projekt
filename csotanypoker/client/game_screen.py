@@ -55,6 +55,10 @@ class GameScreen(BaseScreen):
         self.cross_rect = None
         self.client.passed = False
 
+        self.local_question_card = None
+        self.local_targeted_player = None
+        self.local_active_animal = None
+
         self.logout_button = create_logout_button_rect(self.client.height)
         self.rules_button = create_rules_button_rect(
             self.client.width, self.client.height
@@ -62,7 +66,7 @@ class GameScreen(BaseScreen):
         self.leave_button = pygame.Rect(
             self.logout_button.x, self.logout_button.y - 90, 200, 75
         )
-
+        self.last_game_id = None
         self.hovered_elements = set()
         self.pressed_elements = set()
 
@@ -134,16 +138,17 @@ class GameScreen(BaseScreen):
                 self.pressed_elements.add("checkmark")
 
     def draw_center_card_area(self):
-        card = load_image(
-            self.client.game_state.question_card, "card", size=(65 * 2.5, 100 * 2.5)
-        )
-        draw_image(
-            self.client.window,
-            card,
-            self.client.width // 2,
-            self.client.height // 2,
-            centered=True,
-        )
+        card_to_show = self.local_question_card or self.client.game_state.question_card
+
+        if card_to_show:
+            card = load_image(card_to_show, "card", size=(65 * 2.5, 100 * 2.5))
+            draw_image(
+                self.client.window,
+                card,
+                self.client.width // 2,
+                self.client.height // 2,
+                centered=True,
+            )
 
     def draw_tipp_area(self):
         self.cross_rect = draw_image_button(
@@ -241,8 +246,10 @@ class GameScreen(BaseScreen):
 
     def draw_mini_card(self):
         if (
-            not self.client.game_state.question_card
-            or not self.client.game_state.targeted_player
+            not (self.local_question_card or self.client.game_state.question_card)
+            or not (
+                self.local_targeted_player or self.client.game_state.targeted_player
+            )
             or self.client.game_state.active_player == self.client.user.username
         ):
             return
@@ -250,19 +257,23 @@ class GameScreen(BaseScreen):
         if not hasattr(self, "opponent_player_rects") or not self.opponent_player_rects:
             return
 
+        target_player = (
+            self.local_targeted_player or self.client.game_state.targeted_player
+        )
+
         targeted_player_rect = None
         for rect, player_name in self.opponent_player_rects:
-            if player_name == self.client.game_state.targeted_player:
+            if player_name == target_player:
                 targeted_player_rect = rect
                 break
 
         if not targeted_player_rect:
             return
 
+        card_to_show = self.local_question_card or self.client.game_state.question_card
+
         mini_card_size = (65 * 1.5, 100 * 1.5)
-        card_image = load_image(
-            self.client.game_state.question_card, "card", size=mini_card_size
-        )
+        card_image = load_image(card_to_show, "card", size=mini_card_size)
 
         card_x = targeted_player_rect.centerx
         card_y = targeted_player_rect.bottom + 80
@@ -569,6 +580,13 @@ class GameScreen(BaseScreen):
             pressed_color=LIGHT_GREEN,
         )
 
+    def _reset_local_selections(self):
+        print("_reset_local_selections")
+        self.local_question_card = None
+        self.local_targeted_player = None
+        self.local_active_animal = None
+        self.active_animal = None
+
     def draw_animal_table(self):
         table_x = 25
         table_y = self.client.height // 2 - 135
@@ -604,7 +622,8 @@ class GameScreen(BaseScreen):
 
             temp_rect = pygame.Rect(button_center_x - 30, button_center_y - 25, 60, 50)
             is_hovered = temp_rect.collidepoint(mouse_pos)
-            is_active = self.active_animal == animal.value
+
+            is_active = self.local_active_animal == animal.value
 
             button_rect = draw_image_button(
                 surface=self.client.window,
@@ -623,6 +642,7 @@ class GameScreen(BaseScreen):
             )
 
             self.animal_button_rects[animal.value] = button_rect
+
         self.oke_button = pygame.Rect(
             table_x + table_width // 2 - 50, table_y + table_height - 40, 100, 35
         )
@@ -650,10 +670,21 @@ class GameScreen(BaseScreen):
         self.rules_button = create_rules_button_rect(
             self.client.width, self.client.height
         )
+       
+        current_game_id = getattr(self.client.game_state, "game_id", None)
+        if current_game_id != self.last_game_id:
+     
+            self._reset_local_selections()
+            self.last_game_id = current_game_id
 
-        if self.adott and not self.client.game_state.targeted_player:
+        if self.client.game_state.active_player != self.client.user.username:
+            self._reset_local_selections()
+
+        if self.adott and not (
+            self.local_targeted_player or self.client.game_state.targeted_player
+        ):
             self.adott = False
-            self.active_animal = None
+            self._reset_local_selections()
 
         self.leave_button = pygame.Rect(
             self.logout_button.x, self.logout_button.y - 90, 200, 75
@@ -676,14 +707,22 @@ class GameScreen(BaseScreen):
             is_hovered="logout" in self.hovered_elements,
             is_pressed="logout" in self.pressed_elements,
         )
-        if self.client.game_state.question_card and (
-            self.client.game_state.targeted_player == self.client.user.username
+
+        question_card = self.local_question_card or self.client.game_state.question_card
+        targeted_player = (
+            self.local_targeted_player or self.client.game_state.targeted_player
+        )
+
+        if question_card and (
+            targeted_player == self.client.user.username
             or self.client.game_state.active_player == self.client.user.username
         ):
             self.draw_center_card_area()
+
         if self.client.game_state.active_player == self.client.user.username:
             self.draw_animal_table()
-        if self.client.game_state.targeted_player == self.client.user.username:
+
+        if targeted_player == self.client.user.username:
             self.draw_tipp_area()
 
         if self.show_leave_button:
@@ -695,7 +734,7 @@ class GameScreen(BaseScreen):
         self.draw_info_messages()
         draw_rules_button(self.client.window, self.rules_button)
 
-        if self.show_rules :
+        if self.show_rules:
             draw_rules_popup(
                 self.client.window,
                 self.client.width,
@@ -705,7 +744,6 @@ class GameScreen(BaseScreen):
                 ],
                 self.client.selected_room.max_player_count,
             )
-
         pygame.display.flip()
 
     def draw_opponent_players(self) -> None:
@@ -721,7 +759,7 @@ class GameScreen(BaseScreen):
         ) + (player_spacing * (len(self.client.opponent_players) - 1))
 
         start_x = (self.client.width - total_players_width) // 2
-        start_y = 10  # Felső margó
+        start_y = 10
 
         self.opponent_player_rects = []
 
@@ -731,10 +769,13 @@ class GameScreen(BaseScreen):
                 panel_x, start_y, player_panel_width, player_panel_height
             )
 
-            if self.client.game_state.targeted_player == player.username:
+            target_player = (
+                self.local_targeted_player or self.client.game_state.targeted_player
+            )
+
+            if target_player == player.username:
                 background_color = LIGHTER_GREEN_TRANSPARENT
                 font_color = DARK_GREEN
-
             elif self.client.game_state.active_player == player.username:
                 background_color = MIDDLE_GREEN_TRANSPARENT_70
                 font_color = WHITE
@@ -851,31 +892,43 @@ class GameScreen(BaseScreen):
             self.client.network.all_players_leave_room(
                 self.client.selected_room.room_id
             )
+            self._reset_local_selections()
             return True
 
         if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
             if self.client.game_state.active_player == self.client.user.username:
-                if not self.client.game_state.question_card:
-                    self.client.message = "Nincs kártya kiválasztva!"
-                    self.client.message_display_time = 30
+                if self.show_leave_button is True:
+                    self.client.message = "Várd meg míg minden játékos visszatér!"
+                    self.client.message_display_time = 20
                     return True
 
-                if not self.client.game_state.targeted_player:
+                if not self.client.passed:
+                    if not self.local_question_card:
+                        self.client.message = "Nincs kártya kiválasztva!"
+                        self.client.message_display_time = 30
+                        return True
+
+                if not self.local_targeted_player:
                     self.client.message = "Válassz egy játékost!"
-                    self.client.message_display_time = 30
+                    self.client.message_display_time = 20
                     return True
 
-                if not self.active_animal:
+                if not self.local_active_animal:
                     self.client.message = "Válassz egy állatot!"
-                    self.client.message_display_time = 30
+                    self.client.message_display_time = 20
                     return True
 
                 if self.adott == False:
+                    self.client.game_state.question_card = self.local_question_card
+                    self.client.game_state.targeted_player = self.local_targeted_player
+
                     self.client.network.oke_click(
-                        statement=self.active_animal, passing=self.client.passed
+                        statement=self.local_active_animal, passing=self.client.passed
                     )
                     self.client.passed = False
                     self.adott = True
+
+                    self._reset_local_selections()
 
         if hasattr(self, "pass_button") and self.pass_button.collidepoint(pos):
             if (
@@ -915,26 +968,39 @@ class GameScreen(BaseScreen):
                         == self.client.user.username
                     ):
                         if self.show_leave_button is True:
+                            clicked_user = None
                             for user in self.client.users:
-                                if (
-                                    user.username == player_name
-                                    and user.is_active is False
-                                ):
-                                    username = user.username
-                                    self.client.message = f"{this_is_ai_name(username)} játékos nem aktiv. Várd meg amig vissza tér!"
+                                if user.username == player_name:
+                                    clicked_user = user
+                                    break
+
+                            if clicked_user and not clicked_user.is_active:
+                                self.client.message = f"{player_name} játékos nem aktív. Várd meg amíg visszatér!"
+                                self.client.message_display_time = 30
+                            else:
+                                inactive_players = [
+                                    user
+                                    for user in self.client.users
+                                    if not user.is_active
+                                ]
+
+                                if inactive_players:
+                                    self.client.message = (
+                                        "Várd meg míg minden játékos visszatér!"
+                                    )
                                     self.client.message_display_time = 30
-                                return True
+                            return True
                         if player_name in self.client.game_state.visited_already:
                             self.client.message = (
                                 "Nála már volt ez a lap. Válassz másik játékost."
                             )
                             self.client.message_display_time = 30
                             return True
-                        if self.client.game_state.targeted_player == player_name:
-                            self.client.game_state.targeted_player = None
 
+                        if self.local_targeted_player == player_name:
+                            self.local_targeted_player = None
                         else:
-                            self.client.game_state.targeted_player = player_name
+                            self.local_targeted_player = player_name
 
                         return True
                     else:
@@ -945,10 +1011,11 @@ class GameScreen(BaseScreen):
             if self.client.game_state.active_player == self.client.user.username:
                 for animal_name, button_rect in self.animal_button_rects.items():
                     if button_rect.collidepoint(pos) and self.adott == False:
-                        if self.active_animal == animal_name:
+                        if self.local_active_animal == animal_name:
+                            self.local_active_animal = None
                             self.active_animal = None
-
                         else:
+                            self.local_active_animal = animal_name
                             self.active_animal = animal_name
 
                         return True
@@ -963,9 +1030,7 @@ class GameScreen(BaseScreen):
 
             if rect.collidepoint(pos) and not self.client.passed:
                 if self.client.game_state.active_player == self.client.user.username:
-                    self.client.game_state.question_card = None
-                    if lap != None:
-                        self.client.game_state.question_card = lap
+                    self.local_question_card = lap if lap is not None else None
                     self.selected_card_frame = rect
                     break
                 else:
