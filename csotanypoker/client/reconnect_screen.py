@@ -2,7 +2,13 @@ import pygame
 
 from csotanypoker.client.base_screen import BaseScreen
 from csotanypoker.client.constans import DARK_GREEN, LIGHT_GREEN, MIDDLE_GREEN, WHITE
-from csotanypoker.client.drawing_helpers import draw_button, draw_text, load_background, create_volume_button_rect, draw_music_volume 
+from csotanypoker.client.drawing_helpers import (
+    draw_button,
+    draw_text,
+    load_background,
+    create_volume_button_rect,
+    draw_sound_volume,
+)
 
 
 class ReconnectScreen(BaseScreen):
@@ -110,15 +116,16 @@ class ReconnectScreen(BaseScreen):
             font="regular",
             font_size=70,
         )
-        
 
         self._draw_room_info()
-        volume_rect = create_volume_button_rect(self.client.width - 40, self.client.height - 40)
-        draw_music_volume(
+        volume_rect = create_volume_button_rect(
+            self.client.width - 40, self.client.height - 40
+        )
+        draw_sound_volume(
             self.client.window,
             volume_rect.centerx,
             volume_rect.centery,
-            self.client.volume_level,
+            "sound",
         )
         if self.client.message:
             draw_text(
@@ -139,12 +146,23 @@ class ReconnectScreen(BaseScreen):
         self._draw_button_with_state("logout", self.logout_button, "Kijelentkezés")
 
     def handle_mouse_click(self, pos):
+        volume_rect = create_volume_button_rect(
+            self.client.width - 40, self.client.height - 40
+        )
+        if volume_rect.collidepoint(pos):
+            return True
+
         if self.reconnect_button.collidepoint(pos):
             self._handle_reconnect()
+            return True
         elif self.leave_button.collidepoint(pos):
             self._handle_leave_room()
+            return True
         elif self.logout_button.collidepoint(pos):
             self.client.network.logout()
+            return True
+        
+        return False  
 
     def _handle_reconnect(self):
         if self.client.previous_room and self.client.previous_room.room_id:

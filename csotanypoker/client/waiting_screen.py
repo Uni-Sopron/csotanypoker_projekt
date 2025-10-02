@@ -31,7 +31,7 @@ from csotanypoker.client.drawing_helpers import (
     this_is_ai_name,
     wrap_text,
     create_volume_button_rect,
-    draw_music_volume,
+    draw_sound_volume,
 )
 
 
@@ -51,13 +51,13 @@ class WaitingScreen(BaseScreen):
         self.margin = 30
         self.hovered_elements = set()
         self.pressed_elements = set()
-        self.player_stats = {}  
-        self.stats_requested = set()  
+        self.player_stats = {}
+        self.stats_requested = set()
 
     def _is_ai_player(self, username: str) -> bool:
         """Ellenőrzi, hogy AI játékosról van-e szó"""
         ai_name = this_is_ai_name(username)
-        return ai_name != username  
+        return ai_name != username
 
     def _update_button_states(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -88,7 +88,6 @@ class WaitingScreen(BaseScreen):
             self.hovered_elements.add("ai_player")
             if mouse_pressed:
                 self.pressed_elements.add("ai_player")
-
 
     def draw(self) -> None:
         """
@@ -159,14 +158,11 @@ class WaitingScreen(BaseScreen):
                 17,
             )
 
-        
             player_name = this_is_ai_name(player.username)
 
             if self._is_ai_player(player.username):
-               
                 player_display = player_name
             else:
-             
                 if (
                     hasattr(self.client, "all_player_stats")
                     and player.username in self.client.all_player_stats
@@ -269,11 +265,8 @@ class WaitingScreen(BaseScreen):
                 self.client.selected_room.max_player_count,
             )
         volume_rect = create_volume_button_rect(50, 50)
-        draw_music_volume(
-            self.client.window,
-            volume_rect.centerx,
-            volume_rect.centery,
-            self.client.volume_level,
+        draw_sound_volume(
+            self.client.window, volume_rect.centerx, volume_rect.centery, "sound"
         )
 
     def _request_player_stats(self):
@@ -282,10 +275,7 @@ class WaitingScreen(BaseScreen):
             return
 
         for user in self.client.users:
-           
             if not self._is_ai_player(user.username):
-                
-
                 self.client.network.get_user_stats(user.username)
                 self.stats_requested.add(user.username)
 

@@ -5,6 +5,8 @@ import os
 from csotanypoker.models.animal import Animal
 from csotanypoker.models.player import VisiblePlayer
 
+from csotanypoker.server.ai_player import AIPlayer
+
 
 class AutoSavingSet(set):
     def __init__(
@@ -51,6 +53,8 @@ class AbstractGameState(BaseModel):
         set(), description="Azoknak a neve akiknél már volt a kérdéses kártya"
     )
     voters: Optional[Set[str]] = Field(set(), description="Szavazók nevei")
+
+
 class GameState(AbstractGameState):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -62,16 +66,8 @@ class GameState(AbstractGameState):
     players: Optional[List[VisiblePlayer]] = Field(
         None, description="Összes játékos a játékban"
     )
+    ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
 
-    ai_memory: Optional[dict] = Field(
-        default_factory=lambda: {
-            "seen_cards": {},
-            "player_risks": {},
-            "guess_patterns": {},
-            "trust_statement": {},
-        },
-        description="AI memória adatok"
-    )
 
     def __init__(self, **data):
         save_path = data.get("save_path")
@@ -89,20 +85,16 @@ class GameState(AbstractGameState):
 
         if self.players is None:
             self.players = []
+        if self.ai_player is None:
+            from csotanypoker.server.ai_player import AIPlayer
 
-        if self.ai_memory is None:
-            self.ai_memory = {
-                "seen_cards": {},
-                "player_risks": {},
-                "guess_patterns": {},
-                "trust_statement": {},
-            }
+            self.ai_player = AIPlayer()
+
 
         if save_path:
             directory = os.path.dirname(save_path)
             if directory and not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)
-
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
@@ -119,7 +111,6 @@ class GameState(AbstractGameState):
             return
 
         try:
-    
             directory = os.path.dirname(self.save_path)
             if directory and not os.path.exists(directory):
                 os.makedirs(directory, exist_ok=True)

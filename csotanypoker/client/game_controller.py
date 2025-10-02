@@ -11,6 +11,7 @@ from csotanypoker.client.constans import FPS, SCREEN_WIDTH, SCREEN_HEIGHT
 from csotanypoker.client.end_screen import EndScreen
 from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
+from csotanypoker.client.music_menü import MusicMenu
 from csotanypoker.client.reconnect_screen import ReconnectScreen
 from csotanypoker.client.registration import LoginScreen
 from csotanypoker.client.rooms_screen import RoomsScreen
@@ -47,20 +48,19 @@ class GameController:
 
         self._network: NetworkManager = NetworkManager(self)
         self._screens = self._initialize_screens()
-        self.volume_level = 1 
+        self.volume_level = 1
         self.input_active = False
-        
+
         self._music_manager = MusicManager()
         self._music_manager.start_background_music()
+        self.music_menu = MusicMenu()
 
     def get_local_ip(self) -> str:
         """
         Automatikusan meghatározza a helyi IP címet több módszerrel
         """
         try:
-
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-              
                 s.connect(("8.8.8.8", 80))
                 local_ip = s.getsockname()[0]
                 print(f"Socket módszerrel talált IP: {local_ip}")
@@ -69,45 +69,50 @@ class GameController:
             print(f"Socket módszer sikertelen: {e}")
 
         try:
-          
             system = platform.system().lower()
-            
+
             if system == "windows":
-             
-                result = subprocess.run(['ipconfig'], capture_output=True, text=True, shell=True)
-                lines = result.stdout.split('\n')
-                
+                result = subprocess.run(
+                    ["ipconfig"], capture_output=True, text=True, shell=True
+                )
+                lines = result.stdout.split("\n")
+
                 for i, line in enumerate(lines):
-                    if 'Wireless LAN adapter' in line or 'Wi-Fi' in line:
-                       
+                    if "Wireless LAN adapter" in line or "Wi-Fi" in line:
                         for j in range(i, min(i + 10, len(lines))):
-                            if 'IPv4' in lines[j] and '192.168.' in lines[j]:
-                                ip = lines[j].split(':')[-1].strip()
-                                if ip.startswith('192.168.'):
-                                    print(f"Windows ipconfig módszerrel talált IP: {ip}")
+                            if "IPv4" in lines[j] and "192.168." in lines[j]:
+                                ip = lines[j].split(":")[-1].strip()
+                                if ip.startswith("192.168."):
+                                    print(
+                                        f"Windows ipconfig módszerrel talált IP: {ip}"
+                                    )
                                     return ip
-            
-            elif system in ["linux", "darwin"]: 
-             
+
+            elif system in ["linux", "darwin"]:
                 try:
-                    result = subprocess.run(['hostname', '-I'], capture_output=True, text=True)
+                    result = subprocess.run(
+                        ["hostname", "-I"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
                         ips = result.stdout.strip().split()
                         for ip in ips:
-                            if ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.'):
+                            if (
+                                ip.startswith("192.168.")
+                                or ip.startswith("10.")
+                                or ip.startswith("172.")
+                            ):
                                 print(f"hostname -I módszerrel talált IP: {ip}")
                                 return ip
                 except:
                     pass
-                
+
         except Exception as e:
             print(f"Platform specifikus módszer sikertelen: {e}")
 
         try:
-            
             hostname = socket.gethostname()
             local_ip = socket.gethostbyname(hostname)
-            if not local_ip.startswith('127.'):
+            if not local_ip.startswith("127."):
                 print(f"gethostbyname módszerrel talált IP: {local_ip}")
                 return local_ip
         except Exception as e:
@@ -245,10 +250,8 @@ class GameController:
 
     def _handle_window_events(self, event: pygame.event.Event) -> None:
         if event.type == pygame.VIDEORESIZE:
-            
             width, height = self._enforce_minimum_size(event.w, event.h)
 
-        
             if width != event.w or height != event.h:
                 self._window = pygame.display.set_mode(
                     (width, height), pygame.RESIZABLE
@@ -277,7 +280,7 @@ class GameController:
         local_ip = self.get_local_ip()
         server_url = f"http://{local_ip}:5000"
         print(f"Csatlakozás a szerverhez: {server_url}")
-        
+
         self._network.connect(server_url)
 
         running: bool = True
@@ -300,6 +303,8 @@ class GameController:
                     self.handle_key_press(event)
                 elif event.type == pygame.MOUSEWHEEL:
                     self.rooms_screen.handle_mouse_wheel(event)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    self.handle_mouse_release(event.pos)
 
             self.draw_screen()
             pygame.display.update()
@@ -307,51 +312,88 @@ class GameController:
 
         self._network.disconnect()
         pygame.quit()
-
     def handle_mouse_click(self, pos: Tuple) -> None:
-        screen_handlers = {
-            "login": lambda: setattr(
-                self, "input_active", self.login.handle_mouse_click(pos)
-            ),
-            "rooms_screen": lambda: self.rooms_screen.handle_mouse_click(pos),
-            "waiting": lambda: self.waiting.handle_mouse_click(pos),
-            "game": lambda: self.game.handle_mouse_click(pos),
-            "reconnect_screen": lambda: self.reconnect_screen.handle_mouse_click(pos),
-            "game_over": lambda: self.game_over.handle_mouse_click(pos),
-        }
+        clicked_something = False
+        invalid_click = False 
+        
+        if hasattr(self, "music_menu"):
+            if self.music_menu.visible:
+                if self.music_menu.handle_mouse_click(pos, self._music_manager):
+                    self._music_manager.button_click_sound()
+                    return
+            else:
+                if self._screen == "login":
+                    result = self.login.handle_mouse_click(pos)
+                    self.input_active = result
+                    clicked_something = result
+                elif self._screen == "rooms_screen":
+                    result = self.rooms_screen.handle_mouse_click(pos)
+                    if isinstance(result, tuple):
+                        clicked_something, invalid_click = result
+                    else:
+                        clicked_something = result
+                elif self._screen == "waiting":
+                    result = self.waiting.handle_mouse_click(pos)
+                    if isinstance(result, tuple):
+                        clicked_something, invalid_click = result
+                    else:
+                        clicked_something = result
+                elif self._screen == "game":
+                    result = self.game.handle_mouse_click(pos)
+                    if isinstance(result, tuple):
+                        clicked_something, invalid_click = result
+                    else:
+                        clicked_something = result
 
-        handler = screen_handlers.get(self._screen)
-        if handler:
-            handler()
+                    if clicked_something and self._is_card_clicked(pos):
+                        return
+                elif self._screen == "reconnect_screen":
+                    result = self.reconnect_screen.handle_mouse_click(pos)
+                    if isinstance(result, tuple):
+                        clicked_something, invalid_click = result
+                    else:
+                        clicked_something = result
+                elif self._screen == "game_over":
+                    result = self.game_over.handle_mouse_click(pos)
+                    if isinstance(result, tuple):
+                        clicked_something, invalid_click = result
+                    else:
+                        clicked_something = result
+
+                if invalid_click:
+                    self._music_manager.invalid_click_sound()
+                elif clicked_something:
+                    self._music_manager.button_click_sound()
+
         volume_rect = None
-        if self._screen not in ["loading", "login", "game_screen"]:
+        if self._screen not in ["loading", "login"]:
             if self.screen in ["rooms_screen", "reconnect_screen", "game_over"]:
                 volume_rect = create_volume_button_rect(
                     self._width - 40, self._height - 40
                 )
             elif self.screen == "waiting":
                 volume_rect = create_volume_button_rect(50, 50)
+            elif self.screen == "game":
+                volume_rect = create_volume_button_rect(
+                    self._width - 65, self._height - 165
+                )
 
             if volume_rect and volume_rect.collidepoint(pos):
-                self.cycle_volume()
+                if hasattr(self, "music_menu"):
+                    self.music_menu.show(self._width, self._height)
+                self._music_manager.button_click_sound()
                 return
-
-    def cycle_volume(self) -> None:
-        """Hangerő ciklikus váltása"""
-        self.volume_level = (self.volume_level + 1) % 4
-
-        volume_values = {
-            0: 0.0, 
-            1: 0.02, 
-            2: 0.05, 
-            3: 0.1, 
-        }
-
         
-        if hasattr(self, "_music_manager"):
-            self._music_manager.set_volume(volume_values[self.volume_level])
-
+    def _is_card_clicked(self, pos: Tuple) -> bool:
+        if hasattr(self.game, 'kartya_poziciok'):
+            for rect, lap in self.game.kartya_poziciok:
+                if rect.collidepoint(pos):
+                    return True
+        return False         
+        
     def handle_mouse_motion(self, pos: Tuple) -> None:
+        if hasattr(self, "music_menu"):
+            self.music_menu.handle_mouse_motion(pos)
         if self._screen == "waiting":
             self.waiting.handle_mouse_motion(pos)
         elif self._screen == "rooms_screen":
@@ -364,6 +406,15 @@ class GameController:
             self.rooms_screen.handle_key_press(event)
 
     def draw_screen(self) -> None:
-        current_screen = self._screens.get(self._screen)
-        if current_screen and hasattr(current_screen, "draw"):
-            current_screen.draw()
+        """Módosított draw_screen metódus"""
+        if hasattr(self, "music_menu"):
+            if self.music_menu.visible:
+                self.music_menu.draw(self._window)
+            else:
+                current_screen = self._screens.get(self._screen)
+                if current_screen and hasattr(current_screen, "draw"):
+                    current_screen.draw()
+
+    def handle_mouse_release(self, pos: Tuple) -> None:
+        if hasattr(self, "music_menu"):
+            self.music_menu.handle_mouse_release(pos)

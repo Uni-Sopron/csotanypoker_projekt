@@ -35,6 +35,8 @@ from csotanypoker.client.drawing_helpers import (
     this_is_ai_name,
     wrap_text,
     preload_all_images,
+    create_volume_button_rect,
+    draw_sound_volume,
 )
 
 
@@ -670,10 +672,9 @@ class GameScreen(BaseScreen):
         self.rules_button = create_rules_button_rect(
             self.client.width, self.client.height
         )
-       
+
         current_game_id = getattr(self.client.game_state, "game_id", None)
         if current_game_id != self.last_game_id:
-     
             self._reset_local_selections()
             self.last_game_id = current_game_id
 
@@ -719,10 +720,13 @@ class GameScreen(BaseScreen):
         ):
             self.draw_center_card_area()
 
-        if self.client.game_state.active_player == self.client.user.username:
+        if (
+            self.client.game_state.active_player == self.client.user.username
+            and self.adott == False
+        ):
             self.draw_animal_table()
 
-        if targeted_player == self.client.user.username:
+        if targeted_player == self.client.user.username and self.adott == False:
             self.draw_tipp_area()
 
         if self.show_leave_button:
@@ -744,6 +748,15 @@ class GameScreen(BaseScreen):
                 ],
                 self.client.selected_room.max_player_count,
             )
+        volume_rect = create_volume_button_rect(
+            self.client.width - 65, self.client.height - 165
+        )
+        draw_sound_volume(
+            self.client.window,
+            volume_rect.centerx,
+            volume_rect.centery,
+            "sound",
+        )
         pygame.display.flip()
 
     def draw_opponent_players(self) -> None:
@@ -886,37 +899,37 @@ class GameScreen(BaseScreen):
 
     def handle_mouse_click(self, pos):
         if handle_logout_button_click(pos, self.logout_button, self.client.network):
-            return True
+            return (True, False)  
 
         if self.leave_button.collidepoint(pos) and self.show_leave_button:
             self.client.network.all_players_leave_room(
                 self.client.selected_room.room_id
             )
             self._reset_local_selections()
-            return True
+            return (True, False)
 
         if hasattr(self, "oke_button") and self.oke_button.collidepoint(pos):
             if self.client.game_state.active_player == self.client.user.username:
                 if self.show_leave_button is True:
                     self.client.message = "Várd meg míg minden játékos visszatér!"
                     self.client.message_display_time = 20
-                    return True
+                    return (False, True) 
 
                 if not self.client.passed:
                     if not self.local_question_card:
                         self.client.message = "Nincs kártya kiválasztva!"
                         self.client.message_display_time = 30
-                        return True
+                        return (False, True)  
 
                 if not self.local_targeted_player:
                     self.client.message = "Válassz egy játékost!"
                     self.client.message_display_time = 20
-                    return True
+                    return (False, True)  
 
                 if not self.local_active_animal:
                     self.client.message = "Válassz egy állatot!"
                     self.client.message_display_time = 20
-                    return True
+                    return (False, True) 
 
                 if self.adott == False:
                     self.client.game_state.question_card = self.local_question_card
@@ -929,6 +942,7 @@ class GameScreen(BaseScreen):
                     self.adott = True
 
                     self._reset_local_selections()
+                    return (True, False)  
 
         if hasattr(self, "pass_button") and self.pass_button.collidepoint(pos):
             if (
@@ -937,6 +951,7 @@ class GameScreen(BaseScreen):
             ):
                 self.client.passed = True
                 self.client.network.passing()
+                return (True, False)
 
         if (
             hasattr(self, "cross_rect")
@@ -948,6 +963,7 @@ class GameScreen(BaseScreen):
                 print("Cross button clicked - False answer")
                 self.adott = True
                 self.client.network.guess(False)
+                return (True, False)
 
         if (
             hasattr(self, "checkmark_rect")
@@ -959,6 +975,8 @@ class GameScreen(BaseScreen):
                 print("Checkmark button clicked - True answer")
                 self.adott = True
                 self.client.network.guess(True)
+                return (True, False)
+
 
         if hasattr(self, "opponent_player_rects"):
             for rect, player_name in self.opponent_player_rects:
@@ -977,6 +995,7 @@ class GameScreen(BaseScreen):
                             if clicked_user and not clicked_user.is_active:
                                 self.client.message = f"{player_name} játékos nem aktív. Várd meg amíg visszatér!"
                                 self.client.message_display_time = 30
+                                return (False, True)  
                             else:
                                 inactive_players = [
                                     user
@@ -989,56 +1008,66 @@ class GameScreen(BaseScreen):
                                         "Várd meg míg minden játékos visszatér!"
                                     )
                                     self.client.message_display_time = 30
-                            return True
+                                    return (
+                                        False,
+                                        True,
+                                    ) 
+
                         if player_name in self.client.game_state.visited_already:
                             self.client.message = (
                                 "Nála már volt ez a lap. Válassz másik játékost."
                             )
                             self.client.message_display_time = 30
-                            return True
-
+                            return (False, True) 
                         if self.local_targeted_player == player_name:
                             self.local_targeted_player = None
                         else:
                             self.local_targeted_player = player_name
 
-                        return True
+                        return (True, False)  
                     else:
                         self.client.message = "Nem te vagy soron"
                         self.client.message_display_time = 30
+                        return (False, True)  
 
         if hasattr(self, "animal_button_rects"):
             if self.client.game_state.active_player == self.client.user.username:
                 for animal_name, button_rect in self.animal_button_rects.items():
-                    if button_rect.collidepoint(pos) and self.adott == False:
-                        if self.local_active_animal == animal_name:
-                            self.local_active_animal = None
-                            self.active_animal = None
-                        else:
-                            self.local_active_animal = animal_name
-                            self.active_animal = animal_name
+                    if button_rect.collidepoint(pos):
+                        if self.adott == False:
+                            if self.local_active_animal == animal_name:
+                                self.local_active_animal = None
+                                self.active_animal = None
+                            else:
+                                self.local_active_animal = animal_name
+                                self.active_animal = animal_name
 
-                        return True
+                            return (True, False)  
+                        else:
+                            return (False, True)  
+
 
         for rect, lap in reversed(self.kartya_poziciok):
-            if self.client.passed:
-                print("Passzoltál ebben a körben.")
-                break
-            if self.adott:
-                print("Már adtál lapot ebben a körben.")
-                break
+            if rect.collidepoint(pos):
+                if self.client.passed:
+                    print("Passzoltál ebben a körben.")
+                    return (False, True) 
 
-            if rect.collidepoint(pos) and not self.client.passed:
+                if self.adott:
+                    print("Már adtál lapot ebben a körben.")
+                    return (False, True)  
+
                 if self.client.game_state.active_player == self.client.user.username:
                     self.local_question_card = lap if lap is not None else None
                     self.selected_card_frame = rect
-                    break
+                    self.client._music_manager.weapon_sound(lap.value)
+                    return (False, False) 
                 else:
                     self.client.message = "Nem te vagy soron"
                     self.client.message_display_time = 30
-                    return True
+                    return (False, True)  
 
-        return False
+        return (False, False)  
 
     def translate_animal_to_hungarian(self, animal_name: str) -> str:
         animal_translations = {

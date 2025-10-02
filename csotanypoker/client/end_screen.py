@@ -17,8 +17,8 @@ from csotanypoker.client.drawing_helpers import (
     draw_text,
     load_background,
     this_is_ai_name,
-    create_volume_button_rect,  
-    draw_music_volume,
+    create_volume_button_rect,
+    draw_sound_volume,
 )
 
 
@@ -32,7 +32,6 @@ class EndScreen(BaseScreen):
         self.pressed_elements = set()
         self.auto_leave_triggered = False
 
-    
         self._init_buttons()
 
     def _init_buttons(self):
@@ -52,7 +51,6 @@ class EndScreen(BaseScreen):
         if not mouse_pressed:
             self.pressed_elements.clear()
 
-     
         for button_name, button_rect in [
             ("leave", self.leave_button),
             ("rematch", self.rematch_button),
@@ -125,7 +123,6 @@ class EndScreen(BaseScreen):
     def draw(self) -> None:
         load_background(self.client.width, self.client.height, self.client.window)
 
-      
         self._init_buttons()
         self._update_button_states()
 
@@ -178,28 +175,39 @@ class EndScreen(BaseScreen):
         )
         self._draw_voters()
         self._draw_timer()
-        volume_rect = create_volume_button_rect(self.client.width - 40, self.client.height - 40)        
-        draw_music_volume(
+        volume_rect = create_volume_button_rect(
+            self.client.width - 40, self.client.height - 40
+        )
+        draw_sound_volume(
             self.client.window,
             volume_rect.centerx,
             volume_rect.centery,
-            self.client.volume_level,
+            "sound",
         )
 
     def auto_leave(self) -> None:
-        """Automatikus kilépés"""
         self.client.network.all_players_leave_room(self.client.selected_room.room_id)
 
     def handle_mouse_click(self, pos):
-        """Egér kattintások kezelése"""
+
         if self.leave_button.collidepoint(pos):
             self.client.network.all_players_leave_room(
                 self.client.selected_room.room_id
             )
+            return True
         elif self.rematch_button.collidepoint(pos):
             self.client.network.vote_rematch(
                 self.client.selected_room.room_id, self.client.user.username
             )
+            return True
+
+        volume_rect = create_volume_button_rect(
+            self.client.width - 40, self.client.height - 40
+        )
+        if volume_rect.collidepoint(pos):
+            return True
+
+        return False 
 
     def handle_key_press(self, event):
         pass

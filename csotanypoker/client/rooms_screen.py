@@ -25,8 +25,8 @@ from csotanypoker.client.drawing_helpers import (
     draw_logout_button,
     check_logout_button_interaction,
     handle_logout_button_click,
-    create_volume_button_rect,  
-    draw_music_volume,  
+    create_volume_button_rect,
+    draw_sound_volume,
 )
 
 
@@ -212,11 +212,11 @@ class RoomsScreen(BaseScreen):
 
         if hasattr(self, "search_input") and self.search_input.collidepoint(pos):
             self._activate_input("search")
-            return
+            return True
 
         if hasattr(self, "room_name_input") and self.room_name_input.collidepoint(pos):
             self._activate_input("room_name")
-            return
+            return True
 
         if (
             hasattr(self, "create_password_input")
@@ -224,7 +224,7 @@ class RoomsScreen(BaseScreen):
             and self.password_protected
         ):
             self._activate_input("password")
-            return
+            return  True
 
         if (
             hasattr(self, "join_password_input")
@@ -233,7 +233,7 @@ class RoomsScreen(BaseScreen):
             and self._get_selected_room().password_protected
         ):
             self._activate_input("join_password")
-            return
+            return True
 
         if hasattr(self, "max_count") and self.max_count.collidepoint(pos):
             self._activate_input("max_count")
@@ -242,24 +242,24 @@ class RoomsScreen(BaseScreen):
 
         if hasattr(self, "search_button") and self.search_button.collidepoint(pos):
             self.apply_filters()
-            return
+            return True
 
         if hasattr(self, "lock_button") and self.lock_button.collidepoint(pos):
             self.filter_state = (self.filter_state + 1) % 3
             self.apply_filters()
-            return
+            return True
 
         if hasattr(self, "password_checkbox") and self.password_checkbox.collidepoint(
             pos
         ):
             self.password_protected = not self.password_protected
-            return
+            return True
 
         if hasattr(self, "max_players_up") and self.max_players_up.collidepoint(pos):
             self._deactivate_inputs()
             if self.max_players < 6:
                 self.max_players += 1
-            return
+            return True
 
         if hasattr(self, "max_players_down") and self.max_players_down.collidepoint(
             pos
@@ -267,7 +267,7 @@ class RoomsScreen(BaseScreen):
             self._deactivate_inputs()
             if self.max_players > 2:
                 self.max_players -= 1
-            return
+            return True
 
         if hasattr(self, "join_button") and self.join_button.collidepoint(pos):
             if self._is_join_enabled(show_error=True):
@@ -277,7 +277,7 @@ class RoomsScreen(BaseScreen):
                 )
                 self.client.network.join_room(selected_room.room_id, password)
                 self.reset_create_room_form()
-            return
+            return  True
 
         if hasattr(self, "create_button") and self.create_button.collidepoint(pos):
             if self._is_create_enabled(show_error=True):
@@ -294,15 +294,15 @@ class RoomsScreen(BaseScreen):
                     password,
                 )
                 self.reset_create_room_form()
-            return
+            return True
 
         room_index = self._get_room_index_at_position(pos)
         if room_index is not None:
             self.selected_room_index = (
                 room_index if self.selected_room_index != room_index else None
             )
-            return
-
+            return True
+        return False
         self._handle_scroll_click(pos)
 
         self._deactivate_inputs()
@@ -529,11 +529,11 @@ class RoomsScreen(BaseScreen):
         volume_rect = create_volume_button_rect(
             self.client.width - 40, self.client.height - 40
         )
-        draw_music_volume(
+        draw_sound_volume(
             self.client.window,
             volume_rect.centerx,
             volume_rect.centery,
-            self.client.volume_level,
+            "sound",
         )
 
     def _setup_rects(self):
@@ -564,7 +564,6 @@ class RoomsScreen(BaseScreen):
         stats_x = 20
         stats_y = 10
 
-     
         draw_text(
             self.client.window,
             f"{self.client.user.username}",
@@ -602,7 +601,6 @@ class RoomsScreen(BaseScreen):
                 20,
             )
         else:
-          
             draw_text(
                 self.client.window,
                 "Játékok száma: ...",
@@ -776,7 +774,6 @@ class RoomsScreen(BaseScreen):
         )
 
         name_text = room.name
-       
 
         name_text = f"{room.name} ID: {room.room_id}"
 

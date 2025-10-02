@@ -175,19 +175,8 @@ def _get_font(
     return _font_cache[cache_key]
 
 
-
-
-
-def draw_music_volume(surface, x, y, volume_level):
-    volume_images = {
-        0: "volume0",  
-        1: "volume1",  
-        2: "volume2", 
-        3: "volume3",  
-    }
-
-    volume_image = load_image(volume_images[volume_level], "button", size=(50, 50))
-
+def draw_sound_volume(surface, x, y, type):
+    volume_image = load_image(type, "button", size=(60, 60))
 
     draw_image(surface, volume_image, x, y, centered=True)
 

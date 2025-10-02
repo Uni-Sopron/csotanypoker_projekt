@@ -175,19 +175,19 @@ class LoginScreen(BaseScreen):
     def handle_mouse_click(self, pos):
         if self.username_box.collidepoint(pos):
             self.active_field = "username"
-            return True
+            return True 
         elif self.password_box.collidepoint(pos):
             self.active_field = "password"
-            return True
+            return True 
         elif self.login_button.collidepoint(pos):
             self.handle_login()
-            return False
+            return True
         elif self.register_button.collidepoint(pos):
             self.handle_register()
-            return False
+            return True
         else:
             self.active_field = None
-            return False
+            return False  
 
     def handle_key_press(self, event):
         if not self.active_field:

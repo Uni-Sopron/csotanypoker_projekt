@@ -141,7 +141,6 @@ class NetworkManager:
 
                     self.get_user_stats(self.game_client.user.username)
 
-                    time.sleep(0.5)
                     if (
                         not hasattr(self.game_client, "room_list")
                         or self.game_client.room_list is None
@@ -187,6 +186,7 @@ class NetworkManager:
 
         @self.sio.on("joined_room")
         def on_joined_room(data: Dict[str, Any]) -> None:
+            self.game_client._music_manager.connect_sound()
             print(f"Joined room: {data}")
             with self._data_lock:
                 try:
@@ -219,6 +219,7 @@ class NetworkManager:
             print("=== GAME STARTING ===")
             with self._data_lock:
                 try:
+                    self.game_client._music_manager.start_game_sound()
                     player_list = data.get("players", [])
 
                     self.game_client.visible_player = None
@@ -265,10 +266,12 @@ class NetworkManager:
                 self.game_client.losing_player_name = None
 
                 if self.game_client.user.username == data["losing_player"]:
+                    self.game_client._music_manager.lose_sound()
                     self.game_client.game_over_message = "Vesztettél!"
 
                 else:
                     self.game_client.game_over_message = "Gratulálok! Nyertél!"
+                    self.game_client._music_manager.win_sound()
                     self.game_client.losing_player_name = data["losing_player"]
 
                 self.game_client.game_over.start_time = time.time()
@@ -300,6 +303,7 @@ class NetworkManager:
                         self.game_client.game_state.targeted_player = game_state.get(
                             "targeted_player"
                         )
+
                         self.game_client.game_state.question_card = game_state.get(
                             "question_card"
                         )
@@ -434,8 +438,7 @@ class NetworkManager:
                         and self.game_client.game_state
                     ):
                         self.game_client.screen = "game"
-                        # if self.game_client._screens["game"]:
-                        #     self.game_client._screens["game"]._reset_local_selections()
+                    
                     else:
                         print(
                             "Warning: Not switching to game screen due to missing data"
@@ -565,6 +568,7 @@ class NetworkManager:
 
         @self.sio.on("room_players_updated")
         def on_room_players_updated(data: Dict[str, Any]) -> None:
+            self.game_client._music_manager.connect_sound()
             with self._data_lock:
                 try:
                     room_data = data.get("room", {})
@@ -600,6 +604,7 @@ class NetworkManager:
 
         @self.sio.on("left_room")
         def on_left_room(data: Dict[str, str]) -> None:
+            self.game_client._music_manager.connect_sound()
             with self._data_lock:
                 print("Left room event received")
 
@@ -619,10 +624,12 @@ class NetworkManager:
                 self.game_client.users = []
                 if self.game_client._screens["game"]:
                     self.game_client._screens["game"]._reset_local_selections()
+                self.get_user_stats(self.game_client.user.username)
                 self.game_client.screen = "rooms_screen"
 
         @self.sio.on("player_left_room")
         def on_player_left_room(data: Dict[str, Any]) -> None:
+            self.game_client._music_manager.connect_sound()
             with self._data_lock:
                 try:
                     players_data = data.get("players", [])
@@ -652,7 +659,7 @@ class NetworkManager:
         def on_rejoin_waiting_success(data: Dict[str, Any]) -> None:
             with self._data_lock:
                 print("Sikeresen visszaléptél a váróterembe")
-
+                self.game_client._music_manager.connect_sound()
                 try:
                     players_data = data.get("players", [])
                     self.game_client.users = []
@@ -696,6 +703,7 @@ class NetworkManager:
         @self.sio.on("player_rejoined")
         def on_player_rejoined(data: Dict[str, Any]) -> None:
             with self._data_lock:
+                self.game_client._music_manager.connect_sound()
                 try:
                     username = data.get("rejoined_player", "")
                     if not username:
