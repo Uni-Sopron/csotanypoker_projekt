@@ -68,7 +68,6 @@ class GameState(AbstractGameState):
     )
     ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
 
-
     def __init__(self, **data):
         save_path = data.get("save_path")
         super().__init__(**data)
@@ -89,7 +88,6 @@ class GameState(AbstractGameState):
             from csotanypoker.server.ai_player import AIPlayer
 
             self.ai_player = AIPlayer()
-
 
         if save_path:
             directory = os.path.dirname(save_path)
@@ -117,7 +115,6 @@ class GameState(AbstractGameState):
 
             with open(self.save_path, "wb") as f:
                 pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
-            print(f"GameState saved successfully: {self.save_path}")
 
         except Exception as e:
             print(f"Error saving GameState to {self.save_path}: {e}")
@@ -146,9 +143,7 @@ class GameState(AbstractGameState):
             if game_state.voters is not None:
                 game_state.voters = AutoSavingSet(game_state.voters, game_state._save)
 
-            print(
-                f"GameState loaded successfully: {file_path}, room_id: {game_state.room_id}"
-            )
+           
             return game_state
 
         except Exception as e:

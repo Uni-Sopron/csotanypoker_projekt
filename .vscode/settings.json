@@ -5,6 +5,8 @@
         "--select", "E,F,W,C",    
         "--ignore", "E501,W503"  
     ],
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": []
    
 }

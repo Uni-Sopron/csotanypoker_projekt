@@ -139,13 +139,22 @@ class GameManager:
             unique_game_id = str(uuid.uuid4())
 
             try:
-                self.game_instances[room_id] = GameLogic(
-                    unique_game_id,
-                    [VisiblePlayer(username=str(user["username"])) for user in players],
+                print("Creating game instance...")
+                print(unique_game_id, players, room_id)
+                print(type(unique_game_id), type(players), type(room_id))
+                print(self.game_instances)
+                print("Creating GameLogic instance...")
+                self.game_instances[str(room_id)] = GameLogic(
+                    id=unique_game_id,
+                    players=[
+                        VisiblePlayer(username=str(user["username"]))
+                        for user in players
+                    ],
                     room_id=room_id,
                 )
+                print("Game instance created in memory")
                 game_instance = self.game_instances[room_id]
-
+                print("Game instance created")
                 db_game = DBGame(
                     game_id=unique_game_id,
                     game_status="run",
@@ -154,7 +163,7 @@ class GameManager:
                 )
                 db.add(db_game)
                 db.commit()
-
+                print(f"DBGame entry created with ID: {unique_game_id}")
                 for player in players:
                     username = (
                         player["username"] if isinstance(player, dict) else player
@@ -438,7 +447,9 @@ class GameManager:
             base_name = self._extract_ai_base_name(active_player_name)
 
             if base_name in AI_NAMES:
-                self.ai_activity(db, game_instance, room_id, True)
+              
+                self.ai_activity(db, game_instance, room_id, passing=True)
+
 
     def _reset_callback(self, db: Session, nextplayer, game_instance, room_id: str):
         game_instance.state.ai_player.reset_round(
@@ -480,7 +491,8 @@ class GameManager:
 
         try:
             active_player = game_instance.state.active_player
-
+            print(f"AI activity - passing: {passing}")
+            
             selected_card, target_player_name, statement = (
                 game_instance.state.ai_player.select_card_and_target(
                     game_instance.state.players,
@@ -492,7 +504,8 @@ class GameManager:
             )
 
             if selected_card is None or target_player_name is None:
-                self.ai_pass_internal(db, game_instance, room_id)
+                if passing:
+                    self.ai_guess(db, game_instance, room_id)
                 return
 
             ai_game_state = {
@@ -577,11 +590,17 @@ class GameManager:
 
         active_player = game_instance.state.active_player
         statement = active_player.statement
+        print(f"""EEEEZ{game_instance.state.active_player},
+            {game_instance.state.targeted_player},
+            {game_instance.state.players},
+            {game_instance.state.visited_already},
+            {statement}""")
 
         choice = game_instance.state.ai_player.make_guess_decision(
             game_instance.state.active_player,
             game_instance.state.targeted_player,
             game_instance.state.players,
+            game_instance.state.visited_already,
             statement,
         )
 
@@ -616,12 +635,12 @@ class GameManager:
             db, game_instance, room_id, hide_card_for_unvisited=False
         )
 
+  
         if self.room_manager.all_players_active_in_room(db, room_id):
             active_player_name = game_instance.state.active_player.username
             base_name = self._extract_ai_base_name(active_player_name)
             if base_name in AI_NAMES:
-                self.ai_activity(db, game_instance, room_id, True)
-
+                self.ai_activity(db, game_instance, room_id, passing=True)
     def handle_rejoin_game(self, db: Session, username: str, room_id: str) -> None:
         target_room = self.room_manager.get_room_by_id(db, room_id)
         if not target_room:
@@ -639,7 +658,11 @@ class GameManager:
                 room=room_id,
             )
             print("rejoin_game: Játék indul a szobában:", room_id)
-            self.start_game(db, player_usernames, room_id, reconnect=True)
+            players = []
+            for user in room_users:
+                players.append({"username": user.username, "is_active": user.is_active})
+
+            self.start_game(db, players, room_id, reconnect=True)
 
         self.resume_ai_activity_if_needed(db, room_id)
 
@@ -715,7 +738,7 @@ class GameManager:
                 if game.game_status == "run":
                     game.game_status = "end"
             db.commit()
-
+            
             self.start_game(db, players, room_id)
         else:
             self.socketio.emit(

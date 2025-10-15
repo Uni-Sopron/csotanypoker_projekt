@@ -88,187 +88,187 @@ class WaitingScreen(BaseScreen):
             self.hovered_elements.add("ai_player")
             if mouse_pressed:
                 self.pressed_elements.add("ai_player")
-
     def draw(self) -> None:
-        """
-        Draw the waiting screen.
-        """
+            """
+            Draw the waiting screen.
+            """
 
-        self.logout_button = create_logout_button_rect(self.client.height)
-        self.leave_button = pygame.Rect(
-            self.client.width // 2 - 140, self.client.height - 150, 350, 90
-        )
-        self.rules_button = create_rules_button_rect(
-            self.client.width, self.client.height
-        )
-
-        self._request_player_stats()
-
-        self._update_button_states()
-
-        load_background(self.client.width, self.client.height, self.client.window)
-
-        if self.client.selected_room is not None:
-            wrapped_text = wrap_text(
-                f"{self.client.room_name} {self.client.selected_room.player_count}/{self.client.selected_room.max_player_count}",
-                max_length=20,
+            self.logout_button = create_logout_button_rect(self.client.height)
+            self.leave_button = pygame.Rect(
+                self.client.width // 2 - 140, self.client.height - 150, 350, 90
             )
-            for i, line in enumerate(wrapped_text):
-                draw_text(
-                    self.client.window,
-                    line,
-                    DARK_GREEN,
-                    self.client.width // 2,
-                    self.margin + (i * 30),
-                    True,
-                    "bold",
-                    TITLE_FONT_SIZE,
+            self.rules_button = create_rules_button_rect(
+                self.client.width, self.client.height
+            )
+
+            self._request_player_stats()
+
+            self._update_button_states()
+
+            load_background(self.client.width, self.client.height, self.client.window)
+
+            wrapped_line_count = 1
+            if self.client.selected_room is not None:
+                wrapped_text = wrap_text(
+                    f"{self.client.room_name} {self.client.selected_room.player_count}/{self.client.selected_room.max_player_count}",
+                    max_length=20,
                 )
-            draw_text(
-                self.client.window,
-                f"ID:{self.client.selected_room.room_id}",
-                DARK_GREEN,
-                250,
-                50,
-                centered=True,
-                font="thin",
-                font_size=25,
-            )
-
-        draw_text(
-            self.client.window,
-            f"Várakozás a többi játékosra.",
-            DARK_GREEN,
-            self.client.width // 2,
-            self.margin + 50,
-            True,
-            "thin",
-            30,
-        )
-
-        start_y = self.client.height // 5
-        start_x = 200
-
-        for i, player in enumerate(self.client.users):
-            dot_color = GREEN if player.is_active else RED
-            pygame.draw.circle(
-                self.client.window,
-                dot_color,
-                (start_x - 70, start_y + 30),
-                17,
-            )
-
-            player_name = this_is_ai_name(player.username)
-
-            if self._is_ai_player(player.username):
-                player_display = player_name
-            else:
-                if (
-                    hasattr(self.client, "all_player_stats")
-                    and player.username in self.client.all_player_stats
-                ):
-                    stats = self.client.all_player_stats[player.username]
-                    won = stats["won_games"]
-                    total = stats["total_games"]
-                    player_display = f"{player_name} {won}/{total}"
-                else:
-                    player_display = f"{player_name} -/-"
-
-            draw_text(
-                self.client.window,
-                player_display,
-                DARK_GREEN,
-                start_x,
-                start_y,
-                font_size=50,
-            )
-            start_y += 70
-            if (
-                i == len(self.client.users) - 1
-                and len(self.client.users) < self.client.selected_room.max_player_count
-            ):
-                self.plus_button = pygame.Rect(start_x - 70, start_y + 7, 40, 40)
-                self.ai_player_button = pygame.Rect(start_x - 90, start_y, 400, 55)
-
-        if self.client.message and self.client.message_display_time > 0:
-            message_lines = wrap_text(self.client.message, 30)
-
-            for i, line in enumerate(message_lines):
+                wrapped_line_count = len(wrapped_text)
+                for i, line in enumerate(wrapped_text):
+                    draw_text(
+                        self.client.window,
+                        line,
+                        DARK_GREEN,
+                        self.client.width // 2,
+                        self.margin + (i * 40),
+                        True,
+                        "bold",
+                        TITLE_FONT_SIZE,
+                    )
                 draw_text(
                     self.client.window,
-                    line,
-                    RED,
-                    self.client.width - 200,
-                    50 + (i * 30),
+                    f"ID:{self.client.selected_room.room_id}",
+                    DARK_GREEN,
+                    250,
+                    50,
                     centered=True,
                     font="thin",
                     font_size=25,
                 )
 
-            self.client.message_display_time -= 1
+            draw_text(
+                self.client.window,
+                f"Várakozás a többi játékosra.",
+                DARK_GREEN,
+                self.client.width // 2,
+                self.margin + 50 + ((wrapped_line_count - 1) * 40),
+                True,
+                "thin",
+                30,
+            )
 
-        draw_button(
-            surface=self.client.window,
-            rect=self.leave_button,
-            text="Szoba elhagyása",
-            text_color=WHITE,
-            background_color=MIDDLE_GREEN,
-            border_color=DARK_GREEN,
-            font_size=35,
-            font_type="bold",
-            border_width=5,
-            is_hovered="leave" in self.hovered_elements,
-            is_pressed="leave" in self.pressed_elements,
-            hover_color=MIDDLE_GREEN_TRANSPARENT_90,
-            pressed_color=LIGHT_GREEN,
-        )
-        draw_logout_button(
-            self.client.window,
-            self.logout_button,
-            is_hovered="logout" in self.hovered_elements,
-            is_pressed="logout" in self.pressed_elements,
-        )
-        draw_rules_button(self.client.window, self.rules_button)
+            start_y = self.client.height // 5
+            start_x = 200
 
-        if (
-            self.client.selected_room
-            and len(self.client.users) < self.client.selected_room.max_player_count
-        ):
+            for i, player in enumerate(self.client.users):
+                dot_color = GREEN if player.is_active else RED
+                pygame.draw.circle(
+                    self.client.window,
+                    dot_color,
+                    (start_x - 70, start_y + 30),
+                    17,
+                )
+
+                player_name = this_is_ai_name(player.username)
+
+                if self._is_ai_player(player.username):
+                    player_display = player_name
+                else:
+                    if (
+                        hasattr(self.client, "all_player_stats")
+                        and player.username in self.client.all_player_stats
+                    ):
+                        stats = self.client.all_player_stats[player.username]
+                        won = stats["won_games"]
+                        total = stats["total_games"]
+                        player_display = f"{player_name} {won}/{total}"
+                    else:
+                        player_display = f"{player_name} -/-"
+
+                draw_text(
+                    self.client.window,
+                    player_display,
+                    DARK_GREEN,
+                    start_x,
+                    start_y,
+                    font_size=50,
+                )
+                start_y += 70
+                if (
+                    i == len(self.client.users) - 1
+                    and len(self.client.users) < self.client.selected_room.max_player_count
+                ):
+                    self.plus_button = pygame.Rect(start_x - 70, start_y + 7, 40, 40)
+                    self.ai_player_button = pygame.Rect(start_x - 90, start_y, 400, 55)
+
+            if self.client.message and self.client.message_display_time > 0:
+                message_lines = wrap_text(self.client.message, 30)
+
+                for i, line in enumerate(message_lines):
+                    draw_text(
+                        self.client.window,
+                        line,
+                        RED,
+                        self.client.width - 200,
+                        50 + (i * 30),
+                        centered=True,
+                        font="thin",
+                        font_size=25,
+                    )
+
+                self.client.message_display_time -= 1
+
             draw_button(
                 surface=self.client.window,
-                rect=self.ai_player_button,
-                text="AI játékos hozzáadása",
-                text_color=DARK_GREEN,
-                background_color=LIGHT_GREEN_TRANSPARENT,
-                border_color=MIDDLE_GREEN,
-                font_size=25,
-                font_type="thin",
-                border_width=3,
-                is_hovered="ai_player" in self.hovered_elements,
-                is_pressed="ai_player" in self.pressed_elements,
+                rect=self.leave_button,
+                text="Szoba elhagyása",
+                text_color=WHITE,
+                background_color=MIDDLE_GREEN,
+                border_color=DARK_GREEN,
+                font_size=35,
+                font_type="bold",
+                border_width=5,
+                is_hovered="leave" in self.hovered_elements,
+                is_pressed="leave" in self.pressed_elements,
                 hover_color=MIDDLE_GREEN_TRANSPARENT_90,
-                pressed_color=LIGHTER_GREEN,
+                pressed_color=LIGHT_GREEN,
             )
-            plus = load_image(
-                "plus", "button", size=(self.plus_button.width, self.plus_button.height)
-            )
-            draw_image(self.client.window, plus, self.plus_button.x, self.plus_button.y)
-
-        if self.show_rules:
-            draw_rules_popup(
+            draw_logout_button(
                 self.client.window,
-                self.client.width,
-                self.client.height,
-                JATEKSZABALY[
-                    "2" if self.client.selected_room.max_player_count == 2 else "3-6"
-                ],
-                self.client.selected_room.max_player_count,
+                self.logout_button,
+                is_hovered="logout" in self.hovered_elements,
+                is_pressed="logout" in self.pressed_elements,
             )
-        volume_rect = create_volume_button_rect(50, 50)
-        draw_sound_volume(
-            self.client.window, volume_rect.centerx, volume_rect.centery, "sound"
-        )
+            draw_rules_button(self.client.window, self.rules_button)
 
+            if (
+                self.client.selected_room
+                and len(self.client.users) < self.client.selected_room.max_player_count
+            ):
+                draw_button(
+                    surface=self.client.window,
+                    rect=self.ai_player_button,
+                    text="AI játékos hozzáadása",
+                    text_color=DARK_GREEN,
+                    background_color=LIGHT_GREEN_TRANSPARENT,
+                    border_color=MIDDLE_GREEN,
+                    font_size=25,
+                    font_type="thin",
+                    border_width=3,
+                    is_hovered="ai_player" in self.hovered_elements,
+                    is_pressed="ai_player" in self.pressed_elements,
+                    hover_color=MIDDLE_GREEN_TRANSPARENT_90,
+                    pressed_color=LIGHTER_GREEN,
+                )
+                plus = load_image(
+                    "plus", "button", size=(self.plus_button.width, self.plus_button.height)
+                )
+                draw_image(self.client.window, plus, self.plus_button.x, self.plus_button.y)
+
+            if self.show_rules:
+                draw_rules_popup(
+                    self.client.window,
+                    self.client.width,
+                    self.client.height,
+                    JATEKSZABALY[
+                        "2" if self.client.selected_room.max_player_count == 2 else "3-6"
+                    ],
+                    self.client.selected_room.max_player_count,
+                )
+            volume_rect = create_volume_button_rect(50, 50)
+            draw_sound_volume(
+                self.client.window, volume_rect.centerx, volume_rect.centery, "sound"
+            )
     def _request_player_stats(self):
         """Lekéri a játékosok statisztikáit - csak emberi játékosoknak"""
         if not hasattr(self.client, "users") or not self.client.users:

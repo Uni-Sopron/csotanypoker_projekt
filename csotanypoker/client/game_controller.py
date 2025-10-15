@@ -2,6 +2,7 @@ from typing import Any, List, Optional, Tuple, Dict
 import socket
 import subprocess
 import platform
+import threading
 
 import pygame
 
@@ -11,7 +12,7 @@ from csotanypoker.client.constans import FPS, SCREEN_WIDTH, SCREEN_HEIGHT
 from csotanypoker.client.end_screen import EndScreen
 from csotanypoker.client.game_screen import GameScreen
 from csotanypoker.client.loading_screen import LoadingScreen
-from csotanypoker.client.music_menü import MusicMenu
+from csotanypoker.client.music_menu import MusicMenu
 from csotanypoker.client.reconnect_screen import ReconnectScreen
 from csotanypoker.client.registration import LoginScreen
 from csotanypoker.client.rooms_screen import RoomsScreen
@@ -20,6 +21,7 @@ from csotanypoker.models.gamestate import ClientGameState
 from csotanypoker.models.player import OpponentPlayer, VisiblePlayer
 from csotanypoker.client.drawing_helpers import create_volume_button_rect
 from csotanypoker.client.music_managger import MusicManager
+from csotanypoker.client.credits_menu import CreditsMenu
 
 
 class GameController:
@@ -54,6 +56,10 @@ class GameController:
         self._music_manager = MusicManager()
         self._music_manager.start_background_music()
         self.music_menu = MusicMenu()
+        self.credits_menu = CreditsMenu()
+
+        self._connection_thread = None
+        self._connection_started = False
 
     def get_local_ip(self) -> str:
         """
@@ -273,18 +279,29 @@ class GameController:
                 self._width = width
                 self._height = height
 
+    def _connect_to_server_thread(self, server_url: str) -> None:
+        """Külön szálon fut a szerverhez való kapcsolódás"""
+        print(f"Kapcsolódás a szerverhez: {server_url}")
+        self._network.connect(server_url)
+
     def run(self) -> None:
         self.draw_screen()
-        pygame.display.update()
 
+  
         local_ip = self.get_local_ip()
         server_url = f"http://{local_ip}:5000"
-        print(f"Csatlakozás a szerverhez: {server_url}")
+        # server_url = "https://probaserver-production.up.railway.app"
 
-        self._network.connect(server_url)
+        if not self._connection_started:
+            self._connection_thread = threading.Thread(
+                target=self._connect_to_server_thread, args=(server_url,), daemon=True
+            )
+            self._connection_thread.start()
+            self._connection_started = True
 
         running: bool = True
         while running:
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -307,15 +324,25 @@ class GameController:
                     self.handle_mouse_release(event.pos)
 
             self.draw_screen()
-            pygame.display.update()
+            pygame.display.update()  
             self._clock.tick(FPS)
 
         self._network.disconnect()
         pygame.quit()
+
     def handle_mouse_click(self, pos: Tuple) -> None:
         clicked_something = False
-        invalid_click = False 
-        
+        invalid_click = False
+
+
+        if self.credits_menu.visible:
+            result = self.credits_menu.handle_mouse_click(pos)
+            if result is not None:
+                if result:
+                    self._music_manager.button_click_sound()
+                return
+
+    
         if hasattr(self, "music_menu"):
             if self.music_menu.visible:
                 if self.music_menu.handle_mouse_click(pos, self._music_manager):
@@ -383,17 +410,18 @@ class GameController:
                     self.music_menu.show(self._width, self._height)
                 self._music_manager.button_click_sound()
                 return
-        
+
     def _is_card_clicked(self, pos: Tuple) -> bool:
-        if hasattr(self.game, 'kartya_poziciok'):
+        if hasattr(self.game, "kartya_poziciok"):
             for rect, lap in self.game.kartya_poziciok:
                 if rect.collidepoint(pos):
                     return True
-        return False         
-        
+        return False
+
     def handle_mouse_motion(self, pos: Tuple) -> None:
         if hasattr(self, "music_menu"):
             self.music_menu.handle_mouse_motion(pos)
+
         if self._screen == "waiting":
             self.waiting.handle_mouse_motion(pos)
         elif self._screen == "rooms_screen":
@@ -408,7 +436,9 @@ class GameController:
     def draw_screen(self) -> None:
         """Módosított draw_screen metódus"""
         if hasattr(self, "music_menu"):
-            if self.music_menu.visible:
+            if self.credits_menu.visible:
+                self.credits_menu.draw(self._window)
+            elif self.music_menu.visible:
                 self.music_menu.draw(self._window)
             else:
                 current_screen = self._screens.get(self._screen)

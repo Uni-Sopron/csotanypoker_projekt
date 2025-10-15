@@ -1,12 +1,12 @@
-
 from typing import Optional
 import random
 from typing import Set
-from flask import Flask,  request, session
+from flask import Flask, request, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from sqlalchemy.orm import Session, sessionmaker
 from csotanypoker.models.animal import Animal
-
+from dotenv import load_dotenv  
+import os
 from csotanypoker.models.user import Client_User, AI_NAMES
 from csotanypoker.server.database import (
     engine,
@@ -17,8 +17,10 @@ from csotanypoker.server.database import (
 )
 from csotanypoker.server.room_manager import RoomManager
 from csotanypoker.server.game_manager import GameManager
+
 app = Flask(__name__)
-app.secret_key = "titkos_kulcs"  # Secret key needed for session handling
+load_dotenv()
+app.secret_key = os.getenv("SECRET_KEY", "titkos_kulcs")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 sockets = {}
@@ -27,6 +29,7 @@ game_instances = {}
 
 room_manager = RoomManager(socketio, sockets)
 game_manager = GameManager(socketio, sockets, room_manager)
+
 
 def weighted_random_choice(choices_weights):
     if not choices_weights:
@@ -40,7 +43,6 @@ def weighted_random_choice(choices_weights):
     return random.choices(choices, weights=weights)[0]
 
 
-
 def get_db_session():
     Session = sessionmaker(bind=engine)
     return Session()
@@ -51,12 +53,9 @@ def get_user_by_username(username: str) -> Optional[DBUser]:
         return db.query(DBUser).filter(DBUser.username == username).first()
 
 
-
-
 def all_players_active_in_room(room_id: str) -> bool:
     with get_db_session() as db:
         return room_manager.all_players_active_in_room(db, room_id)
-
 
 
 def get_rooms_data():
@@ -72,7 +71,9 @@ def validate_room_password(room_id: str, provided_password: str) -> bool:
 def remove_all_users_from_room(room_id: str, reconnecting: bool = False) -> None:
     with get_db_session() as db:
         current_username = session.get("username")
-        room_manager.remove_all_users_from_room(db, room_id, current_username, reconnecting)
+        room_manager.remove_all_users_from_room(
+            db, room_id, current_username, reconnecting
+        )
 
 
 @socketio.on("connect")
@@ -150,11 +151,9 @@ def handle_rejoin_game() -> None:
                 room=room_id,
             )
             print("rejoin_waiting_room: Játék indul a szobában:", room_id)
-            game_manager.start_game(db,player_usernames, room_id, reconnect=True)
+            game_manager.start_game(db, player_usernames, room_id, reconnect=True)
 
-        game_manager.resume_ai_activity_if_needed(db,room_id)
-
-
+        game_manager.resume_ai_activity_if_needed(db, room_id)
 
 
 @socketio.on("rejoin_waiting_room")
@@ -226,12 +225,12 @@ def handle_start_new_game(data: dict):
             if target_game:
                 game_instance = game_manager.get_game_instance(room_id)
                 if game_instance:
-                    game_manager.send_game_state_to_players(db,
-                        game_instance, room_id, hide_card_for_unvisited=True
+                    game_manager.send_game_state_to_players(
+                        db, game_instance, room_id, hide_card_for_unvisited=True
                     )
-                    game_manager.resume_ai_activity_if_needed(db,room_id)
+                    game_manager.resume_ai_activity_if_needed(db, room_id)
                     return
-            
+
             socketio.emit(
                 "start_game",
                 {"players": player_usernames},
@@ -239,7 +238,7 @@ def handle_start_new_game(data: dict):
             )
 
             print("rejoin_waiting_room: Játék indul a szobában:", room_id)
-            game_manager.start_game(db,player_usernames, room_id)
+            game_manager.start_game(db, player_usernames, room_id)
 
         room_manager.broadcast_room_list_update(db)
 
@@ -248,6 +247,7 @@ def handle_start_new_game(data: dict):
 def handle_all_players_leave_room(data) -> None:
     room_id = data["room_id"]
     remove_all_users_from_room(room_id, data.get("reconnecting", False))
+
 
 @socketio.on("vote_rematch")
 def handle_vote_rematch(data: dict) -> None:
@@ -266,7 +266,7 @@ def handle_vote_rematch(data: dict) -> None:
         if game_instance:
             game_instance.state.voters.add(username)
 
-        room_users = room_manager.get_room_users(db,room_id)
+        room_users = room_manager.get_room_users(db, room_id)
         if (
             len(game_instance.state.voters)
             + sum(
@@ -393,8 +393,6 @@ def user_counter(room_id) -> int:
         return len(users)
 
 
-
-
 def game_is_start(room_id: int) -> bool:
     with get_db_session() as db:
         running_game = (
@@ -403,10 +401,6 @@ def game_is_start(room_id: int) -> bool:
             .first()
         )
         return running_game is not None
-
-
-
-
 
 
 @socketio.on("logout")
@@ -452,6 +446,7 @@ def handle_logout(data) -> None:
     session.pop("username", None)
     session.pop("socket_id", None)
 
+
 @socketio.on("disconnect")
 def handle_disconnect() -> None:
     username = session.get("username")
@@ -487,11 +482,10 @@ def handle_disconnect() -> None:
     sockets.pop(username, None)
     session.pop("username", None)
     session.pop("socket_id", None)
-   
+
 
 @socketio.on("get_user_stats")
 def handle_get_user_stats(data: dict) -> None:
-   
     username = data.get("username")
     if not username:
         return
@@ -552,7 +546,7 @@ def handle_leave_room(data: dict) -> None:
 
         leave_room(room_id)
         emit("left_room", {"message": "Szoba elhagyás"})
-        
+
         users = room_manager.get_client_users_in_room(db, room_id)
 
         socketio.emit(
@@ -568,6 +562,7 @@ def handle_leave_room(data: dict) -> None:
 
         room_manager.broadcast_room_list_update(db)
 
+
 @socketio.on("create_room")
 def create_room(data: dict) -> None:
     username = session.get("username")
@@ -580,12 +575,11 @@ def create_room(data: dict) -> None:
             db,
             room_name=data["room_name"],
             max_player_count=data["max_player_count"],
-            password=password
+            password=password,
         )
 
         join_user_to_room(db_room.room_id, username, skip_password_check=True)
         room_manager.broadcast_room_list_update(db)
-
 
 
 @socketio.on("join_room")
@@ -599,10 +593,6 @@ def join_room_request(data: dict) -> None:
         join_user_to_room(room_id, username)
     else:
         emit("join_room_error", {"message": "Helytelen jelszó"}, to=request.sid)
-
-
-
-
 
 
 def join_user_to_room(
@@ -646,9 +636,8 @@ def join_user_to_room(
                 room=room_id,
             )
 
-            game_manager.start_game(db,players, room_id)
+            game_manager.start_game(db, players, room_id)
             room_manager.broadcast_room_list_update(db)
-
 
 
 def room_joined() -> None:
@@ -679,11 +668,10 @@ def room_joined() -> None:
             to=request.sid,
         )
 
+
 def get_user_room_id(username: str) -> Optional[str]:
     db_user = get_user_by_username(username)
     return db_user.current_room_id if db_user else None
-
-
 
 
 @socketio.on("oke_click")
@@ -739,15 +727,13 @@ def handle_oke_click(data: dict) -> None:
 
             game_instance.make_statement(statement)
 
-            game_manager.send_game_state_to_players(db,
-                game_instance, room_id, hide_card_for_unvisited=True
+            game_manager.send_game_state_to_players(
+                db, game_instance, room_id, hide_card_for_unvisited=True
             )
             if game_manager.is_ai_player(game_instance.state.targeted_player.username):
-                game_manager.ai_guess(db,game_instance, room_id)
+                game_manager.ai_guess(db, game_instance, room_id)
         except Exception as e:
             print(f"Error in handle_oke_click: {e}")
-
-
 
 
 @socketio.on("guess")
@@ -760,15 +746,15 @@ def handle_guess(data: dict) -> None:
         return
 
     guess = data["guess"]
-    game_manager.ai_handle_guess_internal(get_db_session(), guess, game_instance, room_id)
-
-
+    game_manager.ai_handle_guess_internal(
+        get_db_session(), guess, game_instance, room_id
+    )
 
 
 def send_game_state_to_all_players(game_instance, room_id, show_card=False):
     hide_card = not show_card
-    game_manager.send_game_state_to_players(get_db_session(),
-        game_instance, room_id, hide_card_for_unvisited=hide_card
+    game_manager.send_game_state_to_players(
+        get_db_session(), game_instance, room_id, hide_card_for_unvisited=hide_card
     )
 
 
@@ -794,8 +780,8 @@ def handle_pass() -> None:
             game_manager.game_end(room_id, db)
             return
 
-        game_manager.send_game_state_to_players(db,
-            game_instance, room_id, hide_card_for_unvisited=False
+        game_manager.send_game_state_to_players(
+            db, game_instance, room_id, hide_card_for_unvisited=False
         )
 
         if all_players_active_in_room(room_id):
@@ -803,8 +789,7 @@ def handle_pass() -> None:
             base_name = this_is_ai_name(active_player_name)
 
             if base_name in AI_NAMES:
-                game_manager.ai_activity(game_instance, room_id, True)
-
+                game_manager.ai_activity(db, game_instance, room_id, True)
 
 
 @socketio.on("add_ai_player")
@@ -847,11 +832,6 @@ def add_ai_player(data: dict) -> None:
             )
 
 
-
-
-
-
-
 def ai_pass(game_instance=None, room_id=None):
     game_manager.ai_pass_internal(get_db_session(), game_instance, room_id)
 
@@ -862,7 +842,6 @@ def this_is_ai_name(name: str) -> str:
             return ai_name
 
     return name
-
 
 
 def initialize_server_data():

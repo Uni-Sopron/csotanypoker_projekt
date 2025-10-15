@@ -10,28 +10,22 @@ class AIPlayer:
         self.trust_statement: Dict[str, Dict] = {}
 
     def calculate_seen_cards(self, players) -> Dict[Animal, int]:
-        
         seen_cards = {}
-        
+
         for player in players:
             for animal, count in player.cards_in_front.items():
                 if animal not in seen_cards:
                     seen_cards[animal] = 0
                 seen_cards[animal] += count
-        
+
         return seen_cards
 
     def calculate_target_weights(
         self, players, active_player_username: str
     ) -> Dict[str, float]:
-       
         weights = {}
 
-        other_players = [
-            p
-            for p in players
-            if p.username != active_player_username
-        ]
+        other_players = [p for p in players if p.username != active_player_username]
 
         for player in other_players:
             weight = 1.0
@@ -59,38 +53,29 @@ class AIPlayer:
         return weights
 
     def calculate_card_weights(
-        self, players, target_player_username: str, active_player
+        self,
+        active_player_cards_in_hand,
+        active_player_cards_in_front,
+        target_player_cards_in_front,
     ) -> Dict[Animal, float]:
-       
         weights = {}
 
-        target_player_obj = None
-        for player in players:
-            if player.username == target_player_username:
-                target_player_obj = player
-                break
-
-        if not target_player_obj:
-            for card in active_player.cards_in_hand:
-                weights[card] = 1.0
-            return weights
-
-        for card in active_player.cards_in_hand:
+        for card in active_player_cards_in_hand:
             weight = 1.0
 
-            cards_in_front = target_player_obj.cards_in_front.get(card, 0)
+            cards_in_front = target_player_cards_in_front.get(card, 0)
             if cards_in_front >= 3:
-                weight *= 8.0
+                weight *= 9.0
             elif cards_in_front >= 2:
                 weight *= 5.0
             elif cards_in_front >= 1:
                 weight *= 3.0
 
-            our_cards_in_front = active_player.cards_in_front.get(card, 0)
+            our_cards_in_front = active_player_cards_in_front.get(card, 0)
             if our_cards_in_front >= 3:
-                weight *= 0.30
-            elif our_cards_in_front >= 2:
                 weight *= 0.50
+            elif our_cards_in_front >= 2:
+                weight *= 0.70
 
             weights[card] = weight
 
@@ -99,7 +84,6 @@ class AIPlayer:
     def calculate_statement_strategy(
         self, players, selected_card: Animal, target_player_obj, active_player
     ) -> str:
-       
         weights = {}
         truth_weight = 2.0
 
@@ -143,7 +127,6 @@ class AIPlayer:
         return self._weighted_random_choice(weights)
 
     def calculate_trust_based_guess(self, active_player_name: str) -> Dict[str, float]:
-        
         if active_player_name not in self.trust_statement:
             return {"true": 1.0, "false": 1.0}
 
@@ -202,14 +185,24 @@ class AIPlayer:
 
         return weights
 
-    def make_guess_decision(self, active_player, targeted_player, players, statement: str) -> Optional[str]:
-        
-
+    def make_guess_decision(
+        self,
+        active_player,
+        targeted_player,
+        players,
+        visited_already: int,
+        statement: str,
+    ) -> Optional[str]:
         card_in_hand = sum(
             1 for card in targeted_player.cards_in_hand if card.value == statement
         )
 
-        weights = {"true": 1.0, "false": 2.0, "pass": 1.5}
+        weights = {"true": 1.0, "false": 2.5, "pass": 1.5}
+        if len(players) == 2 or len(visited_already) >= len(players) - 1:
+            weights["pass"] = 0
+            print(
+                f"Pass disabled: players={len(players)}, visited={len(visited_already)}"
+            )
 
         seen_cards = self.calculate_seen_cards(players)
 
@@ -220,25 +213,30 @@ class AIPlayer:
 
         remaining_cards = 8 - seen_count
 
+        trust_weights = self.calculate_trust_based_guess(active_player.username)
         if remaining_cards == 0:
-            weights["false"] *= 10.0
+            weights["false"] *= 13.0
             weights["true"] *= 0
+            weights["pass"] *= 0.1
         elif remaining_cards <= 2:
             weights["false"] *= 3.0
             weights["true"] *= 0.5
         elif remaining_cards >= 6:
             weights["true"] *= 1.5
 
-        trust_weights = self.calculate_trust_based_guess(active_player.username)
         weights["true"] *= trust_weights["true"]
         weights["false"] *= trust_weights["false"]
-
+        print("Guess weights:", weights)
         return self._weighted_random_choice(weights)
 
     def select_card_and_target(
-        self, players, question_card, visited_already, active_player, passing: bool = False
+        self,
+        players,
+        question_card,
+        visited_already,
+        active_player,
+        passing: bool = False,
     ) -> Tuple[Optional[Animal], Optional[str], Optional[str]]:
-      
         if not passing:
             safe_cards = []
             for card in active_player.cards_in_hand:
@@ -249,65 +247,57 @@ class AIPlayer:
             if not safe_cards:
                 return None, None, None
 
-        target_weights = self.calculate_target_weights(
-            players, active_player.username
-        )
+        target_weights = self.calculate_target_weights(players, active_player.username)
 
-        if not passing:
-            available_targets = {
-                name: weight
-                for name, weight in target_weights.items()
-                if name not in visited_already
-            }
-        else:
+        if passing:
+            print("Passing turn, filtering targets...")
             available_targets = {
                 name: weight
                 for name, weight in target_weights.items()
                 if name not in visited_already
             }
 
-        if not available_targets:
-            if not passing:
-                available_targets = target_weights
-            else:
+            if not available_targets:
                 return None, None, None
+        else:
+      
+            available_targets = {
+                name: weight
+                for name, weight in target_weights.items()
+                if name not in visited_already
+            }
 
         if not available_targets:
             return None, None, None
 
         target_player_name = self._weighted_random_choice(available_targets)
-
+        target_player_obj = [p for p in players if p.username == target_player_name][0]
         if not passing:
             card_weights = self.calculate_card_weights(
-                players, target_player_name, active_player
+                active_player.cards_in_hand,
+                active_player.cards_in_front,
+                target_player_obj.cards_in_front,
             )
-
             if max(card_weights.values()) < 0.1:
                 return None, None, None
 
             selected_card = self._weighted_random_choice(card_weights)
         else:
+            print("Passing turn, filtering targets2...")
             selected_card = question_card
             if not selected_card:
                 return None, None, None
-
-        target_player_obj = None
-        for player in players:
-            if player.username == target_player_name:
-                target_player_obj = player
-                break
 
         if not target_player_obj:
             return None, None, None
 
         statement = self.calculate_statement_strategy(
-           players, selected_card, target_player_obj, active_player
+            players, selected_card, target_player_obj, active_player
         )
 
         return selected_card, target_player_name, statement
 
     def update_guess_patterns(self, guesser_name: str, guess: bool):
-       
         if guesser_name not in self.guess_patterns:
             self.guess_patterns[guesser_name] = {
                 "true_guesses": 0,
@@ -343,7 +333,6 @@ class AIPlayer:
             pattern["recent_guesses"].pop(0)
 
     def update_truth_statement_memory(self, player_name: str, was_truthful: bool):
-
         if player_name not in self.trust_statement:
             self.trust_statement[player_name] = {
                 "truth_statements": 0,
@@ -379,11 +368,9 @@ class AIPlayer:
             pattern["recent_statements"].pop(0)
 
     def update_player_risks(self, player_name: str, risk_level: int):
-
         self.player_risks[player_name] = risk_level
 
     def process_guess(self, game_instance, guess: bool) -> Tuple[bool, any]:
-       
         guesser_name = game_instance.state.targeted_player.username
         active_player_name = game_instance.state.active_player.username
 
@@ -404,7 +391,6 @@ class AIPlayer:
         return was_truthful, nextplayer
 
     def reset_round(self, question_card, players):
-       
         if question_card:
             print("Adding seen card:", question_card)
 
@@ -418,7 +404,6 @@ class AIPlayer:
 
     @staticmethod
     def _weighted_random_choice(choices_weights: Dict[str, float]) -> Optional[str]:
-       
         if not choices_weights:
             return None
 
