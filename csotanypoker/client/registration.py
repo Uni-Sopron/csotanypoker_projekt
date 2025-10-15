@@ -32,14 +32,25 @@ class LoginScreen(BaseScreen):
         self.register_button_color = MIDDLE_GREEN
         self.input_border_color = MIDDLE_GREEN_TRANSPARENT_90
         self.active_input_color = MIDDLE_GREEN_TRANSPARENT_70
-
+       
         self.login_button_hovered = False
         self.register_button_hovered = False
         self.login_button_pressed = False
         self.register_button_pressed = False
+        
+        self.credits_button_hovered = False
+        self.credits_button_pressed = False
 
         self.input_padding = 15
         self.cursor_blink_interval = 400
+        self.cursor_visible = True
+        self.cursor_timer = pygame.time.get_ticks()
+       
+        self.username_box = None
+        self.password_box = None
+        self.login_button = None
+        self.register_button = None
+        self.credits_button = None
 
     def _update_cursor_state(self):
         current_time = pygame.time.get_ticks()
@@ -59,20 +70,32 @@ class LoginScreen(BaseScreen):
         self.register_button = pygame.Rect(
             center_x + 30, self.client.height // 2, 220, 85
         )
+        
+        credits_width = 180
+        credits_height = 50
+        credits_y = self.register_button.bottom + 20
+        self.credits_button = pygame.Rect(
+            center_x - credits_width // 2,
+            credits_y,
+            credits_width,
+            credits_height,
+        )
 
     def _update_button_states(self):
         mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
 
-        self.login_button_hovered = self.login_button.collidepoint(mouse_pos)
-        self.register_button_hovered = self.register_button.collidepoint(mouse_pos)
+        self.login_button_hovered = self.login_button.collidepoint(mouse_pos) if self.login_button else False
+        self.register_button_hovered = self.register_button.collidepoint(mouse_pos) if self.register_button else False
+        self.credits_button_hovered = self.credits_button.collidepoint(mouse_pos) if self.credits_button else False
 
         self.login_button_pressed = self.login_button_hovered and mouse_pressed
         self.register_button_pressed = self.register_button_hovered and mouse_pressed
+        self.credits_button_pressed = self.credits_button_hovered and mouse_pressed
 
     def _draw_error_message(self):
         if self.client.message and self.client.message_display_time > 0:
-            error_y = self.register_button.bottom + 150
+            error_y = self.credits_button.bottom + 80 if self.credits_button else self.client.height - 100
             draw_text(
                 self.client.window,
                 self.client.message,
@@ -88,6 +111,7 @@ class LoginScreen(BaseScreen):
     def draw(self):
         self._calculate_ui_rects()
         self._update_button_states()
+        self._update_cursor_state()
 
         load_background(
             self.client.width, self.client.height, self.client.window, type="background"
@@ -170,24 +194,44 @@ class LoginScreen(BaseScreen):
             pressed_color=LIGHT_GREEN,
         )
 
+        draw_button(
+            surface=self.client.window,
+            rect=self.credits_button,
+            text="Készítők",
+            text_color=WHITE,
+            background_color=DARK_GREEN,
+            border_color=DARK_GREEN,
+            font_size=25,
+            font_type="bold",
+            border_width=5,
+            is_hovered=self.credits_button_hovered,
+            is_pressed=self.credits_button_pressed,
+            hover_color=MIDDLE_GREEN,
+            pressed_color=LIGHT_GREEN,
+        )
+
         self._draw_error_message()
 
     def handle_mouse_click(self, pos):
-        if self.username_box.collidepoint(pos):
+        if self.username_box and self.username_box.collidepoint(pos):
             self.active_field = "username"
-            return True 
-        elif self.password_box.collidepoint(pos):
+            return True
+        elif self.password_box and self.password_box.collidepoint(pos):
             self.active_field = "password"
-            return True 
-        elif self.login_button.collidepoint(pos):
+            return True
+        elif self.login_button and self.login_button.collidepoint(pos):
             self.handle_login()
             return True
-        elif self.register_button.collidepoint(pos):
+        elif self.register_button and self.register_button.collidepoint(pos):
             self.handle_register()
+            return True
+        elif self.credits_button and self.credits_button.collidepoint(pos):
+            print("Credits button clicked")
+            self.client.credits_menu.show(self.client.width, self.client.height)
             return True
         else:
             self.active_field = None
-            return False  
+            return False
 
     def handle_key_press(self, event):
         if not self.active_field:

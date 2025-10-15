@@ -4,7 +4,7 @@ from typing import Dict
 
 class MusicManager:
     def __init__(
-        self, music_file: str = "csotanypoker/client/music/background_music.mp3"
+        self, music_file: str = "csotanypoker/client/music/samurai-heart-290878.mp3"
     ) -> None:
         pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
         pygame.mixer.init()
@@ -23,13 +23,10 @@ class MusicManager:
         pygame.mixer.music.set_volume(self.music_volume)
 
     def _load_sounds(self) -> None:
-
         sound_files = {
-            "start_game": "csotanypoker/client/music/start_game.mp3",
-            "end_game": "csotanypoker/client/music/end_game.mp3",
-            "win_game": "csotanypoker/client/music/win_game.mp3",
-            "lose_game": "csotanypoker/client/music/lose_game.mp3",
-            "card_sound": "csotanypoker/client/music/card_sound.mp3",
+            "start_game": "csotanypoker/client/music/game-start-317318.mp3",
+            "win_game": "csotanypoker/client/music/brass-144755.mp3",
+            "lose_game": "csotanypoker/client/music/fail-144746.mp3",
             "button_click": "csotanypoker/client/music/zapsplat_multimedia_button_click_bright_002_92099.mp3",
             "invalid_click": "csotanypoker/client/music/zapsplat_multimedia_error_incorrect_buzz_73714.mp3",
             "rat_weapon": "csotanypoker/client/music/sword-blade-slicing-flesh-352708.mp3",
@@ -51,9 +48,10 @@ class MusicManager:
                 self.sounds[sound_name] = sound
             except pygame.error as e:
                 print(f"Nem sikerült betölteni a hangfájlt {file_path}: {e}")
+
     def connect_sound(self) -> None:
         self._play_sound("join")
-    
+
     def _play_sound(self, sound_name: str) -> None:
         if self.sound_effects_enabled and sound_name in self.sounds:
             self.sounds[sound_name].play()
@@ -64,17 +62,11 @@ class MusicManager:
     def start_game_sound(self) -> None:
         self._play_sound("start_game")
 
-    def end_game_sound(self) -> None:
-        self._play_sound("end_game")
-
     def win_sound(self) -> None:
         self._play_sound("win_game")
 
     def lose_sound(self) -> None:
         self._play_sound("lose_game")
-
-    def card_sound(self) -> None:
-        self._play_sound("card_sound")
 
     def button_click_sound(self) -> None:
         self._play_sound("button_click")

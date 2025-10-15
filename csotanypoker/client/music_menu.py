@@ -17,8 +17,8 @@ from csotanypoker.client.constans import (
 class MusicMenu:
     def __init__(self):
         self.visible = False
-        self.music_volume = 5
-        self.sound_effects_volume = 8
+        self.music_volume = 2
+        self.sound_effects_volume = 1
         self.dragging_music = False
         self.dragging_sound = False
         self.menu_rect = None
@@ -255,7 +255,7 @@ class MusicMenu:
             if music_manager:
                 sound_vol = self.sound_effects_volume / 10
                 music_manager.set_sound_effects_volume(sound_vol)
-                music_manager.card_sound()
+                music_manager.button_click_sound()
 
     def _apply_settings(self, music_manager):
         music_vol = (self.music_volume / 10) * 0.1
