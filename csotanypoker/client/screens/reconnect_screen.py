@@ -1,14 +1,14 @@
 import pygame
 
-from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import DARK_GREEN, LIGHT_GREEN, MIDDLE_GREEN, WHITE
-from csotanypoker.client.drawing_helpers import (
+from csotanypoker.client.screens.base_screen import BaseScreen
+from csotanypoker.client.drawing_helpers.constans import DARK_GREEN, LIGHT_GREEN, MIDDLE_GREEN, WHITE
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
     draw_button,
     draw_text,
-    load_background,
     create_volume_button_rect,
     draw_sound_volume,
 )
+from csotanypoker.client.drawing_helpers.image_manager import load_background
 
 
 class ReconnectScreen(BaseScreen):

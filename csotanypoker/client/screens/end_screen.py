@@ -1,8 +1,8 @@
 import pygame
 import time
 
-from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (
+from csotanypoker.client.screens.base_screen import BaseScreen
+from csotanypoker.client.drawing_helpers.constans import (
     DARK_GREEN,
     LIGHT_GREEN,
     MIDDLE_GREEN,
@@ -11,16 +11,15 @@ from csotanypoker.client.constans import (
     WHITE,
 )
 
-from csotanypoker.client.drawing_helpers import (
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
     _draw_rounded_rect,
     draw_button,
     draw_text,
-    load_background,
-    this_is_ai_name,
     create_volume_button_rect,
     draw_sound_volume,
 )
-
+from csotanypoker.client.drawing_helpers.image_manager import load_background
+from csotanypoker.models.user import this_is_ai_name
 
 class EndScreen(BaseScreen):
     def __init__(self, client) -> None:

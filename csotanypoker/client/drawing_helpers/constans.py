@@ -19,7 +19,7 @@ TITLE_FONT_SIZE = 60
 
 SCREEN_WIDTH = 1520
 SCREEN_HEIGHT = 780
-FPS = 5
+FPS = 30
 
 # Színek
 
@@ -81,3 +81,21 @@ Ha valaki tippel és eltalálja, a feladó kapja vissza a kártyát, ha nem, a t
 Vesztesz, ha összegyűlik 4 ugyanolyan kártya előtted vagy elfogynak a kártyáid.
 """,
 }
+MUSIC_CREDITS_TEXT = """
+        samurai-heart-290878: Music by H Tb HEON from Pixabay
+        giant-fall-impact-352446: Sound Effect by Universfield from Pixabay
+        ground-impact-352053: Sound Effect by Universfield from Pixabay
+        interface-124464: Sound Effect by Universfield from Pixabay
+        game-start-317318: Sound Effect by FoxBoyTails from Pixabay
+        fail-144746: Sound Effect by Universfield from Pixabay
+        steel-chain-dragged-shower-reverb-106252: Sound Effect by freesound_community from Pixabay
+        swoosh-142322: Sound Effect by Universfield from Pixabay
+        sword-slice-393847: Sound Effect by DRAGON-STUDIO from Pixabay
+        sword-blade-slicing-flesh-352708: Sound Effect by Universfield from Pixabay
+        brass-144755: Sound Effect by Universfield from Pixabay
+        foley_walkers_suriken+3: Sound Effect by Foley Walkers from ZapSplat
+        zapsplat_multimedia_button_click_bright_002_92099: Sound Effect by ZapSplat
+        zapsplat_multimedia_error_incorrect_buzz_73714: Sound Effect by ZapSplat
+        zapsplat_warfare_throwing_star_throw_spin_hit_person_squelch_blood_20926: Sound Effect by ZapSplat
+        
+        """

@@ -1,7 +1,7 @@
 import pygame
 
-from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import (
+from csotanypoker.client.screens.base_screen import BaseScreen
+from csotanypoker.client.drawing_helpers.constans import (
     RED,
     WHITE,
     DARK_GREEN,
@@ -10,14 +10,13 @@ from csotanypoker.client.constans import (
     MIDDLE_GREEN_TRANSPARENT_90,
     MIDDLE_GREEN,
 )
-from csotanypoker.client.drawing_helpers import (
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
     draw_text,
-    load_background,
     draw_input_box,
-    validate_text_input,
     draw_button,
-    this_is_ai_name,
+    validate_text_input,
 )
+from csotanypoker.client.drawing_helpers.image_manager import load_background
 from csotanypoker.models.user import AI_NAMES
 
 
@@ -32,12 +31,12 @@ class LoginScreen(BaseScreen):
         self.register_button_color = MIDDLE_GREEN
         self.input_border_color = MIDDLE_GREEN_TRANSPARENT_90
         self.active_input_color = MIDDLE_GREEN_TRANSPARENT_70
-       
+
         self.login_button_hovered = False
         self.register_button_hovered = False
         self.login_button_pressed = False
         self.register_button_pressed = False
-        
+
         self.credits_button_hovered = False
         self.credits_button_pressed = False
 
@@ -45,7 +44,9 @@ class LoginScreen(BaseScreen):
         self.cursor_blink_interval = 400
         self.cursor_visible = True
         self.cursor_timer = pygame.time.get_ticks()
-       
+
+        self.username_cursor_pos = 0
+        self.password_cursor_pos = 0
         self.username_box = None
         self.password_box = None
         self.login_button = None
@@ -70,7 +71,7 @@ class LoginScreen(BaseScreen):
         self.register_button = pygame.Rect(
             center_x + 30, self.client.height // 2, 220, 85
         )
-        
+
         credits_width = 180
         credits_height = 50
         credits_y = self.register_button.bottom + 20
@@ -85,9 +86,19 @@ class LoginScreen(BaseScreen):
         mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
 
-        self.login_button_hovered = self.login_button.collidepoint(mouse_pos) if self.login_button else False
-        self.register_button_hovered = self.register_button.collidepoint(mouse_pos) if self.register_button else False
-        self.credits_button_hovered = self.credits_button.collidepoint(mouse_pos) if self.credits_button else False
+        self.login_button_hovered = (
+            self.login_button.collidepoint(mouse_pos) if self.login_button else False
+        )
+        self.register_button_hovered = (
+            self.register_button.collidepoint(mouse_pos)
+            if self.register_button
+            else False
+        )
+        self.credits_button_hovered = (
+            self.credits_button.collidepoint(mouse_pos)
+            if self.credits_button
+            else False
+        )
 
         self.login_button_pressed = self.login_button_hovered and mouse_pressed
         self.register_button_pressed = self.register_button_hovered and mouse_pressed
@@ -95,7 +106,11 @@ class LoginScreen(BaseScreen):
 
     def _draw_error_message(self):
         if self.client.message and self.client.message_display_time > 0:
-            error_y = self.credits_button.bottom + 80 if self.credits_button else self.client.height - 100
+            error_y = (
+                self.credits_button.bottom + 80
+                if self.credits_button
+                else self.client.height - 100
+            )
             draw_text(
                 self.client.window,
                 self.client.message,
@@ -161,7 +176,6 @@ class LoginScreen(BaseScreen):
             placeholder="Jelszó",
             placeholder_color=WHITE,
         )
-
         draw_button(
             surface=self.client.window,
             rect=self.login_button,
@@ -226,7 +240,6 @@ class LoginScreen(BaseScreen):
             self.handle_register()
             return True
         elif self.credits_button and self.credits_button.collidepoint(pos):
-            print("Credits button clicked")
             self.client.credits_menu.show(self.client.width, self.client.height)
             return True
         else:
@@ -281,7 +294,10 @@ class LoginScreen(BaseScreen):
         if not self.password_text.strip():
             self.set_error("A jelszó nem lehet üres!")
             return
-        if this_is_ai_name(self.username_text.strip()) in AI_NAMES:
+        username = self.username_text.strip().lower()
+        ai_names_lower = [name.lower() for name in AI_NAMES]
+
+        if any(ai_name in username for ai_name in ai_names_lower):
             self.set_error("Az AI nevek nem használhatók felhasználónévként!")
             return
 
@@ -293,6 +309,12 @@ class LoginScreen(BaseScreen):
             return
         elif not self.password_text.strip():
             self.set_error("A jelszó nem lehet üres!")
+            return
+        username = self.username_text.strip().lower()
+        ai_names_lower = [name.lower() for name in AI_NAMES]
+
+        if any(ai_name in username for ai_name in ai_names_lower):
+            self.set_error("Az AI nevek nem használhatók felhasználónévként!")
             return
 
         self.client.network.register(self.username_text.strip(), self.password_text)

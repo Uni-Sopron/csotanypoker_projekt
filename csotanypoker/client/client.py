@@ -1,11 +1,11 @@
 import time
 from typing import Any, Dict, List
 import socketio
-from csotanypoker.client.drawing_helpers import this_is_ai_name
+
 from csotanypoker.models.animal import Animal
 from csotanypoker.models.player import OpponentPlayer, VisiblePlayer
 from csotanypoker.models.room import Room
-from csotanypoker.models.user import Client_User
+from csotanypoker.models.user import Client_User, this_is_ai_name
 import threading
 
 
@@ -25,17 +25,6 @@ class NetworkManager:
             """Connection event handler."""
             with self._data_lock:
                 self.game_client.screen = "login"
-
-        @self.sio.event
-        def disconnect() -> None:
-            """Disconnection event handler."""
-            print("Disconnected from server")
-
-        @self.sio.on("ai_player_add_error")
-        def on_ai_player_add_error(data: Dict[str, Any]) -> None:
-            with self._data_lock:
-                self.game_client.message = data.get("message", "AI hozzáadási hiba")
-                self.game_client.message_display_time = 30.0
 
         @self.sio.on("reconnect_offer")
         def on_reconnect_offer(data: Dict[str, Any]) -> None:
@@ -133,7 +122,7 @@ class NetworkManager:
                 try:
                     self.game_client.user = None
                     user_data = data.get("user", {})
-                    print(f"Login success, user data: {user_data}")
+                   
                     self.game_client.user = Client_User(
                         username=user_data.get("username", ""),
                         is_active=user_data.get("is_active", True),
@@ -187,7 +176,6 @@ class NetworkManager:
         @self.sio.on("joined_room")
         def on_joined_room(data: Dict[str, Any]) -> None:
             self.game_client._music_manager.connect_sound()
-            print(f"Joined room: {data}")
             with self._data_lock:
                 try:
                     self.game_client.room_id = data.get("room_id")
@@ -216,7 +204,6 @@ class NetworkManager:
 
         @self.sio.on("start_game")
         def on_start_game(data: Dict[str, List[str]]) -> None:
-            print("=== GAME STARTING ===")
             with self._data_lock:
                 try:
                     self.game_client._music_manager.start_game_sound()
@@ -237,12 +224,10 @@ class NetworkManager:
                             continue
 
                         if self.game_client.user.username == player_username:
-                            print(f"Setting up my player: {player_username}")
                             self.game_client.visible_player = VisiblePlayer(
                                 username=player_username,
                             )
                         else:
-                            print(f"Adding opponent: {player_username}")
                             self.game_client.opponent_players.append(
                                 OpponentPlayer(
                                     username=player_username,
@@ -279,7 +264,6 @@ class NetworkManager:
 
         @self.sio.on("Game_state")
         def on_game_state(data: Dict[str, Any]) -> None:
-            """Thread-safe game state update with comprehensive error handling."""
             with self._data_lock:
                 if self._update_in_progress:
                     print("Update already in progress, skipping...")
@@ -307,10 +291,6 @@ class NetworkManager:
                         self.game_client.game_state.question_card = game_state.get(
                             "question_card"
                         )
-                        print(
-                            "a szerver visited_already:",
-                            game_state.get("visited_already"),
-                        )
 
                         visited_already_data = game_state.get("visited_already", [])
                         if isinstance(visited_already_data, list):
@@ -331,7 +311,6 @@ class NetworkManager:
                         cards_in_hand_data = visible_player_data.get(
                             "cards_in_hand", []
                         )
-                        print(f"cards_in_hand_data: {cards_in_hand_data}")
                         if isinstance(cards_in_hand_data, list):
                             for card_name in cards_in_hand_data:
                                 if card_name and isinstance(card_name, str):
@@ -383,8 +362,7 @@ class NetworkManager:
                                     print("Warning: Opponent without username")
                                     continue
 
-                                print(f"Processing opponent: {username}")
-
+                              
                                 opponent_cards_in_front = {}
                                 cards_in_front_data = opponent_data.get(
                                     "cards_in_front", {}
@@ -417,10 +395,6 @@ class NetworkManager:
                                     card_count_int=int(
                                         opponent_data.get("card_count_int", 0)
                                     ),
-                                )
-
-                                print(
-                                    f"Opponent player: {opponent.username}, Cards in front: {len(opponent.cards_in_front)}, Card count: {opponent.card_count_int}"
                                 )
                                 new_opponent_players.append(opponent)
 
@@ -546,17 +520,12 @@ class NetworkManager:
                                     player_count=player_count,
                                 )
                                 new_room_list.append(room)
-                                print(f"Room created: {room.name}, {room.player_count}")
-
+                                
                             except Exception as e:
                                 print(f"Error creating room object for {room_id}: {e}")
                                 continue
 
                         self.game_client.room_list = new_room_list
-                        print(f"Room list updated with {len(new_room_list)} rooms")
-                    else:
-                        print("Rooms data unchanged, skipping update")
-
                 except Exception as e:
                     print(f"Critical error in rooms_updated handler: {e}")
 
@@ -606,8 +575,6 @@ class NetworkManager:
         def on_left_room(data: Dict[str, str]) -> None:
             self.game_client._music_manager.connect_sound()
             with self._data_lock:
-                print("Left room event received")
-
                 if self.game_client.screen == "reconnect_screen":
                     self.game_client.message = (
                         "A szoba közben megszünt. Szoba elhagyása"
@@ -623,7 +590,7 @@ class NetworkManager:
                 self.game_client.room_name = None
                 self.game_client.users = []
                 if self.game_client._screens["game"]:
-                    self.game_client._screens["game"]._reset_local_selections()
+                    self.game_client._screens["game"].state_manager.reset_local_selections()
                 self.get_user_stats(self.game_client.user.username)
                 self.game_client.screen = "rooms_screen"
 
@@ -658,7 +625,6 @@ class NetworkManager:
         @self.sio.on("rejoin_waiting_success")
         def on_rejoin_waiting_success(data: Dict[str, Any]) -> None:
             with self._data_lock:
-                print("Sikeresen visszaléptél a váróterembe")
                 self.game_client._music_manager.connect_sound()
                 try:
                     players_data = data.get("players", [])
@@ -689,14 +655,11 @@ class NetworkManager:
         @self.sio.on("rematch_vote_received")
         def on_vote_rematch(data: Dict[str, Any]) -> None:
             with self._data_lock:
-                print("BELEPETT a rematch_vote_received eseménybe")
-
                 try:
                     if self.game_client.game_state:
                         voters_data = data.get("voters", [])
                         if isinstance(voters_data, list):
                             self.game_client.game_state.voters = set(voters_data)
-                        print(f"Voters updated: {self.game_client.game_state.voters}")
                 except Exception as e:
                     print(f"Error in rematch_vote_received: {e}")
 
@@ -727,11 +690,6 @@ class NetworkManager:
                 except Exception as e:
                     print(f"Error in player_rejoined: {e}")
 
-        @self.sio.on("ai_player_add_success")
-        def on_ai_player_added(data: Dict[str, Any]) -> None:
-            with self._data_lock:
-                self.game_client.message = "AI játékos sikeresen hozzáadva"
-            self.game_client.message_display_time = 30.0
 
         @self.sio.on("user_stats")
         def on_user_stats(data: Dict[str, Any]) -> None:
@@ -760,9 +718,9 @@ class NetworkManager:
                     print(f"Error in user_stats handler: {e}")
 
     def get_user_stats(self, username: str) -> None:
-        """Felhasználó statisztikáinak lekérése"""
         self.sio.emit("get_user_stats", {"username": username})
-
+    def remove_ai_player(self, ai_username: str) -> None:
+        self.sio.emit("leave_room", {"username": ai_username, "reconnecting": False})
     def logout(self) -> None:
         with self._data_lock:
             if self.game_client.user and hasattr(self.game_client.user, "username"):
@@ -782,9 +740,6 @@ class NetworkManager:
                     "add_ai_player", {"room_id": self.game_client.selected_room.room_id}
                 )
 
-    def disconnect(self) -> None:
-        self.sio.disconnect()
-
     def vote_rematch(self, room_id: str, username: str) -> None:
         self.sio.emit("vote_rematch", {"room_id": room_id, "username": username})
 
@@ -794,16 +749,9 @@ class NetworkManager:
         )
 
     def rejoin_waiting_room(self) -> None:
-        """
-        Send a request to rejoin the waiting room after game ends.
-        """
 
         self.sio.emit(
             "rejoin_waiting_room",
-            {
-                "username": self.game_client.user.username,
-                "room_id": self.game_client.room_id,
-            },
         )
 
     def leave_room(self, reconnecting=False) -> None:
@@ -822,9 +770,7 @@ class NetworkManager:
 
         while self.game_client.screen == "loading":
             try:
-                print(f"Connecting to server at {server_url}...")
                 self.sio.connect(server_url)
-                print("Connected to server")
                 break
             except Exception as e:
                 print(f"Error connecting to server: {e}")

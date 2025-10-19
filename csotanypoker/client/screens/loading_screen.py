@@ -1,6 +1,7 @@
-from csotanypoker.client.base_screen import BaseScreen
-from csotanypoker.client.constans import DARK_GREEN
-from csotanypoker.client.drawing_helpers import draw_text, load_background
+from csotanypoker.client.screens.base_screen import BaseScreen
+from csotanypoker.client.drawing_helpers.constans import DARK_GREEN
+from csotanypoker.client.drawing_helpers.drawing_helpers import draw_text
+from csotanypoker.client.drawing_helpers.image_manager import load_background
 
 
 class LoadingScreen(BaseScreen):

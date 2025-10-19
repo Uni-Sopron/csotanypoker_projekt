@@ -1,15 +1,16 @@
 import pygame
 from typing import Tuple
-from csotanypoker.client.drawing_helpers import (
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
     _draw_rounded_rect,
     draw_text,
     draw_button,
 )
-from csotanypoker.client.constans import (
+from csotanypoker.client.drawing_helpers.constans import (
     LEGVILAGOS_ZOLD,
     MIDDLE_GREEN,
     DARK_GREEN,
     WHITE,
+    MUSIC_CREDITS_TEXT,
 )
 
 
@@ -25,7 +26,6 @@ class CreditsMenu:
         self.drag_start_offset = 0
 
     def show(self, screen_width: int, screen_height: int):
-        print("Showing credits menu")
         self.visible = True
 
         menu_width = int(screen_width * 0.9)
@@ -59,13 +59,11 @@ class CreditsMenu:
         if not self.visible or not self.menu_rect:
             return
 
-  
         _draw_rounded_rect(
             surface, LEGVILAGOS_ZOLD, self.menu_rect, MIDDLE_GREEN, 5, 0.05
         )
 
         if self.content_rect:
-
             original_clip = surface.get_clip()
             surface.set_clip(self.content_rect)
 
@@ -96,7 +94,7 @@ class CreditsMenu:
             )
 
             y_pos += line_height
-       
+
             draw_text(
                 surface,
                 "Játékfejlesztés és grafikai elemek: Skriba Izabella",
@@ -121,26 +119,7 @@ class CreditsMenu:
             )
             y_pos += line_height + 10
 
-            music_text = """
-            samurai-heart-290878: Music by H Tb HEON from Pixabay
-            giant-fall-impact-352446: Sound Effect by Universfield from Pixabay
-            ground-impact-352053: Sound Effect by Universfield from Pixabay
-            interface-124464: Sound Effect by Universfield from Pixabay
-            game-start-317318: Sound Effect by FoxBoyTails from Pixabay
-            fail-144746: Sound Effect by Universfield from Pixabay
-            steel-chain-dragged-shower-reverb-106252: Sound Effect by freesound_community from Pixabay
-            swoosh-142322: Sound Effect by Universfield from Pixabay
-            sword-slice-393847: Sound Effect by DRAGON-STUDIO from Pixabay
-            sword-blade-slicing-flesh-352708: Sound Effect by Universfield from Pixabay
-            brass-144755: Sound Effect by Universfield from Pixabay
-            foley_walkers_suriken+3: Sound Effect by Foley Walkers from ZapSplat
-            zapsplat_multimedia_button_click_bright_002_92099: Sound Effect by ZapSplat
-            zapsplat_multimedia_error_incorrect_buzz_73714: Sound Effect by ZapSplat
-            zapsplat_warfare_throwing_star_throw_spin_hit_person_squelch_blood_20926: Sound Effect by ZapSplat
-           
-            """
-
-        for line in music_text.strip().split("\n"):
+        for line in MUSIC_CREDITS_TEXT.strip().split("\n"):
             draw_text(
                 surface,
                 line.strip(),
@@ -148,12 +127,11 @@ class CreditsMenu:
                 self.content_rect.x + 40,
                 y_pos,
                 centered=False,
-                font="regular",  
+                font="regular",
                 font_size=20,
             )
             y_pos += line_height
 
-     
             surface.set_clip(original_clip)
 
         draw_button(

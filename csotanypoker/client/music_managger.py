@@ -10,9 +10,9 @@ class MusicManager:
         pygame.mixer.init()
 
         self.music_file = music_file
-        self.music_volume = 0.02
+        self.music_volume = 0.00
         self.sound_effects_enabled = True
-        self.sound_effects_volume = 0.1
+        self.sound_effects_volume = 0.0
 
         self.sounds: Dict[str, pygame.mixer.Sound] = {}
         self._load_sounds()

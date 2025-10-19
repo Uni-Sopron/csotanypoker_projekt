@@ -1,12 +1,12 @@
 import pygame
 from typing import Tuple
-from csotanypoker.client.drawing_helpers import (
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
     _draw_rounded_rect,
     draw_sound_volume,
     draw_text,
     draw_button,
 )
-from csotanypoker.client.constans import (
+from csotanypoker.client.drawing_helpers.constans import (
     LEGVILAGOS_ZOLD,
     MIDDLE_GREEN,
     DARK_GREEN,
@@ -17,8 +17,8 @@ from csotanypoker.client.constans import (
 class MusicMenu:
     def __init__(self):
         self.visible = False
-        self.music_volume = 2
-        self.sound_effects_volume = 1
+        self.music_volume = 0
+        self.sound_effects_volume = 0
         self.dragging_music = False
         self.dragging_sound = False
         self.menu_rect = None
@@ -199,18 +199,21 @@ class MusicMenu:
         if self.music_slider_rect and self.music_slider_rect.collidepoint(pos):
             self.dragging_music = True
             self._update_music_volume(pos, music_manager)
-            return False
+            return True  
 
         if self.sound_slider_rect and self.sound_slider_rect.collidepoint(pos):
             self.dragging_sound = True
             self._update_sound_volume(pos, music_manager)
-            return False
+            return True 
 
         if self.menu_rect and self.menu_rect.collidepoint(pos):
             return False
 
         self.hide()
         return None
+
+
+
 
     def handle_mouse_release(self, pos: Tuple[int, int]):
         self.dragging_music = False
@@ -221,7 +224,6 @@ class MusicMenu:
             self._update_music_volume(pos, music_manager)
         elif self.dragging_sound and music_manager:
             self._update_sound_volume(pos, music_manager)
-
     def _update_music_volume(self, pos: Tuple[int, int], music_manager=None):
         if not self.music_slider_rect:
             return
