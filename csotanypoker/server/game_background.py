@@ -1,7 +1,7 @@
 import os
 from random import choice, shuffle
 from csotanypoker.models.animal import Animal
-from csotanypoker.models.gamestate import GameState
+from csotanypoker.server.gamestate import GameState
 
 
 class GameLogic:
@@ -39,7 +39,6 @@ class GameLogic:
         self.deck = deck_cards
 
         self.deck = [animal for animal in Animal for _ in range(8)]
-        print("Deck generated with animals:", self.deck)
 
     def shuffle_deck(self):
         deck_list = list(self.deck)
@@ -56,15 +55,7 @@ class GameLogic:
             self.state.players[i].cards_in_hand = self.deck[
                 i * portions : (i + 1) * portions
             ]
-        for player in self.state.players:
-            print(
-                "Player:",
-                player.username,
-                "Cards in hand:",
-                player.cards_in_hand,
-                "Card count:",
-                player.card_count(),
-            )
+        
 
     def choose_starting_player(self):
         return choice(self.state.players)
@@ -97,10 +88,6 @@ class GameLogic:
                 if not passing:
                     self.state.active_player.cards_in_hand.remove(card)
 
-                print(
-                    f"Active player card count: {self.state.active_player.card_count()}"
-                )
-
                 if self.state.active_player.username not in self.state.visited_already:
                     self.state.visited_already.add(self.state.active_player.username)
                 return
@@ -112,21 +99,17 @@ class GameLogic:
         self.state.targeted_player.is_true = answer
         if self.state.targeted_player.is_true is True:
             if self.state.active_player.statement == self.state.question_card.value:
-                print("correct answer")
                 return True
             else:
-                print("wrong answer")
                 return False
         elif self.state.targeted_player.is_true is False:
             if self.state.active_player.statement != self.state.question_card.value:
-                print("correct answer")
                 return True
             else:
-                print("wrong answer")
                 return False
 
     def place_card(self, player):
-        # A játékos elhelyezi a kérdéskártyát maga előtt
+       
         card_type = self.state.question_card
         if card_type not in player.cards_in_front:
             player.cards_in_front[card_type] = 1

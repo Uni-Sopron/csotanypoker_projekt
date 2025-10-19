@@ -1,10 +1,12 @@
+from typing import Set
+import random
 import uuid
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from csotanypoker.models.user import Client_User
+from csotanypoker.models.user import AI_NAMES, Client_User, this_is_ai_name
 from csotanypoker.models.room import Room
-from csotanypoker.server.database import DBUser, DBRoom, DBGame
-
+from csotanypoker.server.database import DBUser, DBRoom, DBGame, get_db_session
+from csotanypoker.server.password_manager import hash_password, verify_password
 
 class RoomManager:
     def __init__(self, socketio, sockets: dict):
@@ -26,17 +28,16 @@ class RoomManager:
             room.player_count = user_count
             db.commit()
 
-    def validate_room_password(
-        self, db: Session, room_id: str, provided_password: str
-    ) -> bool:
-        room = self.get_room_by_id(db, room_id)
-        if not room:
-            return False
+    def validate_room_password(self,  room_id: str, provided_password: str) -> bool:
+        with get_db_session() as db:
+            room = self.get_room_by_id(db, room_id)
+            if not room:
+                return False
 
-        if not room.password:
-            return True
+            if not room.password:
+                return True
 
-        return room.password == provided_password
+            return verify_password(provided_password, room.password)
 
     def create_room(
         self,
@@ -51,17 +52,20 @@ class RoomManager:
             if not existing:
                 break
 
+        hashed_password = hash_password(password) if password else None
+
         db_room = DBRoom(
             room_id=room_id,
             name=room_name,
             max_player_count=max_player_count,
-            password=password,
+            password=hashed_password,
             password_protected=bool(password),
         )
 
         db.add(db_room)
         db.commit()
         return db_room
+
 
     def join_user_to_room(self, db: Session, room_id: str, username: str) -> bool:
         db_user = db.query(DBUser).filter(DBUser.username == username).first()
@@ -88,70 +92,74 @@ class RoomManager:
 
     def remove_all_users_from_room(
         self,
-        db: Session,
+        
         room_id: str,
         current_username: Optional[str] = None,
         reconnecting: bool = False,
     ) -> List[str]:
-        target_room = self.get_room_by_id(db, room_id)
-        if not target_room:
-            return []
+        with get_db_session() as db:
+            target_room = self.get_room_by_id(db, room_id)
+            if not target_room:
+                return []
 
-        room_users = self.get_room_users(db, room_id)
-        removed_users = []
+            room_users = self.get_room_users(db, room_id)
+            removed_users = []
 
-        for user in room_users:
-            dbuser = db.query(DBUser).filter(DBUser.username == user.username).first()
+            for user in room_users:
+                dbuser = db.query(DBUser).filter(DBUser.username == user.username).first()
 
-            if reconnecting and dbuser.username == current_username:
-                dbuser.is_active = True
-                db.commit()
+                if reconnecting and dbuser.username == current_username:
+                    dbuser.is_active = True
+                    db.commit()
 
-            if dbuser:
-                dbuser.current_room_id = None
-                removed_users.append(user.username)
+                if dbuser:
+                    dbuser.current_room_id = None
+                    removed_users.append(user.username)
 
-                if user.username in self.sockets:
-                    try:
-                        if dbuser.is_active or not dbuser.is_active:
-                            self.socketio.emit(
-                                "left_room",
-                                {"message": "Szoba elhagyás"},
-                                to=self.sockets[user.username],
-                            )
-                            dbuser.is_active = True
-                            db.commit()
-                    except Exception as e:
-                        print(f"Error notifying user {user.username}: {e}")
-                        self.sockets.pop(user.username, None)
+                    if user.username in self.sockets:
+                        try:
+                            if dbuser.is_active or not dbuser.is_active:
+                                self.socketio.emit(
+                                    "left_room",
+                                    {"message": "Szoba elhagyás"},
+                                    to=self.sockets[user.username],
+                                )
+                                dbuser.is_active = True
+                                db.commit()
+                        except Exception as e:
+                            print(f"Error notifying user {user.username}: {e}")
+                            self.sockets.pop(user.username, None)
 
-        db.commit()
-        self.update_room_player_count(db, room_id)
-        self.broadcast_room_list_update(db)
-        return removed_users
+            db.commit()
+            self.update_room_player_count(db, room_id)
+            self.broadcast_room_list_update(db)
+            return removed_users
 
-    def get_rooms_data(self, db: Session) -> dict:
-        rooms_data = {}
-        rooms = db.query(DBRoom).all()
+    def get_rooms_data(self) -> dict:
+        with get_db_session() as db:
+                
+            rooms_data = {}
+            rooms = db.query(DBRoom).all()
 
-        for room in rooms:
-            player_count = self.user_counter(db, room.room_id)
-            has_running_game = self.game_is_running(db, room.room_id)
-            has_human = self.has_human_player_in_room(db, room.room_id)
+            for room in rooms:
+                player_count = self.user_counter( room.room_id)
+                has_running_game = self.game_is_running(db, room.room_id)
+                has_human = self.has_human_player_in_room(db, room.room_id)
 
-            if not has_running_game and player_count != 0 and has_human:
-                rooms_data[room.room_id] = {
-                    "name": room.name,
-                    "max_player_count": room.max_player_count,
-                    "password_protected": True if room.password else False,
-                    "player_count": player_count,
-                }
+                if not has_running_game and player_count != 0 and has_human:
+                    rooms_data[room.room_id] = {
+                        "name": room.name,
+                        "max_player_count": room.max_player_count,
+                        "password_protected": True if room.password else False,
+                        "player_count": player_count,
+                    }
 
-        return rooms_data
-
-    def user_counter(self, db: Session, room_id: str) -> int:
-        users = self.get_room_users(db, room_id)
-        return len(users)
+            return rooms_data
+    
+    def user_counter(self,  room_id: str) -> int:
+        with get_db_session() as db:
+            users = self.get_room_users(db, room_id)
+            return len(users)
 
     def game_is_running(self, db: Session, room_id: str) -> bool:
         running_game = (
@@ -171,22 +179,23 @@ class RoomManager:
                 return True
         return False
 
-    def all_players_active_in_room(self, db: Session, room_id: str) -> bool:
-        room_users = self.get_room_users(db, room_id)
-        if not room_users:
-            return False
-
-        for user in room_users:
-            db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
-            if not db_user or not db_user.is_active:
-                print(f"Player {user.username} is not active")
+    def all_players_active_in_room(self, room_id: str) -> bool:
+        with get_db_session() as db:
+            room_users = self.get_room_users(db, room_id)
+            if not room_users:
                 return False
 
-        print(f"All {len(room_users)} players in room {room_id} are active")
-        return True
+            for user in room_users:
+                db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
+                if not db_user or not db_user.is_active:
+                    print(f"Player {user.username} is not active")
+                    return False
+
+            print(f"All {len(room_users)} players in room {room_id} are active")
+            return True
 
     def broadcast_room_list_update(self, db: Session) -> None:
-        rooms_data = self.get_rooms_data(db)
+        rooms_data = self.get_rooms_data()
         users_not_in_room = (
             db.query(DBUser)
             .filter(DBUser.current_room_id == None, DBUser.is_active == True)
@@ -209,7 +218,7 @@ class RoomManager:
         if not db_room:
             return None
 
-        player_count = self.user_counter(db, room_id)
+        player_count = self.user_counter( room_id)
 
         return Room(
             room_id=room_id,
@@ -225,6 +234,31 @@ class RoomManager:
             Client_User(username=r_u.username, is_active=r_u.is_active)
             for r_u in room_users
         ]
+    def create_ai_user_in_db(self,ai_username: str) -> DBUser:
+        with get_db_session() as db:
+            existing_ai = db.query(DBUser).filter(DBUser.username == ai_username).first()
+            if existing_ai:
+                return existing_ai
+            ai_user = DBUser(
+                username=ai_username,
+                password="ai_password",
+                is_active=True,
+            )
+            db.add(ai_user)
+            db.commit()
+            return ai_user
+
+    def get_available_ai_name(self, existing_players: Set[str], room_id) -> str:
+        used_base_names = set()
+        for player_name in existing_players:
+            base_name = this_is_ai_name(player_name)
+            if base_name in AI_NAMES:
+                used_base_names.add(base_name)
+
+        available_names = [name for name in AI_NAMES if name not in used_base_names]
+
+        base_name = random.choice(available_names)
+        return f"{base_name}_{room_id}"
 
     @staticmethod
     def _extract_ai_base_name(name: str) -> str:

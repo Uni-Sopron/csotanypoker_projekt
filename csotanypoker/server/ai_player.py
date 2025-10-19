@@ -200,10 +200,7 @@ class AIPlayer:
         weights = {"true": 1.0, "false": 2.5, "pass": 1.5}
         if len(players) == 2 or len(visited_already) >= len(players) - 1:
             weights["pass"] = 0
-            print(
-                f"Pass disabled: players={len(players)}, visited={len(visited_already)}"
-            )
-
+          
         seen_cards = self.calculate_seen_cards(players)
 
         seen_count = 0
@@ -226,7 +223,6 @@ class AIPlayer:
 
         weights["true"] *= trust_weights["true"]
         weights["false"] *= trust_weights["false"]
-        print("Guess weights:", weights)
         return self._weighted_random_choice(weights)
 
     def select_card_and_target(
@@ -250,7 +246,7 @@ class AIPlayer:
         target_weights = self.calculate_target_weights(players, active_player.username)
 
         if passing:
-            print("Passing turn, filtering targets...")
+
             available_targets = {
                 name: weight
                 for name, weight in target_weights.items()
@@ -283,7 +279,6 @@ class AIPlayer:
 
             selected_card = self._weighted_random_choice(card_weights)
         else:
-            print("Passing turn, filtering targets2...")
             selected_card = question_card
             if not selected_card:
                 return None, None, None
@@ -391,9 +386,6 @@ class AIPlayer:
         return was_truthful, nextplayer
 
     def reset_round(self, question_card, players):
-        if question_card:
-            print("Adding seen card:", question_card)
-
         for player in players:
             player.statement = None
             player.is_true = None

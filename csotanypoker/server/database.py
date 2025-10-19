@@ -8,7 +8,7 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker
 
 engine = create_engine("sqlite:///game.db")
 Base = declarative_base()
@@ -53,6 +53,11 @@ class DBGame(Base):
 
     room = relationship("DBRoom", back_populates="games")
     players = relationship("DBUser", secondary=Users_in_Game, back_populates="games")
+
+
+def get_db_session():
+    Session = sessionmaker(bind=engine)
+    return Session()
 
 
 def create_tables():
