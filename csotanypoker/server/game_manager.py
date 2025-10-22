@@ -19,7 +19,9 @@ class GameManager:
         self.sockets = sockets
         self.room_manager = room_manager
         self.game_instances: Dict[str, GameLogic] = {}
-        
+        data_dir = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '.')
+        self.saves_dir = os.path.join(data_dir, 'games_saves')
+        os.makedirs(self.saves_dir, exist_ok=True)
 
     def get_game_instance(self, room_id: str) -> Optional[GameLogic]:
         return self.game_instances.get(room_id)
@@ -30,10 +32,10 @@ class GameManager:
             
             for db_game in running_games:
                 try:
-                    save_path = (
-                        f"csotanypoker/server/games_saves/game_{db_game.game_id}.pkl"
-                    )
-
+                    # save_path = (
+                    #     f"csotanypoker/server/games_saves/game_{db_game.game_id}.pkl"
+                    # )
+                    save_path = os.path.join(self.saves_dir, f"game_{db_game.game_id}.pkl")
                     if not os.path.exists(save_path):
                         continue
 

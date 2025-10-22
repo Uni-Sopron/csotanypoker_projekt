@@ -6,7 +6,8 @@ from csotanypoker.server.gamestate import GameState
 
 class GameLogic:
     def __init__(self, id, players, room_id=None, from_db=False):
-        save_dir = "csotanypoker/server/games_saves"
+        data_dir = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '.')
+        save_dir = os.path.join(data_dir, "games_saves")
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, f"game_{id}.pkl")
 

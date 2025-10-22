@@ -1,3 +1,4 @@
+import os
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -10,7 +11,9 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-engine = create_engine("sqlite:///game.db")
+# engine = create_engine("sqlite:///game.db")
+DATA_DIR = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '.')
+engine = create_engine(f"sqlite:///{DATA_DIR}/game.db")
 Base = declarative_base()
 
 Users_in_Game = Table(
