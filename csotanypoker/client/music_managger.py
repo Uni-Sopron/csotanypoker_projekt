@@ -1,5 +1,6 @@
 import pygame
 from typing import Dict
+from csotanypoker.client.utils.path_helper import resource_path
 
 
 class MusicManager:
@@ -16,10 +17,12 @@ class MusicManager:
 
         self.sounds: Dict[str, pygame.mixer.Sound] = {}
         self._load_sounds()
-        self._load_background_music()
+
+        if self.music_file is not None:
+            self._load_background_music()
 
     def _load_background_music(self) -> None:
-        pygame.mixer.music.load(self.music_file)
+        pygame.mixer.music.load(resource_path(self.music_file))
         pygame.mixer.music.set_volume(self.music_volume)
 
     def _load_sounds(self) -> None:
@@ -43,7 +46,7 @@ class MusicManager:
 
         for sound_name, file_path in sound_files.items():
             try:
-                sound = pygame.mixer.Sound(file_path)
+                sound = pygame.mixer.Sound(resource_path(file_path))
                 sound.set_volume(self.sound_effects_volume)
                 self.sounds[sound_name] = sound
             except pygame.error as e:

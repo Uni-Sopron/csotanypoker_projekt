@@ -6,6 +6,8 @@ import pygame
 from collections import defaultdict
 import os
 
+from csotanypoker.client.utils.path_helper import resource_path
+
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
@@ -455,7 +457,7 @@ class Client:
         player_font = pygame.font.Font(None, 24)
         count_font = pygame.font.Font(None, 24)
         message_font = pygame.font.Font(None, 30)
-        kep_mappa = os.path.join("csotanypoker", "client", "kepek")
+        kep_mappa = resource_path(os.path.join("csotanypoker", "client", "kepek"))
 
         kartya_csoportok = defaultdict(list)
         for lap in kezben_levo_lapok:
@@ -465,7 +467,7 @@ class Client:
         for player_data in jatekosok.values():
             for lap_tipus in player_data["elotte_levo_kartyak"].keys():
                 if lap_tipus not in logo_images:
-                    logo_utvonal = os.path.join(kep_mappa, f"{lap_tipus}_logo.png")
+                    logo_utvonal = resource_path(os.path.join(kep_mappa, f"{lap_tipus}_logo.png"))
                     if os.path.exists(logo_utvonal):
                         logo = pygame.image.load(logo_utvonal)
                         logo = pygame.transform.scale(logo, (40, 40))
@@ -578,7 +580,7 @@ class Client:
 
             x_kep, y_kep = self.width / 2, self.height / 1.3
             for lap, lap_lista in kartya_csoportok.items():
-                kep_utvonal = os.path.join(kep_mappa, f"{lap}.png")
+                kep_utvonal = resource_path(os.path.join(kep_mappa, f"{lap}.png"))
 
                 if os.path.exists(kep_utvonal):
                     kep = pygame.image.load(kep_utvonal)
@@ -606,13 +608,13 @@ class Client:
                 card_y = (self.height - card_height) // 2
 
                 if kozepso_lap == "hatlap":
-                    kozepso_lap_path = os.path.join(
+                    kozepso_lap_path = resource_path(os.path.join(
                         "csotanypoker", "client", "kepek", "hatlap.png"
-                    )
+                    ))
 
-                    pipa_path = os.path.join(
+                    pipa_path = resource_path(os.path.join(
                         "csotanypoker", "client", "kepek", "pipa.png"
-                    )
+                    ))
                     if os.path.exists(pipa_path):
                         pipa_img = pygame.image.load(pipa_path)
                         pipa_img = pygame.transform.scale(pipa_img, (40, 40))
@@ -620,7 +622,7 @@ class Client:
                             pipa_img, (card_x - 50, card_y + (card_height // 2) - 20)
                         )
 
-                    x_path = os.path.join("csotanypoker", "client", "kepek", "x.png")
+                    x_path = resource_path(os.path.join("csotanypoker", "client", "kepek", "x.png"))    
                     if os.path.exists(x_path):
                         x_img = pygame.image.load(x_path)
                         x_img = pygame.transform.scale(x_img, (40, 40))
@@ -633,9 +635,9 @@ class Client:
                         )
 
                 elif kozepso_lap in kartya_csoportok:
-                    kozepso_lap_path = os.path.join(
+                    kozepso_lap_path = resource_path(os.path.join(
                         "csotanypoker", "client", "kepek", f"{kozepso_lap}.png"
-                    )
+                    ))
 
                 kozepso_lap_image = pygame.image.load(kozepso_lap_path)
 

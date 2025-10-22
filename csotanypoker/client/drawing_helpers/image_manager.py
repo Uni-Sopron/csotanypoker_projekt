@@ -1,7 +1,7 @@
 import os
 import pygame
 from typing import Dict
-
+from csotanypoker.client.utils.path_helper import resource_path
 _image_cache: Dict[str, pygame.Surface] = {}
 _scaled_image_cache: Dict[tuple, pygame.Surface] = {}
 
@@ -62,7 +62,7 @@ def _get_cached_image(name: str, image_type: str) -> pygame.Surface:
             raise ValueError(f"Unknown image type: {image_type}")
 
         folder, filename = path_mapping[image_type]
-        path = os.path.join("csotanypoker", "client", "images", folder, filename)
+        path = resource_path(os.path.join("csotanypoker", "client", "images", folder, filename))
 
         try:
             image = pygame.image.load(path).convert_alpha()

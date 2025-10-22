@@ -7,7 +7,11 @@ import threading
 import pygame
 
 from csotanypoker.client.client import NetworkManager
-from csotanypoker.client.drawing_helpers.constans import FPS, SCREEN_WIDTH, SCREEN_HEIGHT
+from csotanypoker.client.drawing_helpers.constans import (
+    FPS,
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
+)
 
 from csotanypoker.client.screens.end_screen import EndScreen
 from csotanypoker.client.screens.game_screen import GameScreen
@@ -19,7 +23,9 @@ from csotanypoker.client.screens.rooms_screen import RoomsScreen
 from csotanypoker.client.screens.waiting_screen import WaitingScreen
 from csotanypoker.models.clientgamestate import ClientGameState
 from csotanypoker.models.player import OpponentPlayer, VisiblePlayer
-from csotanypoker.client.drawing_helpers.drawing_helpers import create_volume_button_rect
+from csotanypoker.client.drawing_helpers.drawing_helpers import (
+    create_volume_button_rect,
+)
 from csotanypoker.client.music_managger import MusicManager
 from csotanypoker.client.screens.credits_menu import CreditsMenu
 
@@ -71,7 +77,6 @@ class GameController:
         self._connection_started = False
 
     def get_local_ip(self) -> str:
-
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -95,7 +100,6 @@ class GameController:
                             if "IPv4" in lines[j] and "192.168." in lines[j]:
                                 ip = lines[j].split(":")[-1].strip()
                                 if ip.startswith("192.168."):
-
                                     return ip
 
             elif system in ["linux", "darwin"]:
@@ -277,12 +281,13 @@ class GameController:
     def _connect_to_server_thread(self, server_url: str) -> None:
         """Külön szálon fut a szerverhez való kapcsolódás"""
         self._network.connect(server_url)
+
     def run(self) -> None:
         self.draw_screen()
 
         # local_ip = self.get_local_ip()
         # server_url = f"http://{local_ip}:5000"
-        server_url = "csotanypokerprojekt-production.up.railway.app"
+        server_url = "https://csotanypokerprojekt-production.up.railway.app"
 
         if not self._connection_started:
             self._connection_thread = threading.Thread(
@@ -320,6 +325,7 @@ class GameController:
 
         self._network.logout()
         pygame.quit()
+
     def handle_mouse_click(self, pos: Tuple) -> None:
         clicked_something = False
         invalid_click = False
@@ -417,6 +423,7 @@ class GameController:
             self.waiting.handle_mouse_motion(pos)
         elif self._screen == "rooms_screen":
             self.rooms_screen.handle_mouse_motion(pos)
+
     def handle_key_press(self, event: pygame.event.Event) -> None:
         if self._screen == "login" and self.input_active:
             self.login.handle_key_press(event)
@@ -435,10 +442,9 @@ class GameController:
                 if current_screen and hasattr(current_screen, "draw"):
                     current_screen.draw()
 
-
     def handle_mouse_release(self, pos: Tuple) -> None:
         if hasattr(self, "music_menu"):
             self.music_menu.handle_mouse_release(pos)
-        
+
         if self._screen == "rooms_screen":
             self.rooms_screen.handle_mouse_release(pos)

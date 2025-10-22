@@ -1,16 +1,16 @@
 import os
 import pygame
-
+from csotanypoker.client.utils.path_helper import resource_path
 pygame.font.init()
 # Font paths
-FONT_PATH_REGULAR = os.path.join(
-    "csotanypoker", "client", "fonts", "DrukaatieBurti-Regular.ttf"
+FONT_PATH_REGULAR = resource_path(
+    os.path.join("csotanypoker", "client", "fonts", "DrukaatieBurti-Regular.ttf")
 )
-FONT_PATH_BOLD = os.path.join(
-    "csotanypoker", "client", "fonts", "DrukaatieBurti-Bold.ttf"
+FONT_PATH_BOLD = resource_path(
+    os.path.join("csotanypoker", "client", "fonts", "DrukaatieBurti-Bold.ttf")
 )
-FONT_PATH_THIN = os.path.join(
-    "csotanypoker", "client", "fonts", "DrukaatieBurti-Thin.ttf"
+FONT_PATH_THIN = resource_path(
+    os.path.join("csotanypoker", "client", "fonts", "DrukaatieBurti-Thin.ttf")
 )
 
 # Font sizes

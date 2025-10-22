@@ -6,3 +6,6 @@ __pycache__/
 *.pkl
 .DS_Store
 .env
+build/
+dist/
+*.spec

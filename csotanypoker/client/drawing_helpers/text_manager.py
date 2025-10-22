@@ -7,6 +7,7 @@ from csotanypoker.client.drawing_helpers.constans import (
     FONT_PATH_BOLD,
     FONT_PATH_THIN,
 )
+from csotanypoker.client.utils.path_helper import resource_path
 
 _font_cache = {}
 
@@ -33,7 +34,7 @@ def _get_font(
 
     cache_key = (font_path, font_size)
     if cache_key not in _font_cache:
-        _font_cache[cache_key] = pygame.font.Font(font_path, font_size)
+        _font_cache[cache_key] = pygame.font.Font(resource_path(font_path), font_size)
     return _font_cache[cache_key]
 
 def draw_text(
