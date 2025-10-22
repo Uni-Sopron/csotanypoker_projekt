@@ -280,9 +280,9 @@ class GameController:
     def run(self) -> None:
         self.draw_screen()
 
-        local_ip = self.get_local_ip()
-        server_url = f"http://{local_ip}:5000"
-        # server_url = "https://probaserver-production.up.railway.app"
+        # local_ip = self.get_local_ip()
+        # server_url = f"http://{local_ip}:5000"
+        server_url = "csotanypokerprojekt-production.up.railway.app"
 
         if not self._connection_started:
             self._connection_thread = threading.Thread(

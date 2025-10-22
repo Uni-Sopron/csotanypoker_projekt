@@ -727,5 +727,5 @@ def add_ai_player(data: dict) -> None:
 
 if __name__ == "__main__":
     initialize_server_data(game_manager)
-    socketio.run(app, debug=False, host="0.0.0.0")
-
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, debug=False, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)
