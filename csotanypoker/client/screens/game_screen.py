@@ -1,4 +1,3 @@
-"""Játék képernyő - egyszerűsített verzió"""
 
 import pygame
 

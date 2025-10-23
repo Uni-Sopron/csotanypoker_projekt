@@ -112,7 +112,7 @@ class WaitingScreen(BaseScreen):
             self.client.width, self.client.height
         )
 
-        # self._request_player_stats()
+        self._request_player_stats()
 
         self.cross_buttons.clear()
 

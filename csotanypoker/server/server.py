@@ -124,56 +124,56 @@ def handle_register(data: dict) -> None:
     handle_login({"username": username, "password": password})
 
 
-@socketio.on("rejoin_game")
-def handle_rejoin_game() -> None:
-    username = session.get("username")
-    if not username:
-        print("Nincs bejelentkezett felhasználó a session-ben")
-        return
-    if username not in sockets:
-        print(f"Nincs aktív socket kapcsolat {username} felhasználóhoz")
-        return
+# @socketio.on("rejoin_game")
+# def handle_rejoin_game() -> None:
+#     username = session.get("username")
+#     if not username:
+#         print("Nincs bejelentkezett felhasználó a session-ben")
+#         return
+#     if username not in sockets:
+#         print(f"Nincs aktív socket kapcsolat {username} felhasználóhoz")
+#         return
 
-    with get_db_session() as db:
-        db_user: Optional[DBUser] = (
-            db.query(DBUser).filter(DBUser.username == username).first()
-        )
-        db_user.is_active = True
-        db.commit()
+#     with get_db_session() as db:
+#         db_user: Optional[DBUser] = (
+#             db.query(DBUser).filter(DBUser.username == username).first()
+#         )
+#         db_user.is_active = True
+#         db.commit()
 
-        if not db_user or not db_user.current_room_id:
-            print(f"Felhasználó nem aktív vagy nincs szobája: {username}")
-            return
+#         if not db_user or not db_user.current_room_id:
+#             print(f"Felhasználó nem aktív vagy nincs szobája: {username}")
+#             return
 
-        room_id = db_user.current_room_id
-        target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
+#         room_id = db_user.current_room_id
+#         target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
 
-        if not target_room:
-            print(f"Szoba nem található: {room_id}")
-            return
+#         if not target_room:
+#             print(f"Szoba nem található: {room_id}")
+#             return
 
-        sockets[username] = request.sid
+#         sockets[username] = request.sid
 
-        if db_user.current_room_id != room_id:
-            db_user.current_room_id = room_id
-            db.commit()
+#         if db_user.current_room_id != room_id:
+#             db_user.current_room_id = room_id
+#             db.commit()
 
-        join_room(room_id)
-        room_manager.update_room_player_count(room_id)
+#         join_room(room_id)
+#         room_manager.update_room_player_count(room_id)
 
-        room_users = room_manager.get_room_users(room_id)
+#         room_users = room_manager.get_room_users(room_id)
 
-        if len(room_users) >= target_room.max_player_count:
-            player_usernames = [user.username for user in room_users]
+#         if len(room_users) >= target_room.max_player_count:
+#             player_usernames = [user.username for user in room_users]
 
-            socketio.emit(
-                "start_game",
-                {"players": player_usernames},
-                room=room_id,
-            )
-            game_manager.start_game(db, player_usernames, room_id, reconnect=True)
+#             socketio.emit(
+#                 "start_game",
+#                 {"players": player_usernames},
+#                 room=room_id,
+#             )
+#             game_manager.start_game(db, player_usernames, room_id, reconnect=True)
 
-        game_manager.resume_ai_activity_if_needed(db, room_id)
+#         game_manager.resume_ai_activity_if_needed(db, room_id)
 
 
 @socketio.on("rejoin_waiting_room")
@@ -642,7 +642,7 @@ def handle_guess(data: dict) -> None:
 
 
 @socketio.on("pass")
-def handle_pass() -> None:
+def handle_pass(data: dict) -> None:
     username = session.get("username")
     room_id = get_user_room_id(username)
 
