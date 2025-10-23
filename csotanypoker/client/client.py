@@ -122,7 +122,7 @@ class NetworkManager:
                 try:
                     self.game_client.user = None
                     user_data = data.get("user", {})
-                   
+
                     self.game_client.user = Client_User(
                         username=user_data.get("username", ""),
                         is_active=user_data.get("is_active", True),
@@ -362,7 +362,6 @@ class NetworkManager:
                                     print("Warning: Opponent without username")
                                     continue
 
-                              
                                 opponent_cards_in_front = {}
                                 cards_in_front_data = opponent_data.get(
                                     "cards_in_front", {}
@@ -412,7 +411,7 @@ class NetworkManager:
                         and self.game_client.game_state
                     ):
                         self.game_client.screen = "game"
-                    
+
                     else:
                         print(
                             "Warning: Not switching to game screen due to missing data"
@@ -520,7 +519,7 @@ class NetworkManager:
                                     player_count=player_count,
                                 )
                                 new_room_list.append(room)
-                                
+
                             except Exception as e:
                                 print(f"Error creating room object for {room_id}: {e}")
                                 continue
@@ -590,7 +589,9 @@ class NetworkManager:
                 self.game_client.room_name = None
                 self.game_client.users = []
                 if self.game_client._screens["game"]:
-                    self.game_client._screens["game"].state_manager.reset_local_selections()
+                    self.game_client._screens[
+                        "game"
+                    ].state_manager.reset_local_selections()
                 self.get_user_stats(self.game_client.user.username)
                 self.game_client.screen = "rooms_screen"
 
@@ -690,7 +691,6 @@ class NetworkManager:
                 except Exception as e:
                     print(f"Error in player_rejoined: {e}")
 
-
         @self.sio.on("user_stats")
         def on_user_stats(data: Dict[str, Any]) -> None:
             """Handle user statistics received from server"""
@@ -717,14 +717,31 @@ class NetworkManager:
                 except Exception as e:
                     print(f"Error in user_stats handler: {e}")
 
+    def _safe_emit(self, event: str, data: dict = None) -> bool:
+        try:
+            if not self.sio.connected:
+                print(f"Cannot emit '{event}': not connected")
+                with self._data_lock:
+                    self.game_client.message = "Nincs kapcsolat a szerverrel"
+                    self.game_client.message_display_time = 30.0
+                return False
+
+            self.sio.emit(event, data or {})
+            return True
+        except Exception as e:
+            print(f"Error emitting '{event}': {e}")
+            return False
+
     def get_user_stats(self, username: str) -> None:
-        self.sio.emit("get_user_stats", {"username": username})
+        self._safe_emit("get_user_stats", {"username": username})
+
     def remove_ai_player(self, ai_username: str) -> None:
-        self.sio.emit("leave_room", {"username": ai_username, "reconnecting": False})
+        self._safe_emit("leave_room", {"username": ai_username, "reconnecting": False})
+
     def logout(self) -> None:
         with self._data_lock:
             if self.game_client.user and hasattr(self.game_client.user, "username"):
-                self.sio.emit("logout", {"username": self.game_client.user.username})
+                self._safe_emit("logout", {"username": self.game_client.user.username})
             self.game_client.message = None
             self.game_client.screen = "login"
             if hasattr(self.game_client, "room_list"):
@@ -736,26 +753,25 @@ class NetworkManager:
     def add_ai_player(self) -> None:
         with self._data_lock:
             if self.game_client.selected_room.room_id:
-                self.sio.emit(
+                self._safe_emit(
                     "add_ai_player", {"room_id": self.game_client.selected_room.room_id}
                 )
 
     def vote_rematch(self, room_id: str, username: str) -> None:
-        self.sio.emit("vote_rematch", {"room_id": room_id, "username": username})
+        self._safe_emit("vote_rematch", {"room_id": room_id, "username": username})
 
     def all_players_leave_room(self, room_id, reconnecting=False) -> None:
-        self.sio.emit(
+        self._safe_emit(
             "all_players_leave_room", {"room_id": room_id, "reconnecting": reconnecting}
         )
 
     def rejoin_waiting_room(self) -> None:
-
-        self.sio.emit(
+        self._safe_emit(
             "rejoin_waiting_room",
         )
 
     def leave_room(self, reconnecting=False) -> None:
-        self.sio.emit(
+        self._safe_emit(
             "leave_room",
             {"username": self.game_client.user.username, "reconnecting": reconnecting},
         )
@@ -777,15 +793,15 @@ class NetworkManager:
                 time.sleep(0.5)
 
     def login(self, username: str, password: str) -> None:
-        self.sio.emit("login", {"username": username, "password": password})
+        self._safe_emit("login", {"username": username, "password": password})
 
     def register(self, username: str, password: str) -> None:
-        self.sio.emit("register", {"username": username, "password": password})
+        self._safe_emit("register", {"username": username, "password": password})
 
     def join_room(
         self, room_id: str, password: str = "", skipp_password: bool = False
     ) -> None:
-        self.sio.emit(
+        self._safe_emit(
             "join_room",
             {
                 "room_id": room_id,
@@ -795,7 +811,7 @@ class NetworkManager:
         )
 
     def guess(self, guess: str) -> None:
-        self.sio.emit("guess", {"guess": guess})
+        self._safe_emit("guess", {"guess": guess})
 
     def oke_click(self, statement, passing) -> None:
         try:
@@ -835,7 +851,7 @@ class NetworkManager:
                 "voters": list(getattr(self.game_client.game_state, "voters", [])),
             }
 
-        self.sio.emit(
+        self._safe_emit(
             "oke_click",
             {
                 "game_state": game_state,
@@ -845,7 +861,7 @@ class NetworkManager:
         )
 
     def passing(self) -> None:
-        self.sio.emit("pass")
+        self._safe_emit("pass")
 
     def create_room(
         self,
@@ -854,7 +870,7 @@ class NetworkManager:
         max_player_count: int = 4,
         pasword: str = "",
     ) -> None:
-        self.sio.emit(
+        self._safe_emit(
             "create_room",
             {
                 "room_name": room_name,

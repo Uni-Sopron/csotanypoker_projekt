@@ -28,13 +28,14 @@ from csotanypoker.client.drawing_helpers.drawing_helpers import (
     handle_logout_button_click,
     create_volume_button_rect,
     draw_sound_volume,
-    draw_image
+    draw_image,
 )
 
 
 from csotanypoker.client.drawing_helpers.image_manager import load_background
 from csotanypoker.client.drawing_helpers.text_manager import wrap_text
 from csotanypoker.models.user import this_is_ai_name
+
 
 class WaitingScreen(BaseScreen):
     def __init__(self, client) -> None:
@@ -54,7 +55,9 @@ class WaitingScreen(BaseScreen):
         self.pressed_elements = set()
         self.player_stats = {}
         self.stats_requested = set()
-        self.cross_buttons = {}  
+        self.cross_buttons = {}
+
+        self.last_players = [] 
 
     def _is_ai_player(self, username: str) -> bool:
         """Ellenőrzi, hogy AI játékosról van-e szó"""
@@ -90,12 +93,13 @@ class WaitingScreen(BaseScreen):
             self.hovered_elements.add("ai_player")
             if mouse_pressed:
                 self.pressed_elements.add("ai_player")
-        
+
         for username, x_button_rect in self.cross_buttons.items():
             if x_button_rect.collidepoint(mouse_pos):
                 self.hovered_elements.add(f"X_{username}")
                 if mouse_pressed:
                     self.pressed_elements.add(f"X_{username}")
+
     def draw(self) -> None:
         """
         Draw the waiting screen.
@@ -108,8 +112,8 @@ class WaitingScreen(BaseScreen):
             self.client.width, self.client.height
         )
 
-        self._request_player_stats()
-        
+        # self._request_player_stats()
+
         self.cross_buttons.clear()
 
         load_background(self.client.width, self.client.height, self.client.window)
@@ -159,7 +163,9 @@ class WaitingScreen(BaseScreen):
 
         for i, player in enumerate(self.client.users):
             if self._is_ai_player(player.username):
-                x_button_rect = pygame.Rect(start_x + 350, start_y + 10 + (i * 70), 40, 40)
+                x_button_rect = pygame.Rect(
+                    start_x + 350, start_y + 10 + (i * 70), 40, 40
+                )
                 self.cross_buttons[player.username] = x_button_rect
 
         if (
@@ -200,7 +206,7 @@ class WaitingScreen(BaseScreen):
 
             if self._is_ai_player(player.username):
                 x_button_rect = self.cross_buttons[player.username]
-                
+
                 is_hovered = f"X_{player.username}" in self.hovered_elements
                 is_pressed = f"X_{player.username}" in self.pressed_elements
 
@@ -216,8 +222,8 @@ class WaitingScreen(BaseScreen):
                     border_width=3,
                     is_hovered=is_hovered,
                     is_pressed=is_pressed,
-                    hover_color=MIDDLE_GREEN_TRANSPARENT_90,  
-                    pressed_color=LIGHT_GREEN, 
+                    hover_color=MIDDLE_GREEN_TRANSPARENT_90,
+                    pressed_color=LIGHT_GREEN,
                 )
 
             draw_text(
@@ -309,15 +315,40 @@ class WaitingScreen(BaseScreen):
             self.client.window, volume_rect.centerx, volume_rect.centery, "sound"
         )
 
+    def _has_players_changed(self) -> bool:
+        if not hasattr(self.client, "users") or not self.client.users:
+            if self.last_players: 
+                self.last_players = []
+                return True
+            return False
+
+        current_players = [user.username for user in self.client.users]
+        if current_players != self.last_players:
+            self.last_players = current_players.copy()
+            return True
+
+        return False
+
     def _request_player_stats(self):
-        """Lekéri a játékosok statisztikáit - csak emberi játékosoknak"""
+        if not self._has_players_changed():
+            return  
+
+        if (
+            not hasattr(self.client.network, "sio")
+            or not self.client.network.sio.connected
+        ):
+            return
+
         if not hasattr(self.client, "users") or not self.client.users:
             return
 
+        self.stats_requested.clear()
+
         for user in self.client.users:
             if not self._is_ai_player(user.username):
-                self.client.network.get_user_stats(user.username)
-                self.stats_requested.add(user.username)
+                if user.username not in self.stats_requested:
+                    self.client.network.get_user_stats(user.username)
+                    self.stats_requested.add(user.username)
 
     def update_player_stats(self, username, total_games, won_games):
         """Frissíti egy játékos statisztikáit"""
@@ -331,19 +362,20 @@ class WaitingScreen(BaseScreen):
             if x_button_rect.collidepoint(pos):
                 self.client.network.remove_ai_player(username)
                 return True
-        
+
         if self.leave_button.collidepoint(pos):
             self.client.network.leave_room()
             return True
         elif handle_logout_button_click(pos, self.logout_button, self.client.network):
             return True
-        elif hasattr(self, "ai_player_button") and self.ai_player_button.collidepoint(pos):
+        elif hasattr(self, "ai_player_button") and self.ai_player_button.collidepoint(
+            pos
+        ):
             if len(self.client.users) < self.client.selected_room.max_player_count:
                 self.client.network.add_ai_player()
                 return True
         elif hasattr(self, "plus_button") and self.plus_button.collidepoint(pos):
             if len(self.client.users) < self.client.selected_room.max_player_count:
-    
                 return True
         return False
 
