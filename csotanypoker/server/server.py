@@ -103,6 +103,7 @@ def handle_connect() -> None:
     print(f"Kliens csatlakozott: {request.sid}")
 
 
+
 @socketio.on("register")
 def handle_register(data: dict) -> None:
     db: Session = get_db_session()
@@ -394,12 +395,20 @@ def handle_login(data: dict) -> None:
         else:
             emit("login_success", {"user": user.model_dump(), "rooms": rooms_data})
 
+@socketio.on("disconnect")
+def handle_disconnect() -> None:
+    username = session.get("username")
+    _handle_user_disconnect(username, send_success_message=False)
+
 
 @socketio.on("logout")
 def handle_logout(data) -> None:
-    username = data.get("username")
-    if not username:
-        username = session.get("username")
+    username = data.get("username") or session.get("username")
+    _handle_user_disconnect(username, send_success_message=True)
+    
+    
+
+def _handle_user_disconnect(username: str, send_success_message: bool = False) -> None:
 
     if not username:
         return
@@ -438,8 +447,6 @@ def handle_logout(data) -> None:
 
     session.clear()  
     print(f"Session törölve: {username}")
-
-    emit("logout_success", {"message": "Sikeres kijelentkezés"})
 
 
 @socketio.on("get_user_stats")
