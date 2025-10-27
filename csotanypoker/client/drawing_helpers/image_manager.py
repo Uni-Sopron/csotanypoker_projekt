@@ -4,11 +4,10 @@ from typing import Dict
 from csotanypoker.client.utils.path_helper import resource_path
 _image_cache: Dict[str, pygame.Surface] = {}
 _scaled_image_cache: Dict[tuple, pygame.Surface] = {}
+from csotanypoker.models.animal import Animal  
 
 
 def preload_all_images():
-    from csotanypoker.models.animal import Animal
-
     for animal in Animal:
         _get_cached_image(animal.value, "logo")
 

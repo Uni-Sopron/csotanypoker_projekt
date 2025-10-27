@@ -170,8 +170,6 @@ class RoomManager:
         return running_game is not None
 
     def has_human_player_in_room(self, db: Session, room_id: str) -> bool:
-        from csotanypoker.models.user import AI_NAMES
-
         room_users = self.get_room_users(db, room_id)
         for user in room_users:
             base_name = self._extract_ai_base_name(user.username)
@@ -262,8 +260,6 @@ class RoomManager:
 
     @staticmethod
     def _extract_ai_base_name(name: str) -> str:
-        from csotanypoker.models.user import AI_NAMES
-
         for ai_name in AI_NAMES:
             if name.startswith(ai_name):
                 return ai_name

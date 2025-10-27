@@ -1,6 +1,4 @@
-"""Szobák képernyő - egyszerűsített verzió"""
 import pygame
-
 from csotanypoker.client.drawing_helpers.drawing_helpers import check_logout_button_interaction
 from csotanypoker.client.screens.base_screen import BaseScreen
 from csotanypoker.client.room_helpers.room_input_handler import RoomInputHandler
@@ -115,6 +113,13 @@ class RoomsScreen(BaseScreen):
         """Billentyű lenyomás kezelése"""
         self.input_handler.handle_key_press(event)
 
+    def handle_key_release(self, event):
+        """Billentyű felengedés kezelése - ÚJ METÓDUS"""
+        self.input_handler.handle_key_release(event)
+
+    def update_continuous_input(self):
+        """Folyamatos input frissítése - ÚJ METÓDUS"""
+        self.input_handler.update_continuous_input()
     
     def reset_create_room_form(self):
         """Szoba létrehozás form visszaállítása alapállapotba"""

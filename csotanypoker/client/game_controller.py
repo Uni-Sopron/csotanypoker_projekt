@@ -33,6 +33,7 @@ from csotanypoker.client.screens.credits_menu import CreditsMenu
 class GameController:
     def __init__(self) -> None:
         pygame.init()
+        pygame.key.set_repeat(500, 30)  
         self._game_state = ClientGameState()
 
         self._window: pygame.Surface = pygame.display.set_mode(
@@ -281,7 +282,6 @@ class GameController:
     def _connect_to_server_thread(self, server_url: str) -> None:
         """Külön szálon fut a szerverhez való kapcsolódás"""
         self._network.connect(server_url)
-
     def run(self) -> None:
         self.draw_screen()
 
@@ -314,17 +314,38 @@ class GameController:
                     self.handle_mouse_motion(event.pos)
                 elif event.type == pygame.KEYDOWN:
                     self.handle_key_press(event)
+                elif event.type == pygame.KEYUP:  
+                    self.handle_key_release(event)
                 elif event.type == pygame.MOUSEWHEEL:
                     self.rooms_screen.handle_mouse_wheel(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.handle_mouse_release(event.pos)
 
+            self.update_continuous_input()
+            
             self.draw_screen()
             pygame.display.update()
             self._clock.tick(FPS)
 
         self._network.logout()
         pygame.quit()
+
+    def update_continuous_input(self):
+        """Update continuous input for all screens"""
+        if self._screen == "login" and self.input_active:
+            self.login.update_continuous_input()
+        elif self._screen == "rooms_screen":
+            self.rooms_screen.update_continuous_input()
+
+
+    def handle_key_release(self, event):
+        """Handle key release events"""
+        if self._screen == "login" and self.input_active:
+            self.login.handle_key_release(event)
+        elif self._screen == "rooms_screen":
+            self.rooms_screen.handle_key_release(event)
+
+
 
     def handle_mouse_click(self, pos: Tuple) -> None:
         clicked_something = False

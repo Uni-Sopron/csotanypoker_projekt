@@ -1,5 +1,5 @@
 import pygame
-
+from csotanypoker.client.drawing_helpers.text_manager import handle_continuous_arrow_keys, handle_continuous_backspace, handle_input_text_event, handle_mouse_click_in_input
 from csotanypoker.client.screens.base_screen import BaseScreen
 from csotanypoker.client.drawing_helpers.constans import (
     RED,
@@ -14,7 +14,7 @@ from csotanypoker.client.drawing_helpers.drawing_helpers import (
     draw_text,
     draw_input_box,
     draw_button,
-    validate_text_input,
+    get_input_state,
 )
 from csotanypoker.client.drawing_helpers.image_manager import load_background
 from csotanypoker.models.user import AI_NAMES
@@ -123,6 +123,34 @@ class LoginScreen(BaseScreen):
             )
             self.client.message_display_time -= 1
 
+    def update_continuous_input(self):
+        """Update continuous input - hívás minden frame-ben"""
+        if not self.active_field:
+            return
+
+
+        state = get_input_state(self.active_field)
+        current_time = pygame.time.get_ticks()
+        keys = pygame.key.get_pressed()
+
+        if self.active_field == "username":
+            new_text, new_cursor, changed = handle_continuous_backspace(
+                state, self.username_text, current_time
+            )
+            if changed:
+                self.username_text = new_text
+        elif self.active_field == "password":
+            new_text, new_cursor, changed = handle_continuous_backspace(
+                state, self.password_text, current_time
+            )
+            if changed:
+                self.password_text = new_text
+
+        text_len = len(self.username_text) if self.active_field == "username" else len(self.password_text)
+        new_cursor, changed = handle_continuous_arrow_keys(state, keys, current_time, text_len)
+        if changed:
+            state.cursor_pos = new_cursor
+
     def draw(self):
         self._calculate_ui_rects()
         self._update_button_states()
@@ -147,6 +175,7 @@ class LoginScreen(BaseScreen):
             surface=self.client.window,
             rect=self.username_box,
             text=self.username_text,
+            input_id="username",
             is_active=(self.active_field == "username"),
             is_password=False,
             background_color=self.input_border_color,
@@ -164,6 +193,7 @@ class LoginScreen(BaseScreen):
             surface=self.client.window,
             rect=self.password_box,
             text=self.password_text,
+            input_id="password",
             is_active=(self.active_field == "password"),
             is_password=True,
             background_color=self.input_border_color,
@@ -229,9 +259,26 @@ class LoginScreen(BaseScreen):
     def handle_mouse_click(self, pos):
         if self.username_box and self.username_box.collidepoint(pos):
             self.active_field = "username"
+            state = get_input_state("username")
+            cursor_pos = handle_mouse_click_in_input(
+                pos,
+                self.username_box,
+                self.username_text,
+                27,
+                self.input_padding,
+                False,
+            )
+            if cursor_pos is not None:
+                state.cursor_pos = cursor_pos
             return True
         elif self.password_box and self.password_box.collidepoint(pos):
             self.active_field = "password"
+            state = get_input_state("password")
+            cursor_pos = handle_mouse_click_in_input(
+                pos, self.password_box, self.password_text, 27, self.input_padding, True
+            )
+            if cursor_pos is not None:
+                state.cursor_pos = cursor_pos
             return True
         elif self.login_button and self.login_button.collidepoint(pos):
             self.handle_login()
@@ -246,45 +293,87 @@ class LoginScreen(BaseScreen):
             self.active_field = None
             return False
 
+    def handle_key_release(self, event):
+        """Handle key release events"""
+        if not self.active_field:
+            return
+            
+        state = get_input_state(self.active_field)
+        
+        if event.key == pygame.K_BACKSPACE:
+            state.backspace_held = False
+        elif event.key == pygame.K_LEFT:
+            state.left_held = False
+        elif event.key == pygame.K_RIGHT:
+            state.right_held = False
+
     def handle_key_press(self, event):
         if not self.active_field:
             return
 
         if event.key == pygame.K_RETURN:
             self.handle_login()
+            return
         elif event.key == pygame.K_TAB:
             self.active_field = (
                 "password" if self.active_field == "username" else "username"
             )
-        elif event.key == pygame.K_BACKSPACE:
-            if self.active_field == "username":
-                self.username_text = self.username_text[:-1]
-            elif self.active_field == "password":
-                self.password_text = self.password_text[:-1]
-        else:
-            if len(event.unicode) == 1 and event.unicode.isprintable():
-                if self.active_field == "username":
-                    if validate_text_input(
-                        self.username_text,
-                        event.unicode,
-                        self.username_box,
-                        13,
-                        False,
-                        font_size=27,
-                        padding=self.input_padding,
-                    ):
-                        self.username_text += event.unicode
-                elif self.active_field == "password":
-                    if validate_text_input(
-                        self.password_text,
-                        event.unicode,
-                        self.password_box,
-                        20,
-                        True,
-                        font_size=27,
-                        padding=self.input_padding,
-                    ):
-                        self.password_text += event.unicode
+            return
+
+   
+
+        state = get_input_state(self.active_field)
+
+        if self.active_field == "username":
+            rect = self.username_box
+            new_text, new_cursor, handled = handle_input_text_event(
+                event,
+                self.username_text,
+                state.cursor_pos,
+                13,
+                rect,
+                27,
+                self.input_padding,
+            )
+            if handled:
+                self.username_text = new_text
+                state.cursor_pos = new_cursor
+
+                if event.key == pygame.K_BACKSPACE:
+                    state.backspace_held = True
+                    state.last_backspace_time = pygame.time.get_ticks()
+                elif event.key == pygame.K_LEFT:
+                    state.left_held = True
+                    state.last_arrow_time = pygame.time.get_ticks()
+                elif event.key == pygame.K_RIGHT:
+                    state.right_held = True
+                    state.last_arrow_time = pygame.time.get_ticks()
+
+        elif self.active_field == "password":
+            rect = self.password_box
+            new_text, new_cursor, handled = handle_input_text_event(
+                event,
+                self.password_text,
+                state.cursor_pos,
+                20,
+                rect,
+                27,
+                self.input_padding,
+                True,
+            )
+            if handled:
+                self.password_text = new_text
+                state.cursor_pos = new_cursor
+
+                if event.key == pygame.K_BACKSPACE:
+                    state.backspace_held = True
+                    state.last_backspace_time = pygame.time.get_ticks()
+                elif event.key == pygame.K_LEFT:
+                    state.left_held = True
+                    state.last_arrow_time = pygame.time.get_ticks()
+                elif event.key == pygame.K_RIGHT:
+                    state.right_held = True
+                    state.last_arrow_time = pygame.time.get_ticks()
 
     def handle_login(self):
         if not self.username_text.strip():

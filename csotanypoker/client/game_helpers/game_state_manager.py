@@ -1,3 +1,6 @@
+from csotanypoker.models.user import this_is_ai_name
+
+
 class GameStateManager:
     def __init__(self, screen):
         self.screen = screen
@@ -63,10 +66,8 @@ class GameStateManager:
             elif targeted_player == username:
                 message = "Igaz vagy hamis az állítás?"
             elif targeted_player is None:
-                from csotanypoker.models.user import this_is_ai_name
                 message = f"Várj az {this_is_ai_name(active_player)} lépésére"
             else:
-                from csotanypoker.models.user import this_is_ai_name
                 message = f"{this_is_ai_name(targeted_player)} játékos lapot kapott {this_is_ai_name(active_player)}-től"
             
             self.screen.client.message = message

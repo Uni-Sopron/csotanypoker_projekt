@@ -200,7 +200,7 @@ class AIPlayer:
         weights = {"true": 1.0, "false": 2.5, "pass": 1.5}
         if len(players) == 2 or len(visited_already) >= len(players) - 1:
             weights["pass"] = 0
-          
+
         seen_cards = self.calculate_seen_cards(players)
 
         seen_count = 0
@@ -233,35 +233,15 @@ class AIPlayer:
         active_player,
         passing: bool = False,
     ) -> Tuple[Optional[Animal], Optional[str], Optional[str]]:
-        if not passing:
-            safe_cards = []
-            for card in active_player.cards_in_hand:
-                our_cards_in_front = active_player.cards_in_front.get(card, 0)
-                if our_cards_in_front < 3:
-                    safe_cards.append(card)
-
-            if not safe_cards:
-                return None, None, None
 
         target_weights = self.calculate_target_weights(players, active_player.username)
 
-        if passing:
-
-            available_targets = {
-                name: weight
-                for name, weight in target_weights.items()
-                if name not in visited_already
-            }
-
-            if not available_targets:
-                return None, None, None
-        else:
-      
-            available_targets = {
-                name: weight
-                for name, weight in target_weights.items()
-                if name not in visited_already
-            }
+ 
+        available_targets = {
+            name: weight
+            for name, weight in target_weights.items()
+            if name not in visited_already
+        }
 
         if not available_targets:
             return None, None, None

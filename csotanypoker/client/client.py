@@ -211,7 +211,6 @@ class NetworkManager:
 
                     self.game_client.visible_player = None
                     self.game_client.opponent_players = []
-
                     if not self.game_client.user or not self.game_client.user.username:
                         print("Error: No valid user found during game start")
                         return
@@ -274,7 +273,7 @@ class NetworkManager:
                     game_state = data.get("game_state", {})
                     visible_player_data = data.get("visible_player_data", {})
                     opponent_players_data = data.get("opponent_players_data", [])
-
+                    self.game_client.passed = data.get("passing", False)
                     if (
                         hasattr(self.game_client, "game_state")
                         and self.game_client.game_state

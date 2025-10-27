@@ -1,4 +1,3 @@
-"""Egér interakció kezelés szobák képernyőhöz"""
 import pygame
 
 from csotanypoker.client.drawing_helpers.drawing_helpers import handle_logout_button_click
@@ -99,26 +98,48 @@ class RoomMouseHandler:
         new_offset = int(click_ratio * max_scroll)
         self.screen.scroll_offset = max(0, min(max_scroll, new_offset))
         return True
-
     def _handle_input_clicks(self, pos):
         """Input mezők kattintásának kezelése"""
-        input_rects = {
-            'search': getattr(self.screen, 'search_input', None),
-            'room_name': getattr(self.screen, 'room_name_input', None),
-            'password': getattr(self.screen, 'create_password_input', None) if self.screen.password_protected else None,
-            'join_password': getattr(self.screen, 'join_password_input', None) if self.screen._get_selected_room() and self.screen._get_selected_room().password_protected else None,
-            'max_players': getattr(self.screen, 'max_count', None),
+        input_configs = {
+            'search': {
+                'rect': getattr(self.screen, 'search_input', None),
+                'visible': True,
+                'is_password': False,
+            },
+            'room_name': {
+                'rect': getattr(self.screen, 'room_name_input', None),
+                'visible': True,
+                'is_password': False,
+            },
+            'password': {
+                'rect': getattr(self.screen, 'create_password_input', None) if self.screen.password_protected else None,
+                'visible': self.screen.password_protected,
+                'is_password': True,
+            },
+            'join_password': {
+                'rect': getattr(self.screen, 'join_password_input', None),
+                'visible': self.screen._get_selected_room() and self.screen._get_selected_room().password_protected,
+                'is_password': True,
+            },
+            'max_players': {
+                'rect': getattr(self.screen, 'max_count', None),
+                'visible': True,
+                'is_password': False,
+            },
         }
 
-        for input_name, rect in input_rects.items():
-            if rect and rect.collidepoint(pos):
-                self.screen.input_handler.activate(input_name)
-                if input_name == 'max_players':
-                    self.screen.input_handler.inputs['max_players'] = str(self.screen.max_players)
-                return True
+        for input_name, config in input_configs.items():
+            rect = config['rect']
+            if config['visible'] and rect and rect.collidepoint(pos):
+                if self.screen.input_handler.handle_mouse_click_in_field(
+                    pos, input_name, rect, config['is_password']
+                ):
+                    self.screen.input_handler.activate(input_name)
+                    if input_name == 'max_players':
+                        self.screen.input_handler.inputs['max_players'] = str(self.screen.max_players)
+                    return True
         
         return False
-
     def _handle_button_clicks(self, pos):
         """Gombok kattintásának kezelése"""
         if hasattr(self.screen, "search_button") and self.screen.search_button.collidepoint(pos):

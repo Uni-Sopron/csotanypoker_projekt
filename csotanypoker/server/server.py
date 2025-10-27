@@ -125,58 +125,6 @@ def handle_register(data: dict) -> None:
     handle_login({"username": username, "password": password})
 
 
-# @socketio.on("rejoin_game")
-# def handle_rejoin_game() -> None:
-#     username = session.get("username")
-#     if not username:
-#         print("Nincs bejelentkezett felhasználó a session-ben")
-#         return
-#     if username not in sockets:
-#         print(f"Nincs aktív socket kapcsolat {username} felhasználóhoz")
-#         return
-
-#     with get_db_session() as db:
-#         db_user: Optional[DBUser] = (
-#             db.query(DBUser).filter(DBUser.username == username).first()
-#         )
-#         db_user.is_active = True
-#         db.commit()
-
-#         if not db_user or not db_user.current_room_id:
-#             print(f"Felhasználó nem aktív vagy nincs szobája: {username}")
-#             return
-
-#         room_id = db_user.current_room_id
-#         target_room = db.query(DBRoom).filter(DBRoom.room_id == room_id).first()
-
-#         if not target_room:
-#             print(f"Szoba nem található: {room_id}")
-#             return
-
-#         sockets[username] = request.sid
-
-#         if db_user.current_room_id != room_id:
-#             db_user.current_room_id = room_id
-#             db.commit()
-
-#         join_room(room_id)
-#         room_manager.update_room_player_count(room_id)
-
-#         room_users = room_manager.get_room_users(room_id)
-
-#         if len(room_users) >= target_room.max_player_count:
-#             player_usernames = [user.username for user in room_users]
-
-#             socketio.emit(
-#                 "start_game",
-#                 {"players": player_usernames},
-#                 room=room_id,
-#             )
-#             game_manager.start_game(db, player_usernames, room_id, reconnect=True)
-
-#         game_manager.resume_ai_activity_if_needed(db, room_id)
-
-
 @socketio.on("rejoin_waiting_room")
 def handle_start_new_game(data: dict) -> None:
     username = session.get("username")
@@ -597,7 +545,6 @@ def handle_oke_click(data: dict) -> None:
             client_game_state = data.get("game_state", {})
             statement = data.get("statement", "")
             passing = data.get("pass", False)
-
             for card in Animal:
                 if card.value == client_game_state["question_card"]:
                     game_instance.select_card(card, passing)
@@ -661,6 +608,7 @@ def handle_pass(data: dict) -> None:
         return
 
     with get_db_session() as db:
+        game_instance.state.passing = True
         if game_instance.state.targeted_player is not None:
             next_player = game_instance.state.targeted_player
             game_instance.state.active_player = next_player
@@ -724,6 +672,7 @@ def add_ai_player(data: dict) -> None:
 if __name__ == "__main__":
     initialize_server_data(game_manager)
     port = int(os.environ.get("PORT", 5000))
+    print(f"Szerver elindítva a {port} porton")
     socketio.run(
         app, debug=False, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True
     )

@@ -1,5 +1,5 @@
 import traceback
-from pydantic import  Field, ConfigDict
+from pydantic import Field, ConfigDict
 from typing import List, Optional, Callable, Iterable, Any
 import pickle
 import os
@@ -46,6 +46,7 @@ class AutoSavingSet(set):
         super().update(*others)
         self._save()
 
+
 class GameState(AbstractGameState):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -58,6 +59,7 @@ class GameState(AbstractGameState):
         None, description="Összes játékos a játékban"
     )
     ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
+    passing: bool = Field(False, description="Az aktív játékos éppen passol")
 
     def __init__(self, **data):
         save_path = data.get("save_path")
@@ -76,8 +78,6 @@ class GameState(AbstractGameState):
         if self.players is None:
             self.players = []
         if self.ai_player is None:
-            from csotanypoker.server.ai_player import AIPlayer
-
             self.ai_player = AIPlayer()
 
         if save_path:
@@ -134,7 +134,6 @@ class GameState(AbstractGameState):
             if game_state.voters is not None:
                 game_state.voters = AutoSavingSet(game_state.voters, game_state._save)
 
-           
             return game_state
 
         except Exception as e:

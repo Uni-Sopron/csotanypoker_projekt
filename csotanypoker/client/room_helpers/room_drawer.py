@@ -108,69 +108,71 @@ class RoomDrawer:
             "Regular",
             TITLE_FONT_SIZE,
         )
-
     def _draw_menu(self):
-        """Felső menü rajzolása"""
-        menu_font_size = 38
-        section_width = self.screen.client.width // 5
-        menu_y = self.screen.client.height // 6
-        input_height = 40
+            """Felső menü rajzolása"""
+            menu_font_size = 38
+            section_width = self.screen.client.width // 5
+            menu_y = self.screen.client.height // 6
+            input_height = 40
 
-        name_x = section_width // 2 + 30
-        draw_text(
-            self.screen.client.window,
-            "Név",
-            DARK_GREEN,
-            name_x,
-            menu_y,
-            True,
-            "Regular",
-            menu_font_size,
-        )
+            name_x = section_width // 2 + 30
+            draw_text(
+                self.screen.client.window,
+                "Név",
+                DARK_GREEN,
+                name_x,
+                menu_y,
+                True,
+                "Regular",
+                menu_font_size,
+            )
 
-        input_x = name_x + 60
-        input_width = self.screen.client.width // 4
-        self.screen.search_input = create_standard_input_rect(
-            input_x, menu_y - input_height // 2, input_width, input_height
-        )
+            input_x = name_x + 60
+            input_width = self.screen.client.width // 4
+            self.screen.search_input = create_standard_input_rect(
+                input_x, menu_y - input_height // 2, input_width, input_height
+            )
+            
+            self.screen.input_handler.input_rects['search'] = self.screen.search_input
 
-        draw_input_field(
-            self.screen.client.window,
-            self.screen.search_input,
-            self.screen.input_handler.inputs["search"],
-            self.screen.input_handler.is_active("search"),
-            placeholder="Keresés...",
-            text_color=DARK_GREEN,
-            cursor_color=DARK_GREEN,
-            placeholder_color=MIDDLE_GREEN,
-            font_size=25,
-        )
+            draw_input_field(
+                self.screen.client.window,
+                self.screen.search_input,
+                self.screen.input_handler.inputs["search"],
+                self.screen.input_handler.is_active("search"),
+                input_id="search",
+                placeholder="Keresés...",
+                text_color=DARK_GREEN,
+                cursor_color=DARK_GREEN,
+                placeholder_color=MIDDLE_GREEN,
+                font_size=25,
+            )
 
-        self._draw_search_and_filter_buttons(input_x + input_width + 20, menu_y)
+            self._draw_search_and_filter_buttons(input_x + input_width + 20, menu_y)
 
-        self.screen.password_x = section_width * 3 + (section_width // 2)
-        draw_text(
-            self.screen.client.window,
-            "Jelszóvédett",
-            DARK_GREEN,
-            self.screen.password_x,
-            menu_y,
-            True,
-            "Regular",
-            menu_font_size,
-        )
+            self.screen.password_x = section_width * 3 + (section_width // 2)
+            draw_text(
+                self.screen.client.window,
+                "Jelszóvédett",
+                DARK_GREEN,
+                self.screen.password_x,
+                menu_y,
+                True,
+                "Regular",
+                menu_font_size,
+            )
 
-        self.screen.count_x = section_width * 4 + (section_width // 2)
-        draw_text(
-            self.screen.client.window,
-            "Létszám",
-            DARK_GREEN,
-            self.screen.count_x,
-            menu_y,
-            True,
-            "Regular",
-            menu_font_size,
-        )
+            self.screen.count_x = section_width * 4 + (section_width // 2)
+            draw_text(
+                self.screen.client.window,
+                "Létszám",
+                DARK_GREEN,
+                self.screen.count_x,
+                menu_y,
+                True,
+                "Regular",
+                menu_font_size,
+            )
 
     def _draw_search_and_filter_buttons(self, icons_x, menu_y):
         """Keresés és szűrő gombok"""
@@ -292,11 +294,15 @@ class RoomDrawer:
         join_enabled = self.screen._is_join_enabled()
 
         if selected_room and selected_room.password_protected:
+
+            self.screen.input_handler.input_rects['join_password'] = self.screen.join_password_input
+            
             draw_input_field(
                 self.screen.client.window,
                 self.screen.join_password_input,
                 self.screen.input_handler.inputs["join_password"],
                 self.screen.input_handler.is_active("join_password"),
+                input_id="join_password",  
                 placeholder="Jelszó",
                 is_password=True,
                 font_size=20,
@@ -311,6 +317,7 @@ class RoomDrawer:
             is_pressed="join" in self.screen.pressed_elements,
         )
 
+
     def _draw_room_creation(self):
         """Szoba létrehozás szekció"""
         creation_start_y = self.screen.client.height // 1.4 + 70
@@ -319,16 +326,20 @@ class RoomDrawer:
         self._draw_password_section(creation_start_y)
         self._draw_create_button(creation_start_y)
 
+
     def _draw_room_name_section(self, y_pos):
         """Szoba neve input"""
-        self.screen.room_name_input = create_standard_input_rect(250, y_pos - 20)
+        self.screen.room_name_input = create_standard_input_rect(250, y_pos - 15)
+        
+
+        self.screen.input_handler.input_rects['room_name'] = self.screen.room_name_input
 
         draw_text(
             self.screen.client.window,
             "Szoba neve:",
             DARK_GREEN,
             100,
-            y_pos - 15,
+            y_pos - 10,
             False,
             "regular",
             30,
@@ -339,6 +350,7 @@ class RoomDrawer:
             self.screen.room_name_input,
             self.screen.input_handler.inputs["room_name"],
             self.screen.input_handler.is_active("room_name"),
+            input_id="room_name", 
             placeholder=f"{self.screen.client.user.username} szobája",
             placeholder_color=MIDDLE_GREEN,
         )
@@ -356,7 +368,68 @@ class RoomDrawer:
             max_players_label_rect.x + max_players_label_rect.width + 10,
             y_pos - 20,
             70,
+            60,
+        )
+        
+        self.screen.input_handler.input_rects['max_players'] = self.screen.max_count
+
+        display_text = (
+            self.screen.input_handler.inputs["max_players"]
+            if self.screen.input_handler.is_active("max_players")
+            else str(self.screen.max_players)
+        )
+
+        draw_text(
+            self.screen.client.window,
+            "Max létszám:",
+            DARK_GREEN,
+            max_players_label_rect.x,
+            y_pos,
+            False,
+            "regular",
+            30,
+            vcenter_rect=max_players_label_rect,
+        )
+
+        draw_input_field(
+            self.screen.client.window,
+            self.screen.max_count,
+            display_text,
+            self.screen.input_handler.is_active("max_players"),
+            input_id="max_players",  
+            text_color=DARK_GREEN,
+            background_color=LIGHT_GREEN_TRANSPARENT,
+            border_color=MIDDLE_GREEN,
+            cursor_color=DARK_GREEN,
+            font_size=30,
+        )
+
+        arrows_x = self.screen.max_count.x + self.screen.max_count.width + 5
+        arrows_y = self.screen.max_count.y - 3
+        up_and_down_buttons = load_image("fel_le_nyilak", "button", size=(80, 64))
+        draw_image(
+            self.screen.client.window, up_and_down_buttons, arrows_x, arrows_y, False
+        )
+
+        self.screen.max_players_up = pygame.Rect(arrows_x, arrows_y, 80, 33)
+        self.screen.max_players_down = pygame.Rect(arrows_x, arrows_y + 33, 80, 33)
+
+
+
+    def _draw_max_players_section(self, y_pos):
+        """Max létszám választó"""
+        max_players_label_rect = pygame.Rect(
+            self.screen.room_name_input.x + self.screen.room_name_input.width + 20,
+            y_pos - 20,
+            150,
             55,
+        )
+
+        self.screen.max_count = pygame.Rect(
+            max_players_label_rect.x + max_players_label_rect.width + 10,
+            y_pos - 20,
+            70,
+            60,
         )
 
         display_text = (
@@ -390,8 +463,8 @@ class RoomDrawer:
         )
 
         arrows_x = self.screen.max_count.x + self.screen.max_count.width + 5
-        arrows_y = self.screen.max_count.y - 8
-        up_and_down_buttons = load_image("fel_le_nyilak", "button", size=(80, 65))
+        arrows_y = self.screen.max_count.y - 3
+        up_and_down_buttons = load_image("fel_le_nyilak", "button", size=(80, 64))
         draw_image(
             self.screen.client.window, up_and_down_buttons, arrows_x, arrows_y, False
         )
@@ -402,8 +475,9 @@ class RoomDrawer:
     def _draw_password_section(self, y_pos):
         """Jelszó védelem szekció"""
         self.screen.create_password_input = create_standard_input_rect(
-            self.screen.client.width // 2 + 200, y_pos - 20, 250, 50
+            self.screen.client.width // 2 + 200, y_pos - 15, 250, 50
         )
+        self.screen.input_handler.input_rects['password'] = self.screen.create_password_input
 
         checkbox_x = self.screen.create_password_input.x - 60
         checkbox_y = self.screen.create_password_input.y
@@ -423,6 +497,7 @@ class RoomDrawer:
                 self.screen.create_password_input,
                 self.screen.input_handler.inputs["password"],
                 self.screen.input_handler.is_active("password"),
+                input_id="password", 
                 placeholder="Jelszó",
                 placeholder_color=MIDDLE_GREEN,
                 is_password=True,
@@ -432,7 +507,7 @@ class RoomDrawer:
         """Létrehozás gomb"""
         self.screen.create_button = pygame.Rect(
             self.screen.client.width - 190 - self.screen.BUTTON_PADDING,
-            y_pos - 35,
+            y_pos - 25,
             190,
             70,
         )
