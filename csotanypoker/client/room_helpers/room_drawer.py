@@ -613,4 +613,7 @@ class RoomDrawer:
             volume_rect.centerx,
             volume_rect.centery,
             "sound",
+            self.screen.client._music_manager.sound_effects_volume,
+            self.screen.client._music_manager.music_volume,
+            center_button=True,
         )

@@ -3,10 +3,16 @@ import random
 import uuid
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from csotanypoker.models.user import AI_NAMES, Client_User, this_is_ai_name
+from csotanypoker.models.user import (
+    AI_NAMES,
+    Client_User,
+    is_ai_player,
+    this_is_ai_name,
+)
 from csotanypoker.models.room import Room
 from csotanypoker.server.database import DBUser, DBRoom, DBGame, get_db_session
 from csotanypoker.server.password_manager import hash_password, verify_password
+
 
 class RoomManager:
     def __init__(self, socketio, sockets: dict):
@@ -28,7 +34,7 @@ class RoomManager:
             room.player_count = user_count
             db.commit()
 
-    def validate_room_password(self,  room_id: str, provided_password: str) -> bool:
+    def validate_room_password(self, room_id: str, provided_password: str) -> bool:
         with get_db_session() as db:
             room = self.get_room_by_id(db, room_id)
             if not room:
@@ -66,7 +72,6 @@ class RoomManager:
         db.commit()
         return db_room
 
-
     def join_user_to_room(self, db: Session, room_id: str, username: str) -> bool:
         db_user = db.query(DBUser).filter(DBUser.username == username).first()
         target_room = self.get_room_by_id(db, room_id)
@@ -92,7 +97,6 @@ class RoomManager:
 
     def remove_all_users_from_room(
         self,
-        
         room_id: str,
         current_username: Optional[str] = None,
         reconnecting: bool = False,
@@ -106,7 +110,9 @@ class RoomManager:
             removed_users = []
 
             for user in room_users:
-                dbuser = db.query(DBUser).filter(DBUser.username == user.username).first()
+                dbuser = (
+                    db.query(DBUser).filter(DBUser.username == user.username).first()
+                )
 
                 if reconnecting and dbuser.username == current_username:
                     dbuser.is_active = True
@@ -137,26 +143,22 @@ class RoomManager:
 
     def get_rooms_data(self) -> dict:
         with get_db_session() as db:
-                
             rooms_data = {}
             rooms = db.query(DBRoom).all()
 
             for room in rooms:
-                player_count = self.user_counter( room.room_id)
+                player_count = self.user_counter(room.room_id)
                 has_running_game = self.game_is_running(db, room.room_id)
                 has_human = self.has_human_player_in_room(db, room.room_id)
 
                 if not has_running_game and player_count != 0 and has_human:
-                    rooms_data[room.room_id] = {
-                        "name": room.name,
-                        "max_player_count": room.max_player_count,
-                        "password_protected": True if room.password else False,
-                        "player_count": player_count,
-                    }
+                  
+                    room_model = self.get_room_model(db, room.room_id)
+                    rooms_data[room.room_id] = room_model.model_dump()
 
             return rooms_data
-    
-    def user_counter(self,  room_id: str) -> int:
+
+    def user_counter(self, room_id: str) -> int:
         with get_db_session() as db:
             users = self.get_room_users(db, room_id)
             return len(users)
@@ -172,8 +174,7 @@ class RoomManager:
     def has_human_player_in_room(self, db: Session, room_id: str) -> bool:
         room_users = self.get_room_users(db, room_id)
         for user in room_users:
-            base_name = self._extract_ai_base_name(user.username)
-            if base_name not in AI_NAMES:
+            if not is_ai_player(user.username):
                 return True
         return False
 
@@ -184,7 +185,9 @@ class RoomManager:
                 return False
 
             for user in room_users:
-                db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
+                db_user = (
+                    db.query(DBUser).filter(DBUser.username == user.username).first()
+                )
                 if not db_user or not db_user.is_active:
                     print(f"Player {user.username} is not active")
                     return False
@@ -216,7 +219,7 @@ class RoomManager:
         if not db_room:
             return None
 
-        player_count = self.user_counter( room_id)
+        player_count = self.user_counter(room_id)
 
         return Room(
             room_id=room_id,
@@ -232,9 +235,12 @@ class RoomManager:
             Client_User(username=r_u.username, is_active=r_u.is_active)
             for r_u in room_users
         ]
-    def create_ai_user_in_db(self,ai_username: str) -> DBUser:
+
+    def create_ai_user_in_db(self, ai_username: str) -> DBUser:
         with get_db_session() as db:
-            existing_ai = db.query(DBUser).filter(DBUser.username == ai_username).first()
+            existing_ai = (
+                db.query(DBUser).filter(DBUser.username == ai_username).first()
+            )
             if existing_ai:
                 return existing_ai
             ai_user = DBUser(
@@ -258,9 +264,10 @@ class RoomManager:
         base_name = random.choice(available_names)
         return f"{base_name}_{room_id}"
 
-    @staticmethod
-    def _extract_ai_base_name(name: str) -> str:
-        for ai_name in AI_NAMES:
-            if name.startswith(ai_name):
-                return ai_name
-        return name
+    def get_players_list(self, db: Session, room_id: str) -> list:
+        """Visszaadja a szoba játékosainak listáját username és is_active adatokkal"""
+        room_users = self.get_room_users(db, room_id)
+        return [
+            Client_User(username=user.username, is_active=user.is_active)  
+            for user in room_users
+        ]

@@ -93,7 +93,7 @@ class GameLogic:
                     self.state.visited_already.add(self.state.active_player.username)
                 return
 
-    def make_statement(self, statement=None):
+    def make_statement(self, statement=""):
         self.state.active_player.statement = statement
 
     def check_truth(self, answer):

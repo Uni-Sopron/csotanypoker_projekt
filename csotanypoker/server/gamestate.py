@@ -59,10 +59,14 @@ class GameState(AbstractGameState):
         None, description="Összes játékos a játékban"
     )
     ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
-    passing: bool = Field(False, description="Az aktív játékos éppen passol")
 
     def __init__(self, **data):
         save_path = data.get("save_path")
+
+      
+        if "passing" not in data:
+            data["passing"] = False
+
         super().__init__(**data)
 
         if self.visited_already is None:

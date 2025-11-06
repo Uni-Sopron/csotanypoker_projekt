@@ -9,18 +9,18 @@ from csotanypoker.models.animal import Animal
 
 def preload_all_images():
     for animal in Animal:
-        _get_cached_image(animal.value, "logo")
+        _get_cached_image(animal, "logo")
 
-        _get_cached_scaled_image(animal.value, "logo", (50, 50))
-        _get_cached_scaled_image(animal.value, "logo", (58, 58))
-        _get_cached_scaled_image(animal.value, "logo", (64, 64))  # hover
-        _get_cached_scaled_image(animal.value, "logo", (70, 70))  # active
+        _get_cached_scaled_image(animal, "logo", (50, 50))
+        _get_cached_scaled_image(animal, "logo", (58, 58))
+        _get_cached_scaled_image(animal, "logo", (64, 64))  # hover
+        _get_cached_scaled_image(animal, "logo", (70, 70))  # active
 
     for animal in Animal:
-        _get_cached_image(animal.value, "card")
+        _get_cached_image(animal, "card")
 
         card_size = (int(650 * 0.17), int(1000 * 0.17))
-        _get_cached_scaled_image(animal.value, "card", card_size)
+        _get_cached_scaled_image(animal, "card", card_size)
 
     ui_elements = [
         "question_mark",
@@ -83,7 +83,7 @@ def _get_cached_scaled_image(name: str, image_type: str, size: tuple) -> pygame.
     return _scaled_image_cache[scale_key]
 
 
-def load_image(name, image_type=None, type=None, scale_ratio=None, size=None):
+def load_image(name: str, image_type=None, type=None, scale_ratio=None, size=None):
     if type is not None and image_type is None:
         image_type = type
 

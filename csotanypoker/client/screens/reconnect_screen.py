@@ -1,3 +1,4 @@
+from http import client
 import pygame
 
 from csotanypoker.client.screens.base_screen import BaseScreen
@@ -126,6 +127,9 @@ class ReconnectScreen(BaseScreen):
             volume_rect.centerx,
             volume_rect.centery,
             "sound",
+            self.client._music_manager.sound_effects_volume,
+            self.client._music_manager.music_volume,
+            center_button=True
         )
         if self.client.message:
             draw_text(

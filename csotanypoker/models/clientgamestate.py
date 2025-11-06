@@ -12,12 +12,13 @@ class AbstractGameState(BaseModel):
         set(), description="Azoknak a neve akiknél már volt a kérdéses kártya"
     )
     voters: Optional[Set[str]] = Field(set(), description="Szavazók nevei")
-
+    passing: bool = Field(
+            False, description="Jelzi, hogy a játékos passzol-e ebben a körben"
+        )
 
 class ClientGameState(AbstractGameState):
     active_player: Optional[str] = Field(None, description="Aktív játékos neve")
     targeted_player: Optional[str] = Field(None, description="Célzott játékos neve")
-
     @field_serializer("question_card")
     def serialize_question_card(self, value):
         if value is None:

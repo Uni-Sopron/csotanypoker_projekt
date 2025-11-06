@@ -40,7 +40,6 @@ class GameScreen(BaseScreen):
         self.show_leave_button = False
         self.adott = False
         self.answer = False
-        self.client.passed = False
 
         # Lokális választások
         self.local_question_card = None

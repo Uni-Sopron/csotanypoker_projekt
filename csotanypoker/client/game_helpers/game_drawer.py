@@ -43,7 +43,7 @@ class GameDrawer:
     def _preload_logos(self):
         for animal in Animal:
             self._logo_images_cache[animal] = load_image(
-                animal.value, image_type="logo", size=(50, 50)
+                animal, image_type="logo", size=(50, 50)
             )
 
     def draw_all(self):
@@ -143,7 +143,7 @@ class GameDrawer:
                 self.screen.client.window,
                 card,
                 self.screen.client.width // 2,
-                self.screen.client.height // 2,
+                (self.screen.client.height // 2) + 20,
                 centered=True,
             )
             return
@@ -160,7 +160,7 @@ class GameDrawer:
             self.screen.client.window,
             card,
             self.screen.client.width // 2,
-            self.screen.client.height // 2,
+            (self.screen.client.height // 2) + 20,
             centered=True,
         )
 
@@ -235,7 +235,7 @@ class GameDrawer:
             lap_csoportok[lap.value].append(lap)
 
         rendezett_allatok = [
-            animal.value for animal in Animal if animal.value in lap_csoportok
+            str(animal) for animal in Animal if str(animal) in lap_csoportok
         ]
 
         tipus_szam = len(rendezett_allatok)
@@ -367,7 +367,7 @@ class GameDrawer:
                     if player.username == self.screen.client.game_state.active_player
                 ]
 
-                if active_statement and active_statement[0] is not None:
+                if active_statement and active_statement[0] is not "":
                     statement_text = (
                         f"Ez egy {self._translate_animal(str(active_statement[0]))}"
                     )
@@ -418,7 +418,7 @@ class GameDrawer:
             return
 
         statement = self.screen.client.visible_player.statement
-        if statement is None:
+        if statement is "":
             return
 
         statement_text = f"Ez egy {self._translate_animal(statement)}"
@@ -509,26 +509,28 @@ class GameDrawer:
             font_size=25,
         )
 
-        if not hasattr(self.screen.client.visible_player, 'cards_in_front'):
+        if not hasattr(self.screen.client.visible_player, "cards_in_front"):
             return
-        
+
         cards_in_front = self.screen.client.visible_player.cards_in_front or {}
         if not cards_in_front:
             return
-        
+
         items_per_column = max(1, (len(cards_in_front) + 1) // 2)
-        
+
         for i, card in enumerate(cards_in_front):
             col = i // items_per_column
             row = i % items_per_column
-            
+
             x_pos = table_x + 35 + (col * table_width // 2 - 20)
             y_pos = table_y + 110 + (row * 55)
-            
+
             if card in self._logo_images_cache:
                 logo = self._logo_images_cache[card]
-                draw_image(self.screen.client.window, logo, x_pos, y_pos, centered=False)
-                
+                draw_image(
+                    self.screen.client.window, logo, x_pos, y_pos, centered=False
+                )
+
                 draw_text(
                     self.screen.client.window,
                     f"{cards_in_front[card]}",
@@ -629,21 +631,20 @@ class GameDrawer:
 
             temp_rect = pygame.Rect(button_center_x - 30, button_center_y - 25, 60, 50)
             is_hovered = temp_rect.collidepoint(mouse_pos)
-            is_active = self.screen.local_active_animal == animal.value
+            is_active = self.screen.local_active_animal == str(animal)
 
-          
             if is_active:
                 pygame.draw.circle(
                     self.screen.client.window,
                     LEGVILAGOS_ZOLD,
-                    (button_center_x+1, button_center_y+1),
+                    (button_center_x + 1, button_center_y + 1),
                     35,
                     6,
                 )
-               
+
             button_rect = draw_image_button(
                 surface=self.screen.client.window,
-                image_name=animal.value,
+                image_name=animal,
                 image_type="logo",
                 x=button_center_x,
                 y=button_center_y,
@@ -653,11 +654,11 @@ class GameDrawer:
                 is_hovered=is_hovered,
                 is_active=is_active,
                 hover_scale=1.1,
-                active_scale=1.1, 
+                active_scale=1.1,
                 centered=True,
             )
 
-            self.screen.animal_button_rects[animal.value] = button_rect
+            self.screen.animal_button_rects[str(animal)] = button_rect
         self.screen.oke_button = pygame.Rect(
             table_x + table_width // 2 - 70, table_y + table_height - 50, 140, 45
         )
@@ -758,7 +759,7 @@ class GameDrawer:
 
             draw_text(
                 self.screen.client.window,
-                f"Lapszám: {player.card_count_int}",
+                f"Lapszám: {player.card_count()}",
                 font_color,
                 player_panel_rect.x + 10,
                 player_panel_rect.y + 40,
@@ -770,7 +771,7 @@ class GameDrawer:
             if player.cards_in_front:
                 card_start_y = player_panel_rect.y + 75
                 col_width, row_height = 70, 38
-                
+
                 for j, (card, count) in enumerate(player.cards_in_front.items()):
                     column, row = j % 2, j // 2
                     pos_x = player_panel_rect.x + 15 + (column * col_width)
@@ -778,8 +779,12 @@ class GameDrawer:
                     if card in self._logo_images_cache:
                         logo = self._logo_images_cache[card]
                         draw_image(
-                            self.screen.client.window, logo,
-                            pos_x, pos_y, size=(37, 37), centered=False
+                            self.screen.client.window,
+                            logo,
+                            pos_x,
+                            pos_y,
+                            size=(37, 37),
+                            centered=False,
                         )
 
                         draw_text(
@@ -808,9 +813,11 @@ class GameDrawer:
                     border_width=3,
                     border_radius=0.15,
                 )
-            
-            self.screen.opponent_player_rects.append((player_panel_rect, player.username))
-    
+
+            self.screen.opponent_player_rects.append(
+                (player_panel_rect, player.username)
+            )
+
     def _draw_bottom_buttons(self):
         """Alsó gombok rajzolása"""
         draw_rules_button(self.screen.client.window, self.screen.rules_button)
@@ -823,6 +830,10 @@ class GameDrawer:
             volume_rect.centerx,
             volume_rect.centery,
             "sound",
+            volume_sound=self.screen.client._music_manager.sound_effects_volume,
+            volume_music=self.screen.client._music_manager.music_volume,
+            center_button=True,
+            
         )
 
     def _translate_animal(self, animal_name: str) -> str:

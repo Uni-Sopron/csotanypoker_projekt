@@ -182,6 +182,9 @@ class EndScreen(BaseScreen):
             volume_rect.centerx,
             volume_rect.centery,
             "sound",
+            self.client._music_manager.sound_effects_volume,
+            self.client._music_manager.music_volume,
+            center_button=True
         )
 
     def auto_leave(self) -> None:

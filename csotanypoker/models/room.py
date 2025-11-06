@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class Room(BaseModel):
     """
-    Pydantic séma a Room osztályhoz (üzleti logika)
+    Pydantic séma a Room osztályhoz 
     """
 
     model_config = ConfigDict(

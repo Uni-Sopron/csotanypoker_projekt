@@ -1,7 +1,7 @@
 import os
 import uuid
 import json
-from typing import Optional, Dict
+from typing import List, Optional, Dict
 
 from sqlalchemy.orm import Session
 from csotanypoker.models.animal import Animal
@@ -9,7 +9,7 @@ from csotanypoker.models.player import VisiblePlayer, OpponentPlayer
 from csotanypoker.server.game_background import GameLogic
 from csotanypoker.models.clientgamestate import ClientGameState
 from csotanypoker.server.gamestate import GameState
-from csotanypoker.models.user import AI_NAMES
+from csotanypoker.models.user import AI_NAMES, is_ai_player, this_is_ai_name
 from csotanypoker.server.database import DBUser, DBGame
 
 
@@ -75,7 +75,7 @@ class GameManager:
             print(f"Hiba a játékok betöltése során: {e}")
 
     def start_game(
-        self, db: Session, players: list, room_id: str, reconnect: bool = False
+        self, db: Session, players: List[str], room_id: str, reconnect: bool = False
     ) -> None:
         db_room = self.room_manager.get_room_by_id(db, room_id)
         if not db_room:
@@ -139,8 +139,7 @@ class GameManager:
                 self.game_instances[str(room_id)] = GameLogic(
                     id=unique_game_id,
                     players=[
-                        VisiblePlayer(username=str(user["username"]))
-                        for user in players
+                        VisiblePlayer(username=str(username)) for username in players
                     ],
                     room_id=room_id,
                 )
@@ -153,10 +152,7 @@ class GameManager:
                 )
                 db.add(db_game)
                 db.commit()
-                for player in players:
-                    username = (
-                        player["username"] if isinstance(player, dict) else player
-                    )
+                for username in players:
                     db_user = (
                         db.query(DBUser).filter(DBUser.username == username).first()
                     )
@@ -210,7 +206,7 @@ class GameManager:
         game_instance,
         room_id: str,
         hide_card_for_unvisited: bool = True,
-        message: str = "",
+
     ):
         try:
             active_users = (
@@ -219,20 +215,21 @@ class GameManager:
                 .all()
             )
             active_usernames = {user.username for user in active_users}
-
+           
             for player in game_instance.state.players:
                 if player.username in active_usernames:
                     player_sid = self.sockets.get(player.username)
-                    if self.is_ai_player(player.username):
+                    if is_ai_player(player.username):
                         continue
                     else:
                         if player_sid:
+                           
                             self._send_game_state_to_single_player(
                                 game_instance,
                                 player,
                                 player_sid,
                                 hide_card_for_unvisited,
-                                message,
+                               
                             )
                         else:
                             print(f"No socket ID found for player: {player.username}")
@@ -246,11 +243,11 @@ class GameManager:
         player,
         player_sid,
         hide_card_for_unvisited: bool,
-        message: str,
     ):
         try:
+            print(f"Building game state for player: {player.username}")
             client_game_state = self._build_client_game_state(game_instance)
-
+            print(f"Preparing to send game state to {player.username}")
             if (
                 hide_card_for_unvisited
                 and game_instance.state.question_card
@@ -270,8 +267,6 @@ class GameManager:
                 "game_state": client_game_state,
                 "visible_player_data": visible_player_data,
                 "opponent_players_data": opponent_players_data,
-                "message": message,
-                "passing": game_instance.state.passing,
             }
 
             try:
@@ -296,6 +291,7 @@ class GameManager:
             if game_instance.state.targeted_player
             else None,
             question_card=game_instance.state.question_card,
+            passing=game_instance.state.passing,
         ).model_dump()
 
     def _build_visible_player_data(self, player_data) -> dict:
@@ -320,7 +316,6 @@ class GameManager:
 
             client_game_state = data.get("game_state", {})
             statement = data.get("statement", "")
-            game_instance.state.passing = data.get("pass", False)
 
             for card in Animal:
                 if card.value == client_game_state["question_card"]:
@@ -352,7 +347,7 @@ class GameManager:
                 db, game_instance, room_id, hide_card_for_unvisited=True
             )
 
-            if self.is_ai_player(game_instance.state.targeted_player.username):
+            if is_ai_player(game_instance.state.targeted_player.username):
                 self.ai_guess(db, game_instance, room_id)
 
         except Exception as e:
@@ -360,7 +355,7 @@ class GameManager:
 
     def _process_guess(self, db: Session, game_instance, room_id: str, guess: bool):
         try:
-            was_truthful, nextplayer = game_instance.state.ai_player.process_guess(
+            was_truthful, nextplayer = game_instance.state.ai_player.evaluate_guess(
                 game_instance, guess
             )
 
@@ -382,24 +377,30 @@ class GameManager:
         except Exception as e:
             print(f"Error in _process_guess: {e}")
 
-    def _reset_callback(self, db: Session, nextplayer, game_instance, room_id: str):
-        game_instance.state.ai_player.reset_round(
-            game_instance.state.question_card, game_instance.state.players
-        )
-        game_instance.state.active_player = nextplayer
-
+    def _check_and_handle_game_end(
+        self, db: Session, game_instance, room_id: str
+    ) -> bool:
         if game_instance.has_cards_in_hand():
             self.game_end(db, room_id)
-            return
+            return True
 
         if game_instance.has_4_cards_in_front():
             self.game_end(db, room_id)
+            return True
+
+        return False
+
+    def _reset_callback(self, db: Session, nextplayer, game_instance, room_id: str):
+        game_instance.state.ai_player.reset_round(game_instance.state.players)
+        game_instance.state.active_player = nextplayer
+
+        if self._check_and_handle_game_end(db, game_instance, room_id):
             return
 
         game_instance.state.question_card = None
         game_instance.state.targeted_player = None
         game_instance.state.visited_already = set()
-        game_instance.state.passing = False 
+        game_instance.state.passing = False
         self.send_game_state_to_players(
             db, game_instance, room_id, hide_card_for_unvisited=True
         )
@@ -412,28 +413,38 @@ class GameManager:
             return
 
         active_player_name = game_instance.state.active_player.username
-        base_name = self._extract_ai_base_name(active_player_name)
-
-        if (
-            base_name not in AI_NAMES
-            or not self.room_manager.all_players_active_in_room(room_id)
-        ):
+      
+        if not is_ai_player(
+            active_player_name
+        ) or not self.room_manager.all_players_active_in_room(room_id):
             return
 
         try:
             active_player = game_instance.state.active_player
-            print(
-                f"AI activity for {active_player.username} - passing: {passing}"
-            )
+           
+            opponent_player_data = [
+                OpponentPlayer(
+                    username=p.username,
+                    cards_in_front=p.cards_in_front,
+                    statement=p.statement,
+                    is_true=p.is_true,
+                    card_count_int=len(p.cards_in_hand),
+                )
+                for p in game_instance.state.players
+                if p.username != active_player.username
+            ]
+
+         
             selected_card, target_player_name, statement = (
                 game_instance.state.ai_player.select_card_and_target(
-                    game_instance.state.players,
+                    opponent_player_data,
                     game_instance.state.question_card,
                     game_instance.state.visited_already,
                     active_player,
                     passing,
                 )
             )
+            
 
             if selected_card is None or target_player_name is None:
                 if passing:
@@ -469,15 +480,6 @@ class GameManager:
         room_id = game_instance.state.room_id
         if not self.room_manager.all_players_active_in_room(room_id):
             return
-
-        if not passing:
-            message = f"{self._extract_ai_base_name(game_instance.state.active_player.username)} új kört kezd..."
-        else:
-            message = f"{self._extract_ai_base_name(game_instance.state.active_player.username)} folytatja..."
-
-        self.send_game_state_to_players(
-            db, game_instance, room_id, hide_card_for_unvisited=True, message=message
-        )
 
         self.socketio.sleep(1.0)
 
@@ -519,16 +521,7 @@ class GameManager:
         if not self.room_manager.all_players_active_in_room(room_id):
             return
 
-        active_player = game_instance.state.active_player
-        statement = active_player.statement
-
-        choice = game_instance.state.ai_player.make_guess_decision(
-            game_instance.state.active_player,
-            game_instance.state.targeted_player,
-            game_instance.state.players,
-            game_instance.state.visited_already,
-            statement,
-        )
+        choice = game_instance.state.ai_player.decide_guess(game_instance)
 
         if choice == "pass":
             self.ai_pass_internal(db, game_instance, room_id)
@@ -545,19 +538,17 @@ class GameManager:
             game_instance,
             room_id,
             hide_card_for_unvisited=True,
-            message=f"{self._extract_ai_base_name(game_instance.state.active_player.username)} passzolt.",
+          
         )
-        
 
         if game_instance.state.targeted_player is not None:
             next_player = game_instance.state.targeted_player
             game_instance.state.active_player = next_player
             game_instance.state.targeted_player = None
 
-        if game_instance.has_4_cards_in_front():
-            self.game_end(db, room_id)
-            return
 
+        if self._check_and_handle_game_end(db, game_instance, room_id):
+            return
         self.socketio.sleep(3.0)
         self.send_game_state_to_players(
             db, game_instance, room_id, hide_card_for_unvisited=False
@@ -565,8 +556,7 @@ class GameManager:
 
         if self.room_manager.all_players_active_in_room(room_id):
             active_player_name = game_instance.state.active_player.username
-            base_name = self._extract_ai_base_name(active_player_name)
-            if base_name in AI_NAMES:
+            if is_ai_player(active_player_name):
                 self.ai_activity(db, game_instance, room_id, passing=True)
 
     def resume_ai_activity_if_needed(self, db: Session, room_id: str):
@@ -575,18 +565,16 @@ class GameManager:
             return
 
         active_player_name = game_instance.state.active_player.username
-        base_name = self._extract_ai_base_name(active_player_name)
 
-        if base_name in AI_NAMES and self.room_manager.all_players_active_in_room(
-            room_id
-        ):
+        if is_ai_player(
+            active_player_name
+        ) and self.room_manager.all_players_active_in_room(room_id):
             has_question_card = game_instance.state.question_card is not None
             has_targeted_player = game_instance.state.targeted_player is not None
 
             if has_question_card and has_targeted_player:
                 targeted_player_name = game_instance.state.targeted_player.username
-                targeted_base_name = self._extract_ai_base_name(targeted_player_name)
-                if targeted_base_name in AI_NAMES:
+                if is_ai_player(targeted_player_name):
                     self.ai_guess(db, game_instance, room_id)
                     return
 
@@ -600,13 +588,3 @@ class GameManager:
                 )
                 self.ai_activity(db, game_instance, room_id)
 
-    def is_ai_player(self, username: str) -> bool:
-        base_name = self._extract_ai_base_name(username)
-        return base_name in AI_NAMES
-
-    @staticmethod
-    def _extract_ai_base_name(name: str) -> str:
-        for ai_name in AI_NAMES:
-            if name.startswith(ai_name):
-                return ai_name
-        return name

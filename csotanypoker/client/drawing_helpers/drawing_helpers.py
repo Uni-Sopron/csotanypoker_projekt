@@ -23,21 +23,21 @@ class InputState:
     def __init__(self):
         self.cursor_pos = 0
         self.last_backspace_time = 0
-        self.backspace_initial_delay = 500  
-        self.backspace_repeat_delay = 50   
+        self.backspace_initial_delay = 500
+        self.backspace_repeat_delay = 50
         self.backspace_held = False
-    
+
         self.left_held = False
         self.right_held = False
         self.last_arrow_time = 0
-        self.arrow_initial_delay = 400  
-        self.arrow_repeat_delay = 80  
-       
+        self.arrow_initial_delay = 400
+        self.arrow_repeat_delay = 80
+
         self.char_held = None
         self.last_char_time = 0
-        self.char_initial_delay = 500 
-        self.char_repeat_delay = 30 
-        
+        self.char_initial_delay = 500
+        self.char_repeat_delay = 30
+
     def reset(self):
         self.cursor_pos = 0
         self.last_backspace_time = 0
@@ -47,7 +47,6 @@ class InputState:
         self.last_arrow_time = 0
         self.char_held = None
         self.last_char_time = 0
-
 
 
 _input_states = {}
@@ -65,7 +64,15 @@ def clear_input_state(input_id):
         del _input_states[input_id]
 
 
-def draw_sound_volume(surface, x, y, type):
+def draw_sound_volume(
+    surface, x, y, type, volume_sound=None, volume_music=None, center_button=False
+):
+    if center_button == True:
+        if volume_sound == 0 and volume_music == 0:
+            type = type + "_0"
+    else:
+        if volume_sound == 0 or volume_music == 0:
+            type = type + "_0"
     volume_image = load_image(type, "button", size=(60, 60))
     draw_image(surface, volume_image, x, y, centered=True)
 
@@ -77,7 +84,6 @@ def create_volume_button_rect(x, y):
 def _draw_rounded_rect(
     surface, color, rect, border_color=None, border_width=0, border_radius=0.27
 ):
-    
     radius = int(min(rect.width, rect.height) * border_radius)
 
     if color:
@@ -95,6 +101,7 @@ def _draw_rounded_rect(
             surface, border_color, rect, width=border_width, border_radius=radius
         )
 
+
 def _draw_cursor(
     surface,
     rect,
@@ -110,20 +117,20 @@ def _draw_cursor(
     font_size=27,
     is_password=False,
 ):
-
     if not (is_active and cursor_visible):
         return
 
-
     text_before_cursor = text[:cursor_pos]
-    text_before_surface = _render_text_surface(text_before_cursor, font_size, cursor_color, is_password)
-    
+    text_before_surface = _render_text_surface(
+        text_before_cursor, font_size, cursor_color, is_password
+    )
+
     cursor_x = text_x + text_before_surface.get_width()
 
     if rect.x + padding <= cursor_x <= rect.x + rect.width - padding:
         cursor_top = rect.y + (rect.height - text_surface.get_height()) // 2
         cursor_bottom = cursor_top + text_surface.get_height()
-        
+
         pygame.draw.line(
             surface,
             cursor_color,
@@ -131,6 +138,8 @@ def _draw_cursor(
             (cursor_x, cursor_bottom),
             2,
         )
+
+
 def draw_input_box(
     surface,
     rect,
@@ -148,9 +157,8 @@ def draw_input_box(
     padding=15,
     placeholder=None,
     placeholder_color=(128, 128, 128),
-    text_align='center',  
+    text_align="center",
 ):
-
     bg_color = (
         active_background_color
         if (is_active and active_background_color)
@@ -160,18 +168,25 @@ def draw_input_box(
 
     state = get_input_state(input_id) if input_id else None
     if state and is_active:
-
         state.cursor_pos = max(0, min(state.cursor_pos, len(text)))
-    
+
     cursor_pos = state.cursor_pos if state else len(text)
 
     if text:
         text_surface, text_x, text_y = draw_text_with_clipping_and_cursor(
-            surface, text, rect, text_color, font_size, padding, is_password, cursor_pos, text_align
+            surface,
+            text,
+            rect,
+            text_color,
+            font_size,
+            padding,
+            is_password,
+            cursor_pos,
+            text_align,
         )
     else:
         text_surface = _render_text_surface("", font_size, text_color)
-        if text_align == 'center':
+        if text_align == "center":
             text_x = rect.x + rect.width // 2
         else:
             text_x = rect.x + padding
@@ -200,6 +215,7 @@ def draw_input_box(
             surface, placeholder, rect, placeholder_color, font_size, padding
         )
 
+
 def validate_text_input(
     current_text,
     new_char,
@@ -209,7 +225,6 @@ def validate_text_input(
     font_size=27,
     padding=15,
 ):
-
     if len(current_text) >= max_length:
         return False
 
@@ -243,7 +258,6 @@ def draw_button(
     hover_color=MIDDLE_GREEN,
     pressed_color=LIGHT_GREEN_TRANSPARENT,
 ):
-
     current_color = _get_button_color(
         is_hovered, is_pressed, background_color, hover_color, pressed_color
     )
@@ -261,7 +275,6 @@ def draw_button(
 
 
 def draw_image(surface, image, x, y, size=None, centered=False):
-
     if size:
         image = pygame.transform.scale(image, size)
 
@@ -274,7 +287,7 @@ def draw_image(surface, image, x, y, size=None, centered=False):
 
 def draw_image_button(
     surface,
-    image_name,
+    image_name: str,
     image_type,
     x,
     y,
@@ -403,7 +416,6 @@ def draw_rules_popup(surface, screen_width, screen_height, rules_text, max_playe
 
 
 def check_logout_button_interaction(mouse_pos, mouse_pressed, logout_rect):
-   
     is_hovered = logout_rect.collidepoint(mouse_pos)
     is_pressed = is_hovered and mouse_pressed
     return is_hovered, is_pressed
@@ -426,6 +438,7 @@ def create_standard_input_rect(x, y, width=230, height=50):
     """Standard input mező rect létrehozása"""
     return pygame.Rect(x, y, width, height)
 
+
 def draw_input_field(
     surface,
     rect,
@@ -440,7 +453,7 @@ def draw_input_field(
     placeholder_color=MIDDLE_GREEN,
     cursor_color=WHITE,
     font_size=23,
-    text_align='center',  
+    text_align="center",
 ):
     draw_input_box(
         surface=surface,
@@ -457,7 +470,7 @@ def draw_input_field(
         placeholder=placeholder,
         placeholder_color=placeholder_color,
         is_password=is_password,
-        text_align=text_align, 
+        text_align=text_align,
     )
 
 
@@ -504,7 +517,7 @@ def draw_icon_button(surface, image_name, x, y, size=(35, 35), centered=True):
         button_rect = pygame.Rect(x - size[0] // 2, y - size[1] // 2, size[0], size[1])
     else:
         button_rect = pygame.Rect(x, y, size[0], size[1])
-    
+
     draw_image(surface, image, x, y, centered=centered)
     return button_rect
 
@@ -531,5 +544,5 @@ def draw_scrollbar(surface, scroll_bar_rect, scroll_offset, total_items, visible
         thumb_height,
     )
     _draw_rounded_rect(surface, MIDDLE_GREEN, thumb_rect)
-    
+
     return thumb_rect

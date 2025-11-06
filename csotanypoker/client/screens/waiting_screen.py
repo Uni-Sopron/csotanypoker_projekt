@@ -34,7 +34,7 @@ from csotanypoker.client.drawing_helpers.drawing_helpers import (
 
 from csotanypoker.client.drawing_helpers.image_manager import load_background
 from csotanypoker.client.drawing_helpers.text_manager import wrap_text
-from csotanypoker.models.user import this_is_ai_name
+from csotanypoker.models.user import this_is_ai_name, is_ai_player
 
 
 class WaitingScreen(BaseScreen):
@@ -59,10 +59,7 @@ class WaitingScreen(BaseScreen):
 
         self.last_players = [] 
 
-    def _is_ai_player(self, username: str) -> bool:
-        """Ellenőrzi, hogy AI játékosról van-e szó"""
-        ai_name = this_is_ai_name(username)
-        return ai_name != username
+
 
     def _update_button_states(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -121,7 +118,7 @@ class WaitingScreen(BaseScreen):
         wrapped_line_count = 1
         if self.client.selected_room is not None:
             wrapped_text = wrap_text(
-                f"{self.client.room_name} {self.client.selected_room.player_count}/{self.client.selected_room.max_player_count}",
+                f"{self.client.selected_room.name} {self.client.selected_room.player_count}/{self.client.selected_room.max_player_count}",
                 max_length=20,
             )
             wrapped_line_count = len(wrapped_text)
@@ -162,7 +159,7 @@ class WaitingScreen(BaseScreen):
         start_x = 200
 
         for i, player in enumerate(self.client.users):
-            if self._is_ai_player(player.username):
+            if is_ai_player(player.username):
                 x_button_rect = pygame.Rect(
                     start_x + 350, start_y + 10 + (i * 70), 40, 40
                 )
@@ -190,7 +187,7 @@ class WaitingScreen(BaseScreen):
 
             player_name = this_is_ai_name(player.username)
 
-            if self._is_ai_player(player.username):
+            if is_ai_player(player.username):
                 player_display = player_name
             else:
                 if (
@@ -204,7 +201,7 @@ class WaitingScreen(BaseScreen):
                 else:
                     player_display = f"{player_name} -/-"
 
-            if self._is_ai_player(player.username):
+            if is_ai_player(player.username):
                 x_button_rect = self.cross_buttons[player.username]
 
                 is_hovered = f"X_{player.username}" in self.hovered_elements
@@ -312,7 +309,7 @@ class WaitingScreen(BaseScreen):
             )
         volume_rect = create_volume_button_rect(50, 50)
         draw_sound_volume(
-            self.client.window, volume_rect.centerx, volume_rect.centery, "sound"
+            self.client.window, volume_rect.centerx, volume_rect.centery, "sound", self.client._music_manager.sound_effects_volume, self.client._music_manager.music_volume, center_button=True
         )
 
     def _has_players_changed(self) -> bool:
@@ -345,7 +342,7 @@ class WaitingScreen(BaseScreen):
         self.stats_requested.clear()
 
         for user in self.client.users:
-            if not self._is_ai_player(user.username):
+            if not is_ai_player(user.username):
                 if user.username not in self.stats_requested:
                     self.client.network.get_user_stats(user.username)
                     self.stats_requested.add(user.username)

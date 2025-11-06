@@ -1,6 +1,7 @@
 import os
 import pygame
 from csotanypoker.client.utils.path_helper import resource_path
+
 pygame.font.init()
 # Font paths
 FONT_PATH_REGULAR = resource_path(
@@ -81,7 +82,7 @@ Ha valaki tippel és eltalálja, a feladó kapja vissza a kártyát, ha nem, a t
 Vesztesz, ha összegyűlik 4 ugyanolyan kártya előtted vagy elfogynak a kártyáid.
 """,
 }
-MUSIC_CREDITS_TEXT = """
+CREDITS_TEXT = """
         samurai-heart-290878: Music by H Tb HEON from Pixabay
         giant-fall-impact-352446: Sound Effect by Universfield from Pixabay
         ground-impact-352053: Sound Effect by Universfield from Pixabay
@@ -97,5 +98,6 @@ MUSIC_CREDITS_TEXT = """
         zapsplat_multimedia_button_click_bright_002_92099: Sound Effect by ZapSplat
         zapsplat_multimedia_error_incorrect_buzz_73714: Sound Effect by ZapSplat
         zapsplat_warfare_throwing_star_throw_spin_hit_person_squelch_blood_20926: Sound Effect by ZapSplat
-        
+        Drukaatie Burti: Font by Kārlis Kalviškis from CufonFonts
         """
+

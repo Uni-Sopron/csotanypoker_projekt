@@ -12,7 +12,7 @@ class GameValidator:
         if self.screen.show_leave_button:
             return False, "Várd meg míg minden játékos visszatér!"
 
-        if not self.screen.client.passed:
+        if not self.screen.client.game_state.passing:
             if not self.screen.local_question_card:
                 return False, "Nincs kártya kiválasztva!"
 
@@ -50,13 +50,7 @@ class GameValidator:
         return True, None
 
     def validate_card_selection(self):
-        if (
-            self.screen.client.passed
-            and self.screen.client.user.username
-            == self.screen.client.game_state.active_player
-        ):
-            return False, "Passoltál ebben a körben."
-
+        """Kártya kiválasztás validálása"""
         if self.screen.adott:
             return False, "Már adtál lapot ebben a körben."
 
@@ -66,11 +60,16 @@ class GameValidator:
         ):
             return False, "Nem te vagy soron"
 
+        if self.screen.client.game_state.passing:
+            return False, "Passoltál ebben a körben, nem választhatsz új kártyát."
+
         return True, None
 
     def validate_animal_selection(self):
+        """Állat kiválasztás validálása"""
         if self.screen.adott:
-            return False, None
+            return False, "Már adtál lapot ebben a körben."
+
         return True, None
 
     def can_show_error(self, error_message):

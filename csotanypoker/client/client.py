@@ -49,47 +49,45 @@ class NetworkManager:
                         self.game_client.room_list.clear()
 
                     rooms_data = data.get("rooms", {})
-                    previos_room_data = data["previous_room"]
-                    self.game_client.previous_room = Room(
-                        room_id=previos_room_data["room_id"],
-                        name=previos_room_data["name"],
-                        max_player_count=previos_room_data["player_count"],
-                    )
-                    self.game_client.previous_room.player_count = previos_room_data[
-                        "actual_player_count"
-                    ]
-                    self.game_client.previous_room.password_protected = (
-                        previos_room_data["password_protected"]
-                    )
+
+                
+                    previous_room_data = data.get("previous_room")
+                    if previous_room_data:
+                        self.game_client.previous_room = Room(
+                            **previous_room_data
+                        )  
+                    else:
+                        self.game_client.previous_room = None
+
 
                     for room_id, room_info in rooms_data.items():
                         try:
                             name = room_info.get("name", "Unknown Room")
                             player_count = room_info.get("player_count", 4)
-                            actual_player_count = room_info.get(
-                                "actual_player_count", 0
-                            )
+                            max_player_count = room_info.get(
+                                "max_player_count", 4
+                            )  
                             password_protected = room_info.get(
                                 "password_protected", False
                             )
 
                             if not isinstance(name, str):
                                 name = str(name)
-                            if not isinstance(player_count, int) or player_count <= 0:
-                                player_count = 4
                             if (
-                                not isinstance(actual_player_count, int)
-                                or actual_player_count < 0
+                                not isinstance(max_player_count, int)
+                                or max_player_count <= 0
                             ):
-                                actual_player_count = 0
+                                max_player_count = 4
+                            if not isinstance(player_count, int) or player_count < 0:
+                                player_count = 0
 
                             room = Room(
                                 room_id=room_id,
                                 name=name,
-                                max_player_count=player_count,
+                                max_player_count=max_player_count,
+                                player_count=player_count,
+                                password_protected=bool(password_protected),
                             )
-                            room.player_count = actual_player_count
-                            room.password_protected = bool(password_protected)
 
                             self.game_client.room_list.append(room)
 
@@ -179,7 +177,7 @@ class NetworkManager:
             with self._data_lock:
                 try:
                     self.game_client.room_id = data.get("room_id")
-                    self.game_client.room_name = data.get("name")
+          
 
                     players_data = data.get("players", [])
                     self.game_client.users = []
@@ -193,7 +191,7 @@ class NetworkManager:
 
                     self.game_client.selected_room = Room(
                         room_id=data.get("room_id", ""),
-                        name=data.get("name", ""),
+                        name=data.get("room_name", ""),
                         player_count=len(self.game_client.users),
                         max_player_count=data.get("max_player_count", 4),
                     )
@@ -273,11 +271,16 @@ class NetworkManager:
                     game_state = data.get("game_state", {})
                     visible_player_data = data.get("visible_player_data", {})
                     opponent_players_data = data.get("opponent_players_data", [])
-                    self.game_client.passed = data.get("passing", False)
+
                     if (
                         hasattr(self.game_client, "game_state")
                         and self.game_client.game_state
                     ):
+                     
+                        print("passing value updated to:", game_state["passing"])
+                        self.game_client.game_state.passing = game_state.get(
+                            "passing", False
+                        )
                         self.game_client.game_state.game_id = game_state.get("game_id")
                         self.game_client.game_state.room_id = game_state.get("room_id")
                         self.game_client.game_state.active_player = game_state.get(
@@ -304,7 +307,6 @@ class NetworkManager:
                             self.game_client.game_state.voters = set(voters_data)
                         else:
                             self.game_client.game_state.voters = set()
-
                     if visible_player_data:
                         cards_in_hand = []
                         cards_in_hand_data = visible_player_data.get(
@@ -538,13 +540,12 @@ class NetworkManager:
             self.game_client._music_manager.connect_sound()
             with self._data_lock:
                 try:
-                    room_data = data.get("room", {})
+                   
                     players_data = data.get("players", [])
 
                     if (
                         self.game_client.selected_room
-                        and self.game_client.selected_room.room_id
-                        == room_data.get("room_id")
+                      
                     ):
                         self.game_client.users = []
                         for player_data in players_data:
@@ -615,10 +616,12 @@ class NetworkManager:
                     )
                     self.game_client.message_display_time = 50
 
+                   
                     if self.game_client.selected_room is not None:
                         self.game_client.selected_room.player_count = len(
                             self.game_client.users
                         )
+                      
                 except Exception as e:
                     print(f"Error in player_left_room: {e}")
 
@@ -642,10 +645,10 @@ class NetworkManager:
                         room_id=data.get("room_id", ""),
                         name=data.get("room_name", ""),
                         max_player_count=data.get("max_player_count", 4),
+                        player_count=len(self.game_client.users), 
                     )
                     self.game_client.room_name = data.get("room_name", "")
-                    self.game_client.selected_room.room_id = data.get("room_id", "")
-
+               
                     self.game_client.screen = "waiting"
                     self.game_client.message = "Visszaléptél a váróterembe"
                     self.game_client.message_display_time = 30.0
@@ -672,11 +675,16 @@ class NetworkManager:
                     if not username:
                         return
 
-                    if hasattr(self.game_client, "users") and self.game_client.users:
-                        for user in self.game_client.users:
-                            if hasattr(user, "username") and user.username == username:
-                                user.is_active = True
-                                break
+                    players_data = data.get("players", [])
+                    self.game_client.users = []
+
+                    for player_data in players_data:
+                        if isinstance(player_data, dict):
+                            user = Client_User(
+                                username=player_data.get("username", ""),
+                                is_active=player_data.get("is_active", False),
+                            )
+                            self.game_client.users.append(user)
 
                     if self.game_client.selected_room is not None:
                         self.game_client.selected_room.player_count = len(
@@ -855,7 +863,6 @@ class NetworkManager:
             {
                 "game_state": game_state,
                 "statement": statement,
-                "pass": passing,
             },
         )
 

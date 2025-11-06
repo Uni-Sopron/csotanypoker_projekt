@@ -78,37 +78,37 @@ class GameMouseHandler:
 
             self.screen.client.network.oke_click(
                 statement=self.screen.local_active_animal,
-                passing=self.screen.client.passed,
+                passing=self.screen.client.game_state.passing,
             )
-            self.screen.client.passed = False
+            self.screen.client.game_state.passing = False
             self.screen.adott = True
 
             self.screen.state_manager.reset_local_selections()
             return (True, False)
 
         return None
-
     def _handle_pass_button(self, pos):
         """Pass gomb kezelése"""
-        print("Pass gomb kezelése")
+        
         if not hasattr(
             self.screen, "pass_button"
         ) or not self.screen.pass_button.collidepoint(pos):
             return False
 
+      
         if (
             self.screen.client.game_state.targeted_player
             == self.screen.client.user.username
             and len(self.screen.client.game_state.visited_already)
-            < len(self.screen.client.users)
+            < len(self.screen.client.users) - 1  
         ):
-            self.screen.client.passed = True
-            print("Passing...")
+          
+            self.screen.client.game_state.passing = True
+           
             self.screen.client.network.passing()
             return True
 
         return False
-
     def _handle_tip_buttons(self, pos):
         if (
             self.screen.client.game_state.targeted_player

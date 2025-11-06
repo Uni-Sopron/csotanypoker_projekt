@@ -14,6 +14,11 @@ def this_is_ai_name(name: str) -> str:
             return ai_name
 
     return name
+def is_ai_player(username: str) -> bool:
+    """Ellenőrzi, hogy a felhasználó AI játékos-e"""
+    base_name = this_is_ai_name(username)
+    return base_name in AI_NAMES
+
 AI_NAMES = [
     "HazugCsóti",
     "Kamucsótány",
