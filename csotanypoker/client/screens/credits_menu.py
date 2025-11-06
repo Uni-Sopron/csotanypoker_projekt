@@ -10,7 +10,7 @@ from csotanypoker.client.drawing_helpers.constans import (
     MIDDLE_GREEN,
     DARK_GREEN,
     WHITE,
-    MUSIC_CREDITS_TEXT,
+    CREDITS_TEXT,
 )
 
 
@@ -109,7 +109,7 @@ class CreditsMenu:
 
             draw_text(
                 surface,
-                "Felhasznált zenék és hangeffektek:",
+                "Felhasznált audió anyagok és betűtípus:",
                 DARK_GREEN,
                 self.content_rect.x + 20,
                 y_pos,
@@ -119,7 +119,7 @@ class CreditsMenu:
             )
             y_pos += line_height + 10
 
-        for line in MUSIC_CREDITS_TEXT.strip().split("\n"):
+        for line in CREDITS_TEXT.strip().split("\n"):
             draw_text(
                 surface,
                 line.strip(),

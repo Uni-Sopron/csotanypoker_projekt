@@ -8,7 +8,13 @@ Ez a projekt a **Csótánypóker** (Cockroach Poker) alapján készült
 - **Weboldal:** https://www.dreimagier.de/home.html
 
 ---
+## Betűtípus
 
+### Drukaatie Burti
+- **Készítő:** Kārlis Kalviškis
+- **Licenc:** https://openfontlicense.org/
+- **Link:** https://www.cufonfonts.com/font/drukaatie-burti
+---
 ## Audió anyagok
 
 ### Háttérzene
@@ -125,5 +131,5 @@ Ez a projekt a **Csótánypóker** (Cockroach Poker) alapján készült
 ## Licenc információk
 https://pixabay.com/service/license-summary/  
 https://www.zapsplat.com/license-type/standard-license/
-
+https://openfontlicense.org/
 
