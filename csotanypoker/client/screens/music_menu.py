@@ -114,6 +114,7 @@ class MusicMenu:
             icon_x,
             icon_y,
             "music",
+            volume_music=self.music_volume,
         )
 
         pygame.draw.rect(
@@ -155,6 +156,7 @@ class MusicMenu:
             icon_x,
             icon_y,
             "sound",
+            self.sound_effects_volume,
         )
 
         pygame.draw.rect(
@@ -199,21 +201,18 @@ class MusicMenu:
         if self.music_slider_rect and self.music_slider_rect.collidepoint(pos):
             self.dragging_music = True
             self._update_music_volume(pos, music_manager)
-            return True  
+            return True
 
         if self.sound_slider_rect and self.sound_slider_rect.collidepoint(pos):
             self.dragging_sound = True
             self._update_sound_volume(pos, music_manager)
-            return True 
+            return True
 
         if self.menu_rect and self.menu_rect.collidepoint(pos):
             return False
 
         self.hide()
         return None
-
-
-
 
     def handle_mouse_release(self, pos: Tuple[int, int]):
         self.dragging_music = False
@@ -224,6 +223,7 @@ class MusicMenu:
             self._update_music_volume(pos, music_manager)
         elif self.dragging_sound and music_manager:
             self._update_sound_volume(pos, music_manager)
+
     def _update_music_volume(self, pos: Tuple[int, int], music_manager=None):
         if not self.music_slider_rect:
             return
