@@ -724,7 +724,7 @@ class GameDrawer:
             surface=self.screen.client.window,
             text=f"Aktuális játékos: {this_is_ai_name(self.screen.client.game_state.active_player_name)}",
             color=DARK_GREEN,
-            x=40,
+            x=25,
             y=37,
             centered=False,
             font="regular",

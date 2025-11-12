@@ -330,7 +330,7 @@ class LoginScreen(BaseScreen):
                 event,
                 self.username_text,
                 state.cursor_pos,
-                13,
+                10,
                 rect,
                 27,
                 self.input_padding,
