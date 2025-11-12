@@ -605,7 +605,6 @@ def add_ai_player(data: dict) -> None:
 if __name__ == "__main__":
     initialize_server_data(game_manager)
     port = int(os.environ.get("PORT", 5000))
-    print(f"Szerver elindítva a {port} porton")
     socketio.run(
         app, debug=False, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True
     )

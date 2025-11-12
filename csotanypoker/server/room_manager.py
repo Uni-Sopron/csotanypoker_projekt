@@ -65,7 +65,6 @@ class RoomManager:
             name=room_name,
             max_player_count=max_player_count,
             password=hashed_password,
-            password_protected=bool(password),
         )
 
         db.add(db_room)

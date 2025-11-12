@@ -50,23 +50,17 @@ class NetworkManager:
 
                     rooms_data = data.get("rooms", {})
 
-                
                     previous_room_data = data.get("previous_room")
                     if previous_room_data:
-                        self.game_client.previous_room = Room(
-                            **previous_room_data
-                        )  
+                        self.game_client.previous_room = Room(**previous_room_data)
                     else:
                         self.game_client.previous_room = None
-
 
                     for room_id, room_info in rooms_data.items():
                         try:
                             name = room_info.get("name", "Unknown Room")
                             player_count = room_info.get("player_count", 4)
-                            max_player_count = room_info.get(
-                                "max_player_count", 4
-                            )  
+                            max_player_count = room_info.get("max_player_count", 4)
                             password_protected = room_info.get(
                                 "password_protected", False
                             )
@@ -177,7 +171,6 @@ class NetworkManager:
             with self._data_lock:
                 try:
                     self.game_client.room_id = data.get("room_id")
-          
 
                     players_data = data.get("players", [])
                     self.game_client.users = []
@@ -276,18 +269,23 @@ class NetworkManager:
                         hasattr(self.game_client, "game_state")
                         and self.game_client.game_state
                     ):
-                     
-                        print("passing value updated to:", game_state["passing"])
+                        
                         self.game_client.game_state.passing = game_state.get(
                             "passing", False
                         )
+
+                        card_placed = data.get("card_placed", None)
+                        if card_placed:
+                            self.game_client.card_placed = card_placed
+                            
+                       
                         self.game_client.game_state.game_id = game_state.get("game_id")
                         self.game_client.game_state.room_id = game_state.get("room_id")
-                        self.game_client.game_state.active_player = game_state.get(
-                            "active_player"
+                        self.game_client.game_state.active_player_name = game_state.get(
+                            "active_player_name"
                         )
-                        self.game_client.game_state.targeted_player = game_state.get(
-                            "targeted_player"
+                        self.game_client.game_state.targeted_player_name = (
+                            game_state.get("targeted_player_name")
                         )
 
                         self.game_client.game_state.question_card = game_state.get(
@@ -307,6 +305,7 @@ class NetworkManager:
                             self.game_client.game_state.voters = set(voters_data)
                         else:
                             self.game_client.game_state.voters = set()
+
                     if visible_player_data:
                         cards_in_hand = []
                         cards_in_hand_data = visible_player_data.get(
@@ -340,12 +339,21 @@ class NetworkManager:
                                         )
 
                         username = visible_player_data.get("username", "")
+
+                        statement_str = visible_player_data.get("statement")
+                        statement_enum = None
+                        if statement_str:
+                            try:
+                                statement_enum = Animal(statement_str)
+                            except (KeyError, ValueError):
+                                print(f"Warning: Invalid statement: {statement_str}")
+
                         if username:
                             self.game_client.visible_player = VisiblePlayer(
                                 username=username,
                                 cards_in_hand=cards_in_hand,
                                 cards_in_front=cards_in_front,
-                                statement=visible_player_data.get("statement", ""),
+                                statement=statement_enum,
                                 is_true=visible_player_data.get("is_true"),
                             )
                         else:
@@ -386,11 +394,21 @@ class NetworkManager:
                                                 print(
                                                     f"Warning: Unknown opponent animal: {animal_name} - {e}"
                                                 )
+                                               
+                                statement_str = opponent_data.get("statement")
+                                statement_enum = None
+                                if statement_str:
+                                    try:
+                                        statement_enum = Animal(statement_str)
+                                    except (KeyError, ValueError):
+                                        print(
+                                            f"Warning: Invalid statement: {statement_str}"
+                                        )
 
                                 opponent = OpponentPlayer(
                                     username=username,
                                     cards_in_front=opponent_cards_in_front,
-                                    statement=opponent_data.get("statement", ""),
+                                    statement=statement_enum,
                                     is_true=opponent_data.get("is_true"),
                                     card_count_int=int(
                                         opponent_data.get("card_count_int", 0)
@@ -540,13 +558,9 @@ class NetworkManager:
             self.game_client._music_manager.connect_sound()
             with self._data_lock:
                 try:
-                   
                     players_data = data.get("players", [])
 
-                    if (
-                        self.game_client.selected_room
-                      
-                    ):
+                    if self.game_client.selected_room:
                         self.game_client.users = []
                         for player_data in players_data:
                             if isinstance(player_data, dict):
@@ -616,12 +630,11 @@ class NetworkManager:
                     )
                     self.game_client.message_display_time = 50
 
-                   
                     if self.game_client.selected_room is not None:
                         self.game_client.selected_room.player_count = len(
                             self.game_client.users
                         )
-                      
+
                 except Exception as e:
                     print(f"Error in player_left_room: {e}")
 
@@ -645,10 +658,10 @@ class NetworkManager:
                         room_id=data.get("room_id", ""),
                         name=data.get("room_name", ""),
                         max_player_count=data.get("max_player_count", 4),
-                        player_count=len(self.game_client.users), 
+                        player_count=len(self.game_client.users),
                     )
                     self.game_client.room_name = data.get("room_name", "")
-               
+
                     self.game_client.screen = "waiting"
                     self.game_client.message = "Visszaléptél a váróterembe"
                     self.game_client.message_display_time = 30.0
@@ -839,11 +852,11 @@ class NetworkManager:
             game_state = {
                 "game_id": getattr(self.game_client.game_state, "game_id", ""),
                 "room_id": getattr(self.game_client.game_state, "room_id", ""),
-                "active_player": getattr(
-                    self.game_client.game_state, "active_player", ""
+                "active_player_name": getattr(
+                    self.game_client.game_state, "active_player_name", ""
                 ),
-                "targeted_player": getattr(
-                    self.game_client.game_state, "targeted_player", None
+                "targeted_player_name": getattr(
+                    self.game_client.game_state, "targeted_player_name", ""
                 ),
                 "question_card": None
                 if original_question_card is None

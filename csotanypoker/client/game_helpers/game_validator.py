@@ -4,7 +4,7 @@ class GameValidator:
 
     def validate_ok_click(self):
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             != self.screen.client.user.username
         ):
             return False, None
@@ -26,7 +26,7 @@ class GameValidator:
 
     def validate_player_selection(self, player_name):
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             != self.screen.client.user.username
         ):
             return False, "Nem te vagy soron"
@@ -55,7 +55,7 @@ class GameValidator:
             return False, "Már adtál lapot ebben a körben."
 
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             != self.screen.client.user.username
         ):
             return False, "Nem te vagy soron"

@@ -1,4 +1,3 @@
-
 import pygame
 
 from csotanypoker.client.drawing_helpers.constans import DARK_GREEN
@@ -17,7 +16,10 @@ from csotanypoker.client.drawing_helpers.drawing_helpers import (
     create_logout_button_rect,
     create_rules_button_rect,
 )
-from csotanypoker.client.drawing_helpers.image_manager import load_background, preload_all_images
+from csotanypoker.client.drawing_helpers.image_manager import (
+    load_background,
+    preload_all_images,
+)
 
 
 class GameScreen(BaseScreen):
@@ -69,14 +71,43 @@ class GameScreen(BaseScreen):
         self.kartya_poziciok = []
         self.animal_button_rects = {}
 
-   
         self._images_preloaded = False
+
+      
+        self._last_game_state_hash = None
 
     def _ensure_images_preloaded(self):
         """Képek előtöltése (csak egyszer)"""
         if not self._images_preloaded:
             preload_all_images()
             self._images_preloaded = True
+
+    def _get_game_state_hash(self) -> int:
+        """
+        Generál egy hash-t a játékállapot fontosabb elemeiről.
+        Ha ez megváltozik, az azt jelenti, hogy új game_state érkezett.
+        """
+        if not self.client.game_state:
+            return None
+
+        return hash(
+            (
+                self.client.game_state.game_id,
+                self.client.game_state.active_player_name,
+                self.client.game_state.targeted_player_name,
+                self.client.game_state.question_card,
+                tuple(
+                    sorted(
+                        [
+                            (p.username, sum((p.cards_in_front or {}).values()))
+                            for p in [self.client.visible_player]
+                            + (self.client.opponent_players or [])
+                            if p
+                        ]
+                    )
+                ),
+            )
+        )
 
     def draw(self) -> None:
         """Képernyő kirajzolása"""
@@ -88,8 +119,12 @@ class GameScreen(BaseScreen):
             return
 
         self._update_state()
+        current_hash = self._get_game_state_hash()
+        if current_hash != self._last_game_state_hash:
+            self._last_game_state_hash = current_hash
+            self.drawer._check_and_animate_card_placements()
 
-  
+       
         self.button_manager.update_button_rects()
         self.button_manager.update_button_states()
 
@@ -110,7 +145,7 @@ class GameScreen(BaseScreen):
         if not hasattr(self.client, "visible_player") or not self.client.visible_player:
             return False
 
-        if not self.client.game_state.active_player:
+        if not self.client.game_state.active_player_name:
             return False
 
         if not hasattr(self.client, "opponent_players"):
@@ -120,8 +155,6 @@ class GameScreen(BaseScreen):
 
     def _draw_loading_screen(self):
         """Betöltő képernyő rajzolása"""
-
-
         load_background(self.client.width, self.client.height, self.client.window)
 
         draw_text(

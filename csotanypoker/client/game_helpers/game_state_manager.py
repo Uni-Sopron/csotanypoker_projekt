@@ -36,17 +36,18 @@ class GameStateManager:
         if not self.screen.client.game_state or not self.screen.client.user:
             return
 
-        active_player = self.screen.client.game_state.active_player
+        active_player = self.screen.client.game_state.active_player_name
         if not active_player:
             return
 
         is_my_turn = active_player == self.screen.client.user.username
 
         if not is_my_turn:
-         
             self.reset_local_selections(preserve_passing=False)
             self.screen.adott = False
-        elif self.screen.adott and not self.screen.client.game_state.targeted_player:
+        elif (
+            self.screen.adott and not self.screen.client.game_state.targeted_player_name
+        ):
             self.screen.adott = False
             if (
                 hasattr(self.screen.client, "opponent_players")
@@ -58,7 +59,6 @@ class GameStateManager:
                 ].username
 
     def check_leave_button_visibility(self):
-
         for user in self.screen.client.users:
             if not user.is_active:
                 self.screen.show_leave_button = True
@@ -66,7 +66,6 @@ class GameStateManager:
         self.screen.show_leave_button = False
 
     def set_contextual_message(self):
-
         if (
             not hasattr(self.screen.client, "message")
             or self.screen.client.message is None
@@ -75,8 +74,8 @@ class GameStateManager:
             if not self.screen.client.game_state or not self.screen.client.user:
                 return
 
-            active_player = self.screen.client.game_state.active_player
-            targeted_player = self.screen.client.game_state.targeted_player
+            active_player = self.screen.client.game_state.active_player_name
+            targeted_player = self.screen.client.game_state.targeted_player_name
             username = self.screen.client.user.username
             message = ""
             if active_player == username:

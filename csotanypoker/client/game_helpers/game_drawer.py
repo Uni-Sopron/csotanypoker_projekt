@@ -90,12 +90,12 @@ class GameDrawer:
         )
         targeted_player = (
             self.screen.local_targeted_player
-            or self.screen.client.game_state.targeted_player
+            or self.screen.client.game_state.targeted_player_name
         )
 
         if question_card and (
             targeted_player == self.screen.client.user.username
-            or self.screen.client.game_state.active_player
+            or self.screen.client.game_state.active_player_name
             == self.screen.client.user.username
         ):
             self._draw_center_card_area()
@@ -105,14 +105,14 @@ class GameDrawer:
     def _draw_interactive_elements(self):
         """Interaktív elemek rajzolása"""
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             == self.screen.client.user.username
             and not self.screen.adott
         ):
             self._draw_animal_table()
 
         if (
-            self.screen.client.game_state.targeted_player
+            self.screen.client.game_state.targeted_player_name
             == self.screen.client.user.username
             and self.screen.client.game_state.question_card == "card_back"
         ):
@@ -128,41 +128,63 @@ class GameDrawer:
             or self.screen.client.game_state.question_card
         )
         if not card_to_show:
+            self.screen.animation_manager.reset_slide_animation("center_card_slide")
             return
+
+      
+        slide_anim = self.screen.animation_manager.get_slide_animation(
+            "center_card_slide"
+        )
+
 
         flip_data = self.screen.animation_manager.get_flip_data(
             "center_card", card_to_show
         )
         base_width, base_height = int(65 * 2.5), int(100 * 2.5)
 
-        if not flip_data["is_animating"]:
-            card = load_image(
-                flip_data["current_card"], "card", size=(base_width, base_height)
+       
+        center_x = self.screen.client.width // 2
+        center_y = (self.screen.client.height // 2) + 20
+        scale_factor = 1.0
+
+       
+        if slide_anim:
+            center_x, center_y = slide_anim["position"]
+            scale_factor = slide_anim["scale"]
+        if flip_data["is_animating"]:
+            progress = flip_data["progress"]
+            flip_scale = (
+                1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
             )
+            current_card = (
+                flip_data["previous_card"]
+                if progress < 0.5
+                else flip_data["current_card"]
+            )
+            scaled_width = max(1, int(base_width * flip_scale * scale_factor))
+            scaled_height = int(base_height * scale_factor)
+        else:
+            current_card = flip_data["current_card"]
+            scaled_width = int(base_width * scale_factor)
+            scaled_height = int(base_height * scale_factor)
+
+        card = load_image(current_card, "card", size=(scaled_width, scaled_height))
+
+        if (
+            slide_anim
+            and not slide_anim["is_animating"]
+            and slide_anim["progress"] >= 1.0
+        ):
+
+            return
+        else:
             draw_image(
                 self.screen.client.window,
                 card,
-                self.screen.client.width // 2,
-                (self.screen.client.height // 2) + 20,
+                int(center_x),
+                int(center_y),
                 centered=True,
             )
-            return
-
-        progress = flip_data["progress"]
-        scale = 1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
-        current_card = (
-            flip_data["previous_card"] if progress < 0.5 else flip_data["current_card"]
-        )
-
-        scaled_width = max(1, int(base_width * scale))
-        card = load_image(current_card, "card", size=(scaled_width, base_height))
-        draw_image(
-            self.screen.client.window,
-            card,
-            self.screen.client.width // 2,
-            (self.screen.client.height // 2) + 20,
-            centered=True,
-        )
 
     def _draw_tipp_area(self):
         """Tippelő gombok rajzolása"""
@@ -268,7 +290,7 @@ class GameDrawer:
             x_kep += base_kartya_meret[0] + 5
 
     def _draw_mini_card(self):
-        """Mini kártya rajzolása ellenfél mellett"""
+        """Mini kártya rajzolása ellenfél mellett csúszó animációval"""
         if (
             not (
                 self.screen.local_question_card
@@ -276,9 +298,9 @@ class GameDrawer:
             )
             or not (
                 self.screen.local_targeted_player
-                or self.screen.client.game_state.targeted_player
+                or self.screen.client.game_state.targeted_player_name
             )
-            or self.screen.client.game_state.active_player
+            or self.screen.client.game_state.active_player_name
             == self.screen.client.user.username
         ):
             return
@@ -291,7 +313,7 @@ class GameDrawer:
 
         target_player = (
             self.screen.local_targeted_player
-            or self.screen.client.game_state.targeted_player
+            or self.screen.client.game_state.targeted_player_name
         )
 
         targeted_player_rect = None
@@ -303,6 +325,10 @@ class GameDrawer:
         if not targeted_player_rect:
             return
 
+        slide_key = f"mini_{target_player}_slide"
+        slide_anim = self.screen.animation_manager.get_slide_animation(slide_key)
+
+      
         card_to_show = (
             self.screen.local_question_card
             or self.screen.client.game_state.question_card
@@ -313,33 +339,50 @@ class GameDrawer:
         )
         base_width, base_height = int(65 * 1.5), int(100 * 1.5)
 
-        if not flip_data["is_animating"]:
-            card_image = load_image(
-                flip_data["current_card"], "card", size=(base_width, base_height)
+    
+        card_x = targeted_player_rect.centerx
+        card_y = targeted_player_rect.bottom + 80
+        scale_factor = 1.0
+       
+        if slide_anim:
+            card_x, card_y = slide_anim["position"]
+            scale_factor = slide_anim["scale"]
+
+        if flip_data["is_animating"]:
+            progress = flip_data["progress"]
+            flip_scale = (
+                1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
             )
+            current_card = (
+                flip_data["previous_card"]
+                if progress < 0.5
+                else flip_data["current_card"]
+            )
+            scaled_width = max(1, int(base_width * flip_scale * scale_factor))
+            scaled_height = int(base_height * scale_factor)
+        else:
+            current_card = flip_data["current_card"]
+            scaled_width = int(base_width * scale_factor)
+            scaled_height = int(base_height * scale_factor)
+
+        card_image = load_image(
+            current_card, "card", size=(scaled_width, scaled_height)
+        )
+        if (
+            slide_anim
+            and not slide_anim["is_animating"]
+            and slide_anim["progress"] >= 1.0
+        ):
+        
+            return
+        else:
             draw_image(
                 self.screen.client.window,
                 card_image,
-                targeted_player_rect.centerx,
-                targeted_player_rect.bottom + 80,
+                int(card_x),
+                int(card_y),
                 centered=True,
             )
-            return
-        progress = flip_data["progress"]
-        scale = 1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
-        current_card = (
-            flip_data["previous_card"] if progress < 0.5 else flip_data["current_card"]
-        )
-
-        scaled_width = max(1, int(base_width * scale))
-        card_image = load_image(current_card, "card", size=(scaled_width, base_height))
-        draw_image(
-            self.screen.client.window,
-            card_image,
-            targeted_player_rect.centerx,
-            targeted_player_rect.bottom + 80,
-            centered=True,
-        )
 
     def _draw_statements(self):
         """Állítások megjelenítése"""
@@ -349,10 +392,10 @@ class GameDrawer:
         ):
             return
 
-        if self.screen.client.game_state.active_player:
+        if self.screen.client.game_state.active_player_name:
             self._draw_active_player_statement()
 
-        if self.screen.client.game_state.targeted_player:
+        if self.screen.client.game_state.targeted_player_name:
             self._draw_targeted_player_answer()
 
         self._draw_main_player_statement()
@@ -360,14 +403,15 @@ class GameDrawer:
     def _draw_active_player_statement(self):
         """Aktív játékos állításának rajzolása"""
         for rect, player_name in self.screen.opponent_player_rects:
-            if player_name == self.screen.client.game_state.active_player:
+            if player_name == self.screen.client.game_state.active_player_name:
                 active_statement = [
                     player.statement
                     for player in self.screen.client.opponent_players
-                    if player.username == self.screen.client.game_state.active_player
+                    if player.username
+                    == self.screen.client.game_state.active_player_name
                 ]
 
-                if active_statement and active_statement[0] is not "":
+                if active_statement and active_statement[0] != None:
                     statement_text = (
                         f"Ez egy {self._translate_animal(str(active_statement[0]))}"
                     )
@@ -383,16 +427,17 @@ class GameDrawer:
     def _draw_targeted_player_answer(self):
         """Célzott játékos válaszának rajzolása"""
         for rect, player_name in self.screen.opponent_player_rects:
-            if player_name == self.screen.client.game_state.targeted_player:
+            if player_name == self.screen.client.game_state.targeted_player_name:
                 target_answer = [
                     player.is_true
                     for player in self.screen.client.opponent_players
-                    if player.username == self.screen.client.game_state.targeted_player
+                    if player.username
+                    == self.screen.client.game_state.targeted_player_name
                 ]
 
                 if target_answer[0] is not None:
                     statement_y = rect.bottom + 15
-                    if player_name == self.screen.client.game_state.active_player:
+                    if player_name == self.screen.client.game_state.active_player_name:
                         statement_y += 40
 
                     statement_text = (
@@ -412,16 +457,16 @@ class GameDrawer:
     def _draw_main_player_statement(self):
         """Saját játékos állításának rajzolása"""
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             != self.screen.client.user.username
         ):
             return
 
         statement = self.screen.client.visible_player.statement
-        if statement is "":
+        if statement == None:
             return
 
-        statement_text = f"Ez egy {self._translate_animal(statement)}"
+        statement_text = f"Ez egy {self._translate_animal(str(statement.value))}"
         self._draw_statement_bubble(
             self.screen.client.width // 2,
             self.screen.client.height - 230,
@@ -429,6 +474,126 @@ class GameDrawer:
             WHITE,
             MIDDLE_GREEN_TRANSPARENT_90,
         )
+
+    def _check_and_animate_card_placements(self):
+        """Ellenőrzi és indítja a kártya lehelyezési animációkat"""
+        center_x = self.screen.client.width // 2
+        center_y = (self.screen.client.height // 2) + 20
+
+        target_player = (
+            self.screen.local_targeted_player
+            or self.screen.client.game_state.targeted_player_name
+        )
+        question_card = self.screen.client.game_state.question_card
+
+        if question_card == None or question_card == "card_back":
+            self.screen.animation_manager.reset_slide_animation("center_card_slide")
+            if target_player:
+                self.screen.animation_manager.reset_slide_animation(
+                    f"mini_{target_player}_slide"
+                )
+            return
+
+        
+        if self.screen.animation_manager.is_slide_animating("center_card_slide"):
+            return
+
+       
+        slide_anim = self.screen.animation_manager.get_slide_animation(
+            "center_card_slide"
+        )
+        if (
+            slide_anim
+            and not slide_anim["is_animating"]
+            and slide_anim["progress"] >= 1.0
+        ):
+            self.screen.animation_manager.reset_slide_animation("center_card_slide")
+            for key in list(self.screen.animation_manager._slide_animations.keys()):
+                if key.startswith("mini_"):
+                    self.screen.animation_manager.reset_slide_animation(key)
+            return
+
+        placed_player = self.screen.client.card_placed
+
+        if question_card == None or question_card == "card_back":
+            self.screen.animation_manager.reset_slide_animation("center_card_slide")
+            if target_player:
+                self.screen.animation_manager.reset_slide_animation(
+                    f"mini_{target_player}_slide"
+                )
+            return
+
+        if self.screen.animation_manager.is_slide_animating("center_card_slide"):
+            return
+
+        placed_player = self.screen.client.card_placed
+        if placed_player:
+            mini_start_x = center_x
+            mini_start_y = center_y
+
+            if target_player == self.screen.client.user.username:
+                mini_start_x = center_x
+                mini_start_y = center_y
+            else:
+                
+                targeted_rect = None
+                if (
+                    hasattr(self.screen, "opponent_player_rects")
+                    and self.screen.opponent_player_rects
+                ):
+                    for rect, player_name in self.screen.opponent_player_rects:
+                        if player_name == target_player:
+                            targeted_rect = rect
+                            mini_start_x = targeted_rect.centerx
+                            mini_start_y = targeted_rect.bottom + 80
+                          
+                            break
+
+                
+        
+            if placed_player == self.screen.client.user.username:
+
+                end_x = self.screen.client.width - 240 - 20 + 120
+                end_y = self.screen.client.height // 2 - 175 + 175
+
+               
+                self.screen.animation_manager.start_slide_animation(
+                    "center_card_slide", (center_x, center_y), (end_x, end_y)
+                )
+
+                self.screen.animation_manager.start_slide_animation(
+                    f"mini_{target_player}_slide",
+                    (mini_start_x, mini_start_y),
+                    (end_x, end_y),
+                )
+            else:
+                target_rect = None
+                if (
+                    hasattr(self.screen, "opponent_player_rects")
+                    and self.screen.opponent_player_rects
+                ):
+                    for rect, player_name in self.screen.opponent_player_rects:
+                        if player_name == placed_player:
+                            target_rect = rect
+                            break
+
+                if target_rect:
+                    end_x = target_rect.centerx
+                    end_y = target_rect.bottom - 30
+
+                    self.screen.animation_manager.start_slide_animation(
+                        "center_card_slide", (center_x, center_y), (end_x, end_y)
+                    )
+
+                    self.screen.animation_manager.start_slide_animation(
+                        f"mini_{target_player}_slide",
+                        (mini_start_x, mini_start_y),
+                        (end_x, end_y),
+                    )
+                
+
+        
+            self.screen.client.card_placed = None
 
     def _draw_statement_bubble(self, x, y, text, text_color, bg_color):
         """Állítás buborék rajzolása"""
@@ -545,7 +710,7 @@ class GameDrawer:
         if (
             not hasattr(self.screen.client, "game_state")
             or not self.screen.client.game_state
-            or not self.screen.client.game_state.active_player
+            or not self.screen.client.game_state.active_player_name
         ):
             return
 
@@ -557,7 +722,7 @@ class GameDrawer:
         )
         draw_text(
             surface=self.screen.client.window,
-            text=f"Aktuális játékos: {this_is_ai_name(self.screen.client.game_state.active_player)}",
+            text=f"Aktuális játékos: {this_is_ai_name(self.screen.client.game_state.active_player_name)}",
             color=DARK_GREEN,
             x=40,
             y=37,
@@ -705,22 +870,34 @@ class GameDrawer:
             )
 
             if (
-                len(self.screen.client.opponent_players) == 1
-                and self.screen.client.user.username
-                == self.screen.client.game_state.active_player
+                self.screen.client.user.username
+                == self.screen.client.game_state.active_player_name
             ):
-                self.screen.local_targeted_player = player.username
+                if not self.screen.local_targeted_player:
+                    unvisited_players = [
+                        p
+                        for p in self.screen.client.opponent_players
+                        if p.username
+                        not in self.screen.client.game_state.visited_already
+                    ]
+
+                    if len(unvisited_players) == 1:
+                        self.screen.local_targeted_player = unvisited_players[
+                            0
+                        ].username
+                    elif len(self.screen.client.opponent_players) == 1:
+                        self.screen.local_targeted_player = player.username
 
             target_player = (
                 self.screen.local_targeted_player
-                or self.screen.client.game_state.targeted_player
+                or self.screen.client.game_state.targeted_player_name
             )
 
             if target_player == player.username:
                 background_color = LIGHTER_GREEN_TRANSPARENT
                 font_color = DARK_GREEN
                 animal_font_color = DARK_GREEN
-            elif self.screen.client.game_state.active_player == player.username:
+            elif self.screen.client.game_state.active_player_name == player.username:
                 background_color = MIDDLE_GREEN_TRANSPARENT_90
                 font_color = WHITE
                 animal_font_color = WHITE
@@ -833,7 +1010,6 @@ class GameDrawer:
             volume_sound=self.screen.client._music_manager.sound_effects_volume,
             volume_music=self.screen.client._music_manager.music_volume,
             center_button=True,
-            
         )
 
     def _translate_animal(self, animal_name: str) -> str:

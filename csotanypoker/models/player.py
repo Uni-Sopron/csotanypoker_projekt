@@ -6,7 +6,7 @@ from csotanypoker.models.animal import Animal
 class AbstractPlayer(BaseModel):
     username: str = Field(...)
     cards_in_front: Dict[Animal, int] = Field(default_factory=lambda: {})
-    statement: str = ""
+    statement: Optional[Animal] = None
     is_true: Optional[bool] = None
 
     @field_serializer("cards_in_front")

@@ -40,7 +40,6 @@ class DBRoom(Base):
     room_id = Column(String(50), primary_key=True)
     name = Column(String(100), nullable=False)
     max_player_count = Column(Integer, default=4)
-    password_protected = Column(Boolean, default=False)
     password = Column(String(100), nullable=True)
 
     current_users = relationship("DBUser", back_populates="current_room")

@@ -200,7 +200,7 @@ class AIPlayer:
     ) -> Optional[str]:
         # A fügvény kiszámolja az aktív játékos döntését a kijelentés alapján (igaz, hamis vagy passzol)
         card_in_hand = sum(
-            1 for card in targeted_player.cards_in_hand if card.value == statement
+            1 for card in targeted_player.cards_in_hand if card == statement
         )
 
         weights = {"true": 1.0, "false": 2.5, "pass": 1.5}
@@ -211,7 +211,7 @@ class AIPlayer:
 
         seen_count = 0
         for card, count in seen_cards.items():
-            if card.value == statement:
+            if card == statement:
                 seen_count += count + card_in_hand
 
         remaining_cards = 8 - seen_count
@@ -389,7 +389,7 @@ class AIPlayer:
     def reset_round(self, players):
         # A fügvény visszaállítja a kör eleji állapotot
         for player in players:
-            player.statement = ""
+            player.statement = None
             player.is_true = None
             max_same_cards = (
                 max(player.cards_in_front.values()) if player.cards_in_front else 0

@@ -79,7 +79,6 @@ class GameManager:
     ) -> None:
         db_room = self.room_manager.get_room_by_id(db, room_id)
         if not db_room:
-            print(f"Room not found: {room_id}")
             return
 
         if reconnect:
@@ -130,7 +129,6 @@ class GameManager:
                     break
 
             if existing_game:
-                print(f"A running game already exists for room {room_id}")
                 return
 
             unique_game_id = str(uuid.uuid4())
@@ -206,7 +204,7 @@ class GameManager:
         game_instance,
         room_id: str,
         hide_card_for_unvisited: bool = True,
-
+        nextplayer=None,
     ):
         try:
             active_users = (
@@ -215,7 +213,6 @@ class GameManager:
                 .all()
             )
             active_usernames = {user.username for user in active_users}
-           
             for player in game_instance.state.players:
                 if player.username in active_usernames:
                     player_sid = self.sockets.get(player.username)
@@ -223,13 +220,12 @@ class GameManager:
                         continue
                     else:
                         if player_sid:
-                           
                             self._send_game_state_to_single_player(
                                 game_instance,
                                 player,
                                 player_sid,
                                 hide_card_for_unvisited,
-                               
+                                nextplayer=nextplayer,
                             )
                         else:
                             print(f"No socket ID found for player: {player.username}")
@@ -243,11 +239,12 @@ class GameManager:
         player,
         player_sid,
         hide_card_for_unvisited: bool,
+        nextplayer=None,
     ):
         try:
-            print(f"Building game state for player: {player.username}")
+           
             client_game_state = self._build_client_game_state(game_instance)
-            print(f"Preparing to send game state to {player.username}")
+           
             if (
                 hide_card_for_unvisited
                 and game_instance.state.question_card
@@ -255,18 +252,17 @@ class GameManager:
                 and game_instance.state.targeted_player is not None
             ):
                 client_game_state["question_card"] = "card_back"
-
             visible_player_data = self._build_visible_player_data(player)
             opponent_players_data = [
                 self._build_opponent_player_data(p)
                 for p in game_instance.state.players
                 if p.username != player.username
             ]
-
             payload = {
                 "game_state": client_game_state,
                 "visible_player_data": visible_player_data,
                 "opponent_players_data": opponent_players_data,
+                "card_placed": str(nextplayer.username) if nextplayer else None,
             }
 
             try:
@@ -286,8 +282,8 @@ class GameManager:
             room_id=game_instance.state.room_id,
             visited_already=game_instance.state.visited_already,
             voters=game_instance.state.voters,
-            active_player=game_instance.state.active_player.username,
-            targeted_player=game_instance.state.targeted_player.username
+            active_player_name=game_instance.state.active_player.username,
+            targeted_player_name=game_instance.state.targeted_player.username
             if game_instance.state.targeted_player
             else None,
             question_card=game_instance.state.question_card,
@@ -295,7 +291,7 @@ class GameManager:
         ).model_dump()
 
     def _build_visible_player_data(self, player_data) -> dict:
-        return player_data.model_dump()
+        return player_data.model_dump(mode="json")
 
     def _build_opponent_player_data(self, player_data) -> dict:
         return OpponentPlayer(
@@ -304,7 +300,7 @@ class GameManager:
             statement=player_data.statement,
             is_true=player_data.is_true,
             card_count_int=len(player_data.cards_in_hand),
-        ).model_dump()
+        ).model_dump(mode="json")
 
     def handle_oke_click(
         self, db: Session, username: str, room_id: str, data: dict
@@ -313,15 +309,18 @@ class GameManager:
             game_instance = self.get_game_instance(room_id)
             if not game_instance:
                 return
-
+            print("A jelenlegi kártya:", game_instance.state.question_card)
+            
             client_game_state = data.get("game_state", {})
-            statement = data.get("statement", "")
-
+            statement = data.get("statement", None)
             for card in Animal:
                 if card.value == client_game_state["question_card"]:
-                    game_instance.select_card(card, game_instance.state.passing)
+                    if game_instance.state.question_card is None:
+                        game_instance.select_card(card, game_instance.state.passing)
 
-            game_instance.select_target_player(client_game_state["targeted_player"])
+            game_instance.select_target_player(
+                client_game_state["targeted_player_name"]
+            )
 
             if (
                 game_instance.state.active_player.username
@@ -332,16 +331,23 @@ class GameManager:
                 )
 
             if (
-                "active_player" in client_game_state
-                and client_game_state["active_player"]
+                "active_player_name" in client_game_state
+                and client_game_state["active_player_name"]
             ):
-                active_player_name = client_game_state["active_player"]
+                active_player_name = client_game_state["active_player_name"]
                 for player in game_instance.state.players:
                     if player.username == active_player_name:
                         game_instance.state.active_player = player
                         break
 
-            game_instance.make_statement(statement)
+            statement_enum = None
+            if statement:
+                for card in Animal:
+                    if card.value == statement:
+                        statement_enum = card
+                        break
+
+            game_instance.make_statement(statement_enum)
 
             self.send_game_state_to_players(
                 db, game_instance, room_id, hide_card_for_unvisited=True
@@ -362,14 +368,17 @@ class GameManager:
             game_instance.state.visited_already = set(
                 player.username for player in game_instance.state.players
             )
-
             self.send_game_state_to_players(
-                db, game_instance, room_id, hide_card_for_unvisited=True
+                db,
+                game_instance,
+                room_id,
+                hide_card_for_unvisited=True,
+                nextplayer=nextplayer,
             )
 
             self.socketio.start_background_task(
                 target=lambda: (
-                    self.socketio.sleep(3),
+                    self.socketio.sleep(5),
                     self._reset_callback(db, nextplayer, game_instance, room_id),
                 )
             )
@@ -413,7 +422,7 @@ class GameManager:
             return
 
         active_player_name = game_instance.state.active_player.username
-      
+
         if not is_ai_player(
             active_player_name
         ) or not self.room_manager.all_players_active_in_room(room_id):
@@ -421,7 +430,7 @@ class GameManager:
 
         try:
             active_player = game_instance.state.active_player
-           
+
             opponent_player_data = [
                 OpponentPlayer(
                     username=p.username,
@@ -434,7 +443,6 @@ class GameManager:
                 if p.username != active_player.username
             ]
 
-         
             selected_card, target_player_name, statement = (
                 game_instance.state.ai_player.select_card_and_target(
                     opponent_player_data,
@@ -444,7 +452,6 @@ class GameManager:
                     passing,
                 )
             )
-            
 
             if selected_card is None or target_player_name is None:
                 if passing:
@@ -453,13 +460,13 @@ class GameManager:
 
             ai_game_state = {
                 "question_card": selected_card.value,
-                "targeted_player": target_player_name,
-                "active_player": game_instance.state.active_player.username,
+                "targeted_player_name": target_player_name,
+                "active_player_name": game_instance.state.active_player.username,
             }
 
             self.socketio.start_background_task(
                 lambda: (
-                    self.socketio.sleep(3.0),
+                    self.socketio.sleep(5.0),
                     self._execute_ai_move(
                         db, game_instance, ai_game_state, statement, passing
                     ),
@@ -474,7 +481,7 @@ class GameManager:
         db: Session,
         game_instance,
         ai_game_state: dict,
-        statement: str,
+        statement: Animal,
         passing: bool,
     ):
         room_id = game_instance.state.room_id
@@ -509,7 +516,7 @@ class GameManager:
             )
             self.socketio.start_background_task(
                 target=lambda: (
-                    self.socketio.sleep(3),
+                    self.socketio.sleep(5),
                     self._reset_callback(db, nextplayer, game_instance, room_id),
                 )
             )
@@ -528,7 +535,7 @@ class GameManager:
             return
 
         tipp = choice == "true"
-        self.socketio.sleep(3.0)
+        self.socketio.sleep(5.0)
         self._process_guess(db, game_instance, room_id, tipp)
 
     def ai_pass_internal(self, db: Session, game_instance, room_id: str):
@@ -538,7 +545,6 @@ class GameManager:
             game_instance,
             room_id,
             hide_card_for_unvisited=True,
-          
         )
 
         if game_instance.state.targeted_player is not None:
@@ -546,10 +552,9 @@ class GameManager:
             game_instance.state.active_player = next_player
             game_instance.state.targeted_player = None
 
-
         if self._check_and_handle_game_end(db, game_instance, room_id):
             return
-        self.socketio.sleep(3.0)
+        self.socketio.sleep(5.0)
         self.send_game_state_to_players(
             db, game_instance, room_id, hide_card_for_unvisited=False
         )
@@ -587,4 +592,3 @@ class GameManager:
                     f"Resuming AI activity for {active_player_name} - no active round"
                 )
                 self.ai_activity(db, game_instance, room_id)
-

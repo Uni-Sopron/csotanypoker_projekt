@@ -93,18 +93,18 @@ class GameLogic:
                     self.state.visited_already.add(self.state.active_player.username)
                 return
 
-    def make_statement(self, statement=""):
+    def make_statement(self, statement=None):
         self.state.active_player.statement = statement
 
     def check_truth(self, answer):
         self.state.targeted_player.is_true = answer
         if self.state.targeted_player.is_true is True:
-            if self.state.active_player.statement == self.state.question_card.value:
+            if self.state.active_player.statement == self.state.question_card:
                 return True
             else:
                 return False
         elif self.state.targeted_player.is_true is False:
-            if self.state.active_player.statement != self.state.question_card.value:
+            if self.state.active_player.statement != self.state.question_card:
                 return True
             else:
                 return False

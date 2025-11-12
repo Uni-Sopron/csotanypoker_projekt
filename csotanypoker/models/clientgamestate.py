@@ -17,8 +17,8 @@ class AbstractGameState(BaseModel):
         )
 
 class ClientGameState(AbstractGameState):
-    active_player: Optional[str] = Field(None, description="Aktív játékos neve")
-    targeted_player: Optional[str] = Field(None, description="Célzott játékos neve")
+    active_player_name: Optional[str] = Field(None, description="Aktív játékos neve")
+    targeted_player_name: Optional[str] = Field(None, description="Célzott játékos neve")
     @field_serializer("question_card")
     def serialize_question_card(self, value):
         if value is None:

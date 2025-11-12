@@ -72,7 +72,7 @@ class GameMouseHandler:
             self.screen.client.game_state.question_card = (
                 self.screen.local_question_card
             )
-            self.screen.client.game_state.targeted_player = (
+            self.screen.client.game_state.targeted_player_name = (
                 self.screen.local_targeted_player
             )
 
@@ -87,31 +87,31 @@ class GameMouseHandler:
             return (True, False)
 
         return None
+
     def _handle_pass_button(self, pos):
         """Pass gomb kezelése"""
-        
+
         if not hasattr(
             self.screen, "pass_button"
         ) or not self.screen.pass_button.collidepoint(pos):
             return False
 
-      
         if (
-            self.screen.client.game_state.targeted_player
+            self.screen.client.game_state.targeted_player_name
             == self.screen.client.user.username
             and len(self.screen.client.game_state.visited_already)
-            < len(self.screen.client.users) - 1  
+            < len(self.screen.client.users) - 1
         ):
-          
             self.screen.client.game_state.passing = True
-           
+
             self.screen.client.network.passing()
             return True
 
         return False
+
     def _handle_tip_buttons(self, pos):
         if (
-            self.screen.client.game_state.targeted_player
+            self.screen.client.game_state.targeted_player_name
             != self.screen.client.user.username
         ):
             return None
@@ -171,7 +171,7 @@ class GameMouseHandler:
             return None
 
         if (
-            self.screen.client.game_state.active_player
+            self.screen.client.game_state.active_player_name
             != self.screen.client.user.username
         ):
             return None
