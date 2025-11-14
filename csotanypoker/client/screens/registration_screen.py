@@ -1,5 +1,10 @@
 import pygame
-from csotanypoker.client.drawing_helpers.text_manager import handle_continuous_arrow_keys, handle_continuous_backspace, handle_input_text_event, handle_mouse_click_in_input
+from csotanypoker.client.drawing_helpers.text_manager import (
+    handle_continuous_arrow_keys,
+    handle_continuous_backspace,
+    handle_input_text_event,
+    handle_mouse_click_in_input,
+)
 from csotanypoker.client.screens.base_screen import BaseScreen
 from csotanypoker.client.drawing_helpers.constans import (
     RED,
@@ -128,7 +133,6 @@ class LoginScreen(BaseScreen):
         if not self.active_field:
             return
 
-
         state = get_input_state(self.active_field)
         current_time = pygame.time.get_ticks()
         keys = pygame.key.get_pressed()
@@ -146,8 +150,14 @@ class LoginScreen(BaseScreen):
             if changed:
                 self.password_text = new_text
 
-        text_len = len(self.username_text) if self.active_field == "username" else len(self.password_text)
-        new_cursor, changed = handle_continuous_arrow_keys(state, keys, current_time, text_len)
+        text_len = (
+            len(self.username_text)
+            if self.active_field == "username"
+            else len(self.password_text)
+        )
+        new_cursor, changed = handle_continuous_arrow_keys(
+            state, keys, current_time, text_len
+        )
         if changed:
             state.cursor_pos = new_cursor
 
@@ -297,9 +307,9 @@ class LoginScreen(BaseScreen):
         """Handle key release events"""
         if not self.active_field:
             return
-            
+
         state = get_input_state(self.active_field)
-        
+
         if event.key == pygame.K_BACKSPACE:
             state.backspace_held = False
         elif event.key == pygame.K_LEFT:
@@ -319,8 +329,6 @@ class LoginScreen(BaseScreen):
                 "password" if self.active_field == "username" else "username"
             )
             return
-
-   
 
         state = get_input_state(self.active_field)
 
@@ -375,38 +383,28 @@ class LoginScreen(BaseScreen):
                     state.right_held = True
                     state.last_arrow_time = pygame.time.get_ticks()
 
-    def handle_login(self):
+    def error_handler(self):
         if not self.username_text.strip():
             self.set_error("A felhasználónév nem lehet üres!")
-            return
-
-        if not self.password_text.strip():
-            self.set_error("A jelszó nem lehet üres!")
-            return
-        username = self.username_text.strip().lower()
-        ai_names_lower = [name.lower() for name in AI_NAMES]
-
-        if any(ai_name in username for ai_name in ai_names_lower):
-            self.set_error("Az AI nevek nem használhatók felhasználónévként!")
-            return
-
-        self.client.network.login(self.username_text.strip(), self.password_text)
-
-    def handle_register(self):
-        if not self.username_text.strip():
-            self.set_error("A felhasználónév nem lehet üres!")
-            return
+            return True
         elif not self.password_text.strip():
             self.set_error("A jelszó nem lehet üres!")
-            return
+            return True
         username = self.username_text.strip().lower()
         ai_names_lower = [name.lower() for name in AI_NAMES]
 
         if any(ai_name in username for ai_name in ai_names_lower):
             self.set_error("Az AI nevek nem használhatók felhasználónévként!")
-            return
+            return True
+        return False
 
-        self.client.network.register(self.username_text.strip(), self.password_text)
+    def handle_login(self):
+        if not self.error_handler():
+            self.client.network.login(self.username_text.strip(), self.password_text)
+
+    def handle_register(self):
+        if not self.error_handler():
+            self.client.network.register(self.username_text.strip(), self.password_text)
 
     def set_error(self, message):
         self.client.message = message

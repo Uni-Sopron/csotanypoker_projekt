@@ -50,7 +50,6 @@ def handle_user_join_to_room(
         socketio.emit(
             "room_players_updated",
             {
-            
                 "players": [u.model_dump() for u in users],
             },
             room=room_id,
@@ -58,7 +57,6 @@ def handle_user_join_to_room(
 
         room_users = room_manager.get_room_users(db, room_id)
         if len(room_users) >= target_room.max_player_count:
-            
             players = room_manager.get_players_list(db, room_id)
             socketio.emit(
                 "start_game",
@@ -66,7 +64,9 @@ def handle_user_join_to_room(
                 room=room_id,
             )
 
-            game_manager.start_game(db,[player.username for player in players], room_id)
+            game_manager.start_game(
+                db, [player.username for player in players], room_id
+            )
             room_manager.broadcast_room_list_update(db)
 
 
@@ -81,19 +81,17 @@ def notify_user_joined_room() -> None:
         if not current_room:
             return
 
-      
         room_users = room_manager.get_room_users(db, db_user.current_room_id)
         players = [
-            Client_User(username=user.username, is_active=user.is_active) 
+            Client_User(username=user.username, is_active=user.is_active)
             for user in room_users
         ]
         emit(
             "joined_room",
             {
                 "room_id": current_room.room_id,
-                "room_name": current_room.name,  
+                "room_name": current_room.name,
                 "players": [p.model_dump() for p in players],
-
                 "max_player_count": current_room.max_player_count,
             },
             to=request.sid,
@@ -124,6 +122,7 @@ def handle_register(data: dict) -> None:
     db.close()
 
     handle_login({"username": username, "password": password})
+
 
 @socketio.on("rejoin_waiting_room")
 def handle_start_new_game(data: dict) -> None:
@@ -175,12 +174,11 @@ def handle_start_new_game(data: dict) -> None:
             to=request.sid,
         )
 
-
         socketio.emit(
             "player_rejoined",
             {
                 "rejoined_player": username,
-                "players": [u.model_dump() for u in users], 
+                "players": [u.model_dump() for u in users],
             },
             room=room_id,
         )
@@ -207,6 +205,7 @@ def handle_start_new_game(data: dict) -> None:
             game_manager.start_game(db, player_usernames, room_id)
 
         room_manager.broadcast_room_list_update(db)
+
 
 @socketio.on("all_players_leave_room")
 def handle_all_players_leave_room(data) -> None:
@@ -258,7 +257,9 @@ def handle_vote_rematch(data: dict) -> None:
                     game.game_status = "end"
             db.commit()
 
-            game_manager.start_game(db, [player.username for player in players], room_id)
+            game_manager.start_game(
+                db, [player.username for player in players], room_id
+            )
         else:
             socketio.emit(
                 "rematch_vote_received",
@@ -323,7 +324,9 @@ def handle_login(data: dict) -> None:
                 {
                     "username": username,
                     "rooms": rooms_data,
-                    "previous_room": previous_room_model.model_dump() if previous_room_model else None, 
+                    "previous_room": previous_room_model.model_dump()
+                    if previous_room_model
+                    else None,
                     "game_start": room_manager.game_is_running(db, previous_room_id),
                 },
                 to=sockets[username],
@@ -332,6 +335,8 @@ def handle_login(data: dict) -> None:
             return
         else:
             emit("login_success", {"user": user.model_dump(), "rooms": rooms_data})
+
+
 @socketio.on("disconnect")
 def handle_disconnect() -> None:
     username = session.get("username")
@@ -454,13 +459,12 @@ def handle_leave_room(data: dict) -> None:
             db.commit()
 
         users = room_manager.get_client_users_in_room(db, room_id)
-    
+
         socketio.emit(
             "player_left_room",
             {
                 "message": f"{this_is_ai_name(username)} elhagyta a szobát",
                 "players": [u.model_dump() for u in users],
-
             },
             room=room_id,
         )

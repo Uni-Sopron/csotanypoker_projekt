@@ -378,7 +378,7 @@ class GameManager:
 
             self.socketio.start_background_task(
                 target=lambda: (
-                    self.socketio.sleep(5),
+                    self.socketio.sleep(4),
                     self._reset_callback(db, nextplayer, game_instance, room_id),
                 )
             )
@@ -466,7 +466,7 @@ class GameManager:
 
             self.socketio.start_background_task(
                 lambda: (
-                    self.socketio.sleep(5.0),
+                    self.socketio.sleep(4.0),
                     self._execute_ai_move(
                         db, game_instance, ai_game_state, statement, passing
                     ),
@@ -516,7 +516,7 @@ class GameManager:
             )
             self.socketio.start_background_task(
                 target=lambda: (
-                    self.socketio.sleep(5),
+                    self.socketio.sleep(4),
                     self._reset_callback(db, nextplayer, game_instance, room_id),
                 )
             )
@@ -535,7 +535,7 @@ class GameManager:
             return
 
         tipp = choice == "true"
-        self.socketio.sleep(5.0)
+        self.socketio.sleep(4.0)
         self._process_guess(db, game_instance, room_id, tipp)
 
     def ai_pass_internal(self, db: Session, game_instance, room_id: str):
@@ -554,7 +554,7 @@ class GameManager:
 
         if self._check_and_handle_game_end(db, game_instance, room_id):
             return
-        self.socketio.sleep(5.0)
+        self.socketio.sleep(4.0)
         self.send_game_state_to_players(
             db, game_instance, room_id, hide_card_for_unvisited=False
         )
