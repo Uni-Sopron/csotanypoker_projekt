@@ -269,16 +269,17 @@ class NetworkManager:
                         hasattr(self.game_client, "game_state")
                         and self.game_client.game_state
                     ):
-                        
                         self.game_client.game_state.passing = game_state.get(
                             "passing", False
+                        )
+                        self.game_client.game_state.card_played = game_state.get(
+                            "card_played", False
                         )
 
                         card_placed = data.get("card_placed", None)
                         if card_placed:
                             self.game_client.card_placed = card_placed
-                            
-                       
+
                         self.game_client.game_state.game_id = game_state.get("game_id")
                         self.game_client.game_state.room_id = game_state.get("room_id")
                         self.game_client.game_state.active_player_name = game_state.get(
@@ -394,7 +395,7 @@ class NetworkManager:
                                                 print(
                                                     f"Warning: Unknown opponent animal: {animal_name} - {e}"
                                                 )
-                                               
+
                                 statement_str = opponent_data.get("statement")
                                 statement_enum = None
                                 if statement_str:
@@ -446,7 +447,6 @@ class NetworkManager:
 
         @self.sio.on("rooms_updated")
         def on_rooms_updated(data: Dict[str, Any]) -> None:
-            self.get_user_stats(self.game_client.user.username)
             with self._data_lock:
                 try:
                     new_rooms_data = data.get("rooms", {})
@@ -819,14 +819,15 @@ class NetworkManager:
         self._safe_emit("register", {"username": username, "password": password})
 
     def join_room(
-        self, room_id: str, password: str = "", skipp_password: bool = False
+        self,
+        room_id: str,
+        password: str = "",
     ) -> None:
         self._safe_emit(
             "join_room",
             {
                 "room_id": room_id,
                 "password": password,
-                "skipp_password": skipp_password,
             },
         )
 
@@ -869,6 +870,10 @@ class NetworkManager:
                     getattr(self.game_client.game_state, "visited_already", [])
                 ),
                 "voters": list(getattr(self.game_client.game_state, "voters", [])),
+                "passing": passing,
+                "card_played": getattr(
+                    self.game_client.game_state, "card_played", False
+                ),
             }
 
         self._safe_emit(

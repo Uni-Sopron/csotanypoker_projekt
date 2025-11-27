@@ -69,7 +69,6 @@ class AnimationManager:
         slide_data = self._slide_animations[card_key]
 
         if slide_data["is_animating"]:
-            # Késleltetés kezelése (60 frame = 1 másodperc 60 FPS-nél)
             if slide_data.get("delay_frames", 0) > 0:
                 slide_data["delay_frames"] -= 1
             else:
@@ -78,7 +77,6 @@ class AnimationManager:
                     slide_data["progress"] = 1.0
                     slide_data["is_animating"] = False
 
-        # Lineáris interpoláció pozícióra
         current_x = (
             slide_data["start_pos"][0]
             + (slide_data["end_pos"][0] - slide_data["start_pos"][0])
@@ -90,7 +88,6 @@ class AnimationManager:
             * slide_data["progress"]
         )
 
-        # Méret interpoláció (1.0 -> 0.3)
         scale = 1.0 - (slide_data["progress"] * 0.7)
 
         return {
@@ -107,7 +104,7 @@ class AnimationManager:
             "end_pos": end_pos,
             "progress": 0.0,
             "is_animating": True,
-            "delay_frames": 50,  # 30 frame = 0.5 másodperc (60 FPS)
+            "delay_frames": 50,  
         }
 
     def is_slide_animating(self, card_key):

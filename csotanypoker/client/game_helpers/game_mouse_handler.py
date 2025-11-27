@@ -68,20 +68,19 @@ class GameMouseHandler:
                 return (False, True)
             return None
 
-        if not self.screen.adott:
+        if not self.screen.client.game_state.card_played:
             self.screen.client.game_state.question_card = (
                 self.screen.local_question_card
             )
             self.screen.client.game_state.targeted_player_name = (
                 self.screen.local_targeted_player
             )
-
+            self.screen.client.game_state.passing = False
+            self.screen.client.game_state.card_played = True
             self.screen.client.network.oke_click(
                 statement=self.screen.local_active_animal,
                 passing=self.screen.client.game_state.passing,
             )
-            self.screen.client.game_state.passing = False
-            self.screen.adott = True
 
             self.screen.state_manager.reset_local_selections()
             return (True, False)
@@ -145,7 +144,7 @@ class GameMouseHandler:
             if not rect.collidepoint(pos):
                 continue
 
-            if self.screen.adott:
+            if self.screen.client.game_state.card_played:
                 return None
 
             is_valid, error_message = self.screen.validator.validate_player_selection(

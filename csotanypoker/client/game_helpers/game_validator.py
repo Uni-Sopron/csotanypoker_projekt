@@ -51,7 +51,7 @@ class GameValidator:
 
     def validate_card_selection(self):
         """Kártya kiválasztás validálása"""
-        if self.screen.adott:
+        if self.screen.client.game_state.card_played:
             return False, "Már adtál lapot ebben a körben."
 
         if (
@@ -67,7 +67,7 @@ class GameValidator:
 
     def validate_animal_selection(self):
         """Állat kiválasztás validálása"""
-        if self.screen.adott:
+        if self.screen.client.game_state.card_played:
             return False, "Már adtál lapot ebben a körben."
 
         return True, None

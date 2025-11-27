@@ -40,10 +40,9 @@ class GameScreen(BaseScreen):
         self.selected_card_frame = None
         self.show_rules = False
         self.show_leave_button = False
-        self.adott = False
+       
         self.answer = False
-
-        # Lokális választások
+        self._last_targeted_player = None 
         self.local_question_card = None
         self.local_targeted_player = None
         self.local_active_animal = None

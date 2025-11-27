@@ -50,20 +50,19 @@ class AutoSavingSet(set):
 class GameState(AbstractGameState):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    save_path: Optional[str] = Field(None, description="Mentési útvonal")
+    save_path: str = Field("", description="Mentési útvonal")
     active_player: Optional[VisiblePlayer] = Field(None, description="Aktív játékos")
     targeted_player: Optional[VisiblePlayer] = Field(
         None, description="Célzott játékos"
     )
     players: Optional[List[VisiblePlayer]] = Field(
-        None, description="Összes játékos a játékban"
+        None, description="Ã–sszes játékos a játékban"
     )
     ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
 
     def __init__(self, **data):
         save_path = data.get("save_path")
 
-      
         if "passing" not in data:
             data["passing"] = False
 
@@ -145,7 +144,7 @@ class GameState(AbstractGameState):
             traceback.print_exc()
             return None
 
-    def manual_save(self):
+    def manual_save(self) -> bool:
         """Force a manual save"""
         if self.save_path is None:
             print("Warning: Cannot save - no save_path specified")
@@ -157,11 +156,3 @@ class GameState(AbstractGameState):
         except Exception as e:
             print(f"Manual save failed: {e}")
             return False
-
-    @classmethod
-    def create_with_autosave(cls, save_path: str, **kwargs) -> "GameState":
-        """Create new GameState with automatic saving enabled"""
-        game_state = cls(save_path=save_path, **kwargs)
-
-        game_state.manual_save()
-        return game_state

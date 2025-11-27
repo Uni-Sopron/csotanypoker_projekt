@@ -38,33 +38,15 @@ class GameManager:
                     if not os.path.exists(save_path):
                         continue
 
-                    loaded_state = GameState.load_from_file(save_path)
+                
+                    game_logic = GameLogic(
+                        db_game.game_id,
+                        players=[],  
+                        room_id=db_game.room_id,
+                        from_pkl=True,  
+                    )
 
-                    if loaded_state:
-                        db_players = db_game.players
-                        players = []
-                        for db_player in db_players:
-                            loaded_player = None
-                            for p in loaded_state.players:
-                                if p.username == db_player.username:
-                                    loaded_player = p
-                                    break
-
-                            if loaded_player:
-                                players.append(loaded_player)
-                            else:
-                                players.append(
-                                    VisiblePlayer(username=db_player.username)
-                                )
-
-                        game_logic = GameLogic(
-                            db_game.game_id,
-                            players,
-                            room_id=db_game.room_id,
-                            from_db=True,
-                        )
-
-                        self.game_instances[db_game.room_id] = game_logic
+                    self.game_instances[db_game.room_id] = game_logic
 
                 except Exception as game_error:
                     print(
@@ -87,36 +69,6 @@ class GameManager:
                 self.send_game_state_to_players(
                     db, game_instance, room_id, hide_card_for_unvisited=True
                 )
-            else:
-                try:
-                    existing_game = None
-                    for game in db_room.games:
-                        if game.game_status == "run":
-                            existing_game = game
-                            break
-
-                    if existing_game:
-                        save_path = f"csotanypoker/server/games_saves/game_{existing_game.game_id}.pkl"
-                        loaded_state = GameState.load_from_file(save_path)
-
-                        if loaded_state:
-                            game_logic = GameLogic(
-                                existing_game.game_id,
-                                list(loaded_state.players),
-                                room_id=room_id,
-                            )
-                            game_logic.state = loaded_state
-                            self.game_instances[room_id] = game_logic
-
-                            self.send_game_state_to_players(
-                                db, game_logic, room_id, hide_card_for_unvisited=True
-                            )
-                        else:
-                            print(f"Failed to load game state, creating new game")
-                            reconnect = False
-                except Exception as e:
-                    print(f"Error during reconnect: {e}")
-                    reconnect = False
 
             if reconnect:
                 return
@@ -242,9 +194,8 @@ class GameManager:
         nextplayer=None,
     ):
         try:
-           
             client_game_state = self._build_client_game_state(game_instance)
-           
+
             if (
                 hide_card_for_unvisited
                 and game_instance.state.question_card
@@ -288,6 +239,7 @@ class GameManager:
             else None,
             question_card=game_instance.state.question_card,
             passing=game_instance.state.passing,
+            card_played=game_instance.state.card_played,
         ).model_dump()
 
     def _build_visible_player_data(self, player_data) -> dict:
@@ -309,8 +261,9 @@ class GameManager:
             game_instance = self.get_game_instance(room_id)
             if not game_instance:
                 return
-            print("A jelenlegi kártya:", game_instance.state.question_card)
-            
+            if game_instance.state.card_played:
+                return
+          
             client_game_state = data.get("game_state", {})
             statement = data.get("statement", None)
             for card in Animal:
@@ -339,7 +292,10 @@ class GameManager:
                     if player.username == active_player_name:
                         game_instance.state.active_player = player
                         break
-
+            game_instance.state.card_played = client_game_state.get(
+                "card_played", False
+            )
+          
             statement_enum = None
             if statement:
                 for card in Animal:
@@ -348,7 +304,8 @@ class GameManager:
                         break
 
             game_instance.make_statement(statement_enum)
-
+            
+            game_instance.state.manual_save()
             self.send_game_state_to_players(
                 db, game_instance, room_id, hide_card_for_unvisited=True
             )
@@ -402,6 +359,7 @@ class GameManager:
     def _reset_callback(self, db: Session, nextplayer, game_instance, room_id: str):
         game_instance.state.ai_player.reset_round(game_instance.state.players)
         game_instance.state.active_player = nextplayer
+        game_instance.state.card_played = False
 
         if self._check_and_handle_game_end(db, game_instance, room_id):
             return
@@ -551,6 +509,7 @@ class GameManager:
             next_player = game_instance.state.targeted_player
             game_instance.state.active_player = next_player
             game_instance.state.targeted_player = None
+            game_instance.state.card_played = False
 
         if self._check_and_handle_game_end(db, game_instance, room_id):
             return
@@ -588,7 +547,4 @@ class GameManager:
                 return
 
             elif not has_question_card:
-                print(
-                    f"Resuming AI activity for {active_player_name} - no active round"
-                )
                 self.ai_activity(db, game_instance, room_id)

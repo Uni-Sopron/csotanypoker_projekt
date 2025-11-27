@@ -44,11 +44,11 @@ class GameStateManager:
 
         if not is_my_turn:
             self.reset_local_selections(preserve_passing=False)
-            self.screen.adott = False
+            self.screen.client.game_state.card_played = False
         elif (
-            self.screen.adott and not self.screen.client.game_state.targeted_player_name
+            self.screen.client.game_state.card_played and not self.screen.client.game_state.targeted_player_name
         ):
-            self.screen.adott = False
+            self.screen.client.game_state.card_played = False
             if (
                 hasattr(self.screen.client, "opponent_players")
                 and self.screen.client.opponent_players
@@ -79,17 +79,17 @@ class GameStateManager:
             username = self.screen.client.user.username
             message = ""
             if active_player == username:
-                if not self.screen.adott:
+                if not self.screen.client.game_state.card_played:
                     if self.screen.client.game_state.passing:
-                        message = "Válassz másik játékost és állíts valamit a lapról"
+                        message = "Válassz másik játékost és állíts valamit a lapról!"
                     else:
-                        message = "Válassz kártyát és játékost, majd állíts valamit"
+                        message = "Válassz kártyát és játékost, majd állíts valamit!"
             elif targeted_player == username:
                 message = "Igaz vagy hamis az állítás?"
             elif targeted_player is None:
-                message = f"Várj {this_is_ai_name(active_player)} lépésére"
+                message = f"Várj {this_is_ai_name(active_player)} lépésére."
             else:
-                message = f"{this_is_ai_name(targeted_player)} játékos lapot kapott {this_is_ai_name(active_player)}-től"
+                message = f"{this_is_ai_name(targeted_player)} játékos lapot kapott {this_is_ai_name(active_player)}-től."
 
             self.screen.client.message = message
             self.screen.client.message_display_time = 30

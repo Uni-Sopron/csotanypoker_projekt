@@ -191,7 +191,6 @@ class RoomManager:
                     print(f"Player {user.username} is not active")
                     return False
 
-            print(f"All {len(room_users)} players in room {room_id} are active")
             return True
 
     def broadcast_room_list_update(self, db: Session) -> None:

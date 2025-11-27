@@ -5,32 +5,33 @@ from csotanypoker.server.gamestate import GameState
 
 
 class GameLogic:
-    def __init__(self, id, players, room_id=None, from_db=False):
-        data_dir = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '.')
+    def __init__(self, id, players, room_id=None, from_pkl=False):  
+        data_dir = os.getenv("RAILWAY_VOLUME_MOUNT_PATH", ".")
         save_dir = os.path.join(data_dir, "games_saves")
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, f"game_{id}.pkl")
 
-        if not from_db:
+        if from_pkl:
+         
+            self.state = GameState.load_from_file(save_path)
+            if self.state is None:
+                raise ValueError(f"Failed to load GameState from {save_path}")
+        
+        else:
+            
             self.state = GameState(
                 game_id=id,
                 room_id=room_id,
                 save_path=save_path,
             )
-
             self.state.players = players
-
             self.state.active_player = self.choose_starting_player()
             self.deck = []
             self.generate_deck()
             self.shuffle_deck()
             self.deal_cards()
-        else:
-            self.state = GameState.load_from_file(save_path)
-            if self.state is None:
-                raise ValueError(f"Failed to load GameState from {save_path}")
 
-        self.state.manual_save()
+            self.state.manual_save()
 
     def generate_deck(self):
         deck_cards = []
@@ -56,7 +57,6 @@ class GameLogic:
             self.state.players[i].cards_in_hand = self.deck[
                 i * portions : (i + 1) * portions
             ]
-        
 
     def choose_starting_player(self):
         return choice(self.state.players)
@@ -110,7 +110,6 @@ class GameLogic:
                 return False
 
     def place_card(self, player):
-       
         card_type = self.state.question_card
         if card_type not in player.cards_in_front:
             player.cards_in_front[card_type] = 1

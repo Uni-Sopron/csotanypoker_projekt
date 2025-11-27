@@ -8,6 +8,7 @@ from csotanypoker.client.drawing_helpers.constans import (
     MIDDLE_GREEN,
     LIGHT_GREEN,
     LEGVILAGOS_ZOLD,
+
 )
 from csotanypoker.client.drawing_helpers.image_manager import load_image
 from csotanypoker.client.drawing_helpers.text_manager import (
@@ -303,6 +304,13 @@ def draw_image_button(
     scale = 1.0
     if is_active:
         scale = active_scale
+        pygame.draw.circle(
+            surface,
+            LEGVILAGOS_ZOLD,
+            (x + 1, y + 1),
+            35,
+            6,
+        )
     elif is_hovered:
         scale = hover_scale
 

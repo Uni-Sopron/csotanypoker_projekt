@@ -107,7 +107,7 @@ class GameDrawer:
         if (
             self.screen.client.game_state.active_player_name
             == self.screen.client.user.username
-            and not self.screen.adott
+            and not self.screen.client.game_state.card_played
         ):
             self._draw_animal_table()
 
@@ -327,7 +327,7 @@ class GameDrawer:
 
         slide_key = f"mini_{target_player}_slide"
         slide_anim = self.screen.animation_manager.get_slide_animation(slide_key)
-
+        
       
         card_to_show = (
             self.screen.local_question_card
@@ -474,7 +474,6 @@ class GameDrawer:
             WHITE,
             MIDDLE_GREEN_TRANSPARENT_90,
         )
-
     def _check_and_animate_card_placements(self):
         """Ellenőrzi és indítja a kártya lehelyezési animációkat"""
         center_x = self.screen.client.width // 2
@@ -485,23 +484,31 @@ class GameDrawer:
             or self.screen.client.game_state.targeted_player_name
         )
         question_card = self.screen.client.game_state.question_card
-
+       
         if question_card == None or question_card == "card_back":
             self.screen.animation_manager.reset_slide_animation("center_card_slide")
             if target_player:
                 self.screen.animation_manager.reset_slide_animation(
                     f"mini_{target_player}_slide"
                 )
+            self.screen._last_targeted_player = None
             return
 
+        target_player_changed = self.screen._last_targeted_player != target_player
         
+        if target_player_changed:
+            if self.screen._last_targeted_player is not None:
+                self.screen.animation_manager.reset_slide_animation("center_card_slide")
+                for key in list(self.screen.animation_manager._slide_animations.keys()):
+                    if key.startswith("mini_"):
+                        self.screen.animation_manager.reset_slide_animation(key)
+            
+            self.screen._last_targeted_player = target_player
+
         if self.screen.animation_manager.is_slide_animating("center_card_slide"):
             return
 
-       
-        slide_anim = self.screen.animation_manager.get_slide_animation(
-            "center_card_slide"
-        )
+        slide_anim = self.screen.animation_manager.get_slide_animation("center_card_slide")
         if (
             slide_anim
             and not slide_anim["is_animating"]
@@ -514,49 +521,61 @@ class GameDrawer:
             return
 
         placed_player = self.screen.client.card_placed
-
-        if question_card == None or question_card == "card_back":
-            self.screen.animation_manager.reset_slide_animation("center_card_slide")
-            if target_player:
-                self.screen.animation_manager.reset_slide_animation(
-                    f"mini_{target_player}_slide"
-                )
+        if not placed_player:
             return
 
-        if self.screen.animation_manager.is_slide_animating("center_card_slide"):
+        self._start_card_animation(placed_player, target_player, center_x, center_y)
+
+        self.screen.client.card_placed = None
+
+    def _start_card_animation(self, placed_player, target_player, center_x, center_y):
+        if not placed_player:
             return
 
-        placed_player = self.screen.client.card_placed
-        if placed_player:
-            mini_start_x = center_x
-            mini_start_y = center_y
+        mini_start_x = center_x
+        mini_start_y = center_y
+        if target_player != self.screen.client.user.username:
+            targeted_rect = None
+            if (
+                hasattr(self.screen, "opponent_player_rects")
+                and self.screen.opponent_player_rects
+            ):
+                for rect, player_name in self.screen.opponent_player_rects:
+                    if player_name == target_player:
+                        targeted_rect = rect
+                        mini_start_x = targeted_rect.centerx
+                        mini_start_y = targeted_rect.bottom + 80
+                        break
 
-            if target_player == self.screen.client.user.username:
-                mini_start_x = center_x
-                mini_start_y = center_y
-            else:
-                
-                targeted_rect = None
-                if (
-                    hasattr(self.screen, "opponent_player_rects")
-                    and self.screen.opponent_player_rects
-                ):
-                    for rect, player_name in self.screen.opponent_player_rects:
-                        if player_name == target_player:
-                            targeted_rect = rect
-                            mini_start_x = targeted_rect.centerx
-                            mini_start_y = targeted_rect.bottom + 80
-                          
-                            break
+      
+        if placed_player == self.screen.client.user.username:
+            end_x = self.screen.client.width - 240 - 20 + 120
+            end_y = self.screen.client.height // 2 - 175 + 175
 
-                
-        
-            if placed_player == self.screen.client.user.username:
+            self.screen.animation_manager.start_slide_animation(
+                "center_card_slide", (center_x, center_y), (end_x, end_y)
+            )
 
-                end_x = self.screen.client.width - 240 - 20 + 120
-                end_y = self.screen.client.height // 2 - 175 + 175
+            self.screen.animation_manager.start_slide_animation(
+                f"mini_{target_player}_slide",
+                (mini_start_x, mini_start_y),
+                (end_x, end_y),
+            )
+        else:
+            target_rect = None
+            if (
+                hasattr(self.screen, "opponent_player_rects")
+                and self.screen.opponent_player_rects
+            ):
+                for rect, player_name in self.screen.opponent_player_rects:
+                    if player_name == placed_player:
+                        target_rect = rect
+                        break
 
-               
+            if target_rect:
+                end_x = target_rect.centerx
+                end_y = target_rect.bottom - 30
+
                 self.screen.animation_manager.start_slide_animation(
                     "center_card_slide", (center_x, center_y), (end_x, end_y)
                 )
@@ -566,34 +585,6 @@ class GameDrawer:
                     (mini_start_x, mini_start_y),
                     (end_x, end_y),
                 )
-            else:
-                target_rect = None
-                if (
-                    hasattr(self.screen, "opponent_player_rects")
-                    and self.screen.opponent_player_rects
-                ):
-                    for rect, player_name in self.screen.opponent_player_rects:
-                        if player_name == placed_player:
-                            target_rect = rect
-                            break
-
-                if target_rect:
-                    end_x = target_rect.centerx
-                    end_y = target_rect.bottom - 30
-
-                    self.screen.animation_manager.start_slide_animation(
-                        "center_card_slide", (center_x, center_y), (end_x, end_y)
-                    )
-
-                    self.screen.animation_manager.start_slide_animation(
-                        f"mini_{target_player}_slide",
-                        (mini_start_x, mini_start_y),
-                        (end_x, end_y),
-                    )
-                
-
-        
-            self.screen.client.card_placed = None
 
     def _draw_statement_bubble(self, x, y, text, text_color, bg_color):
         """Állítás buborék rajzolása"""
@@ -797,15 +788,6 @@ class GameDrawer:
             temp_rect = pygame.Rect(button_center_x - 30, button_center_y - 25, 60, 50)
             is_hovered = temp_rect.collidepoint(mouse_pos)
             is_active = self.screen.local_active_animal == str(animal)
-
-            if is_active:
-                pygame.draw.circle(
-                    self.screen.client.window,
-                    LEGVILAGOS_ZOLD,
-                    (button_center_x + 1, button_center_y + 1),
-                    35,
-                    6,
-                )
 
             button_rect = draw_image_button(
                 surface=self.screen.client.window,

@@ -11,7 +11,6 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-# engine = create_engine("sqlite:///game.db")
 DATA_DIR = os.getenv('RAILWAY_VOLUME_MOUNT_PATH', '.')
 engine = create_engine(f"sqlite:///{DATA_DIR}/game.db")
 Base = declarative_base()

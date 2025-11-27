@@ -285,7 +285,7 @@ def handle_login(data: dict) -> None:
             db.query(DBUser).filter(DBUser.username == username).first()
         )
         if not dbuser:
-            emit("login_error", {"message": "Nem létezik a megadott felhasználónév"})
+            emit("login_error", {"message": "Nem létezik a megadott felhasználónév."})
             return
 
         if not verify_password(password, dbuser.password):
@@ -364,7 +364,6 @@ def _handle_user_disconnect(username: str, send_success_message: bool = False) -
 
             if room_id:
                 leave_room(room_id)
-                print(f"{username} elhagyta a SocketIO room-ot: {room_id}")
 
                 users = room_manager.get_client_users_in_room(db, room_id)
                 room = room_manager.get_room_by_id(db, room_id)
@@ -372,7 +371,7 @@ def _handle_user_disconnect(username: str, send_success_message: bool = False) -
                     socketio.emit(
                         "player_left_room",
                         {
-                            "message": f"{this_is_ai_name(username)} inaktív lett",
+                            "message": f"{this_is_ai_name(username)} inaktív lett.",
                             "players": [u.model_dump() for u in users],
                         },
                         room=room_id,
@@ -383,7 +382,6 @@ def _handle_user_disconnect(username: str, send_success_message: bool = False) -
     sockets.pop(username, None)
 
     session.clear()
-    print(f"Session törölve: {username}")
 
 
 @socketio.on("get_user_stats")
@@ -496,11 +494,8 @@ def join_room_request(data: dict) -> None:
     username = session.get("username")
     room_id = data["room_id"]
     provided_password = data.get("password", "")
-    skipp_password_check = data["skipp_password"]
 
-    if skipp_password_check or room_manager.validate_room_password(
-        room_id, provided_password
-    ):
+    if room_manager.validate_room_password(room_id, provided_password):
         handle_user_join_to_room(room_id, username)
     else:
         emit("join_room_error", {"message": "Helytelen jelszó"}, to=request.sid)
@@ -551,6 +546,7 @@ def handle_pass(data: dict) -> None:
             game_instance.state.active_player = next_player
             game_instance.state.targeted_player = None
             game_instance.state.passing = True
+            game_instance.state.card_played = False
 
         if game_manager._check_and_handle_game_end(db, game_instance, room_id):
             return

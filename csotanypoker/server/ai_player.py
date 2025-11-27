@@ -5,7 +5,6 @@ from csotanypoker.models.animal import Animal
 
 class AIPlayer:
     def __init__(self):
-        self.player_risks: Dict[str, int] = {}
         self.guess_patterns: Dict[str, Dict] = {}
         self.trust_statement: Dict[str, Dict] = {}
 
@@ -22,12 +21,20 @@ class AIPlayer:
         return seen_cards
 
     def calculate_target_weights(
-        self, players, active_player_username: str
+        self,
+        players,
+        active_player: str,
+        passing_card: Optional[Animal] = None,
     ) -> Dict[str, float]:
-        # A fügvény kiszámolja a célpont játékosok súlyait az aktív játékos számára
+        """
+        Kiszámolja a célpont játékosok súlyait.
+
+        Ha passing_card meg van adva (passzolás esetén), akkor figyelembe veszi,
+        hogy az adott kártyából mennyi van már az egyes játékosoknál.
+        """
         weights = {}
 
-        other_players = [p for p in players if p.username != active_player_username]
+        other_players = [p for p in players if p.username != active_player.username]
 
         for player in other_players:
             weight = 1.0
@@ -50,6 +57,23 @@ class AIPlayer:
             elif max_same_cards >= 1:
                 weight *= 1.8
 
+            card_types = set()
+            for card in active_player.cards_in_hand:
+                card_types.add(card)
+
+            if passing_card is not None:
+                cards_of_this_type = player.cards_in_front.get(passing_card, 0)
+                if cards_of_this_type >= 3:
+                    weight *= 9.0
+                elif cards_of_this_type >= 2:
+                    weight *= 5.0
+                elif cards_of_this_type >= 1:
+                    weight *= 3.0
+            else:
+                for card in card_types:
+                    if card in player.cards_in_front:
+                        weight *= 1.5
+
             weights[player.username] = weight
 
         return weights
@@ -60,10 +84,12 @@ class AIPlayer:
         active_player_cards_in_front,
         target_player_cards_in_front,
     ) -> Dict[Animal, float]:
-        # A fügvény kiszámolja a kártyák súlyait az aktív játékos kezében
         weights = {}
-
+        card_types = set()
         for card in active_player_cards_in_hand:
+            card_types.add(card)
+
+        for card in card_types:
             weight = 1.0
 
             cards_in_front = target_player_cards_in_front.get(card, 0)
@@ -87,24 +113,20 @@ class AIPlayer:
     def calculate_statement_strategy(
         self, players, selected_card: Animal, target_player_obj, active_player
     ) -> str:
-        # A fügvény kiszámolja a kijelentés stratégiáját az aktív játékos számára
         weights = {}
         truth_weight = 2.0
 
-        seen_cards = self.calculate_seen_cards(players)
+        seen_cards = self.calculate_seen_cards(players + [active_player])
 
         for animal in Animal:
             if animal != selected_card:
                 lie_weight = 1.0
 
-                card_in_hand = sum(
-                    1 for card in active_player.cards_in_hand if card == animal
-                )
-                seen_count = seen_cards.get(animal, 0) + card_in_hand
+                seen_count = seen_cards.get(animal, 0)
                 remaining_cards = 8 - seen_count
 
                 if remaining_cards == 0:
-                    lie_weight *= 0
+                    lie_weight = 0
                 elif remaining_cards <= 2:
                     lie_weight *= 0.3
                 elif remaining_cards >= 6:
@@ -126,12 +148,19 @@ class AIPlayer:
                     for animal_value in weights:
                         weights[animal_value] *= 0.3
                     truth_weight *= 3.0
+            if pattern["consecutive_true"] >= 3:
+                for animal_value in weights:
+                    weights[animal_value] *= 2.0
+                truth_weight *= 0.5
+            elif pattern["consecutive_false"] >= 3:
+                for animal_value in weights:
+                    weights[animal_value] *= 0.5
+                truth_weight *= 2.0
 
         weights[selected_card.value] = truth_weight
         return self._weighted_random_choice(weights)
 
     def calculate_trust_based_guess(self, active_player_name: str) -> Dict[str, float]:
-        # A fügvény kiszámolja  hogy mennyire bízik az aktív játékos a kijelentésekben (igaz vagy hamis)
         if active_player_name not in self.trust_statement:
             return {"true": 1.0, "false": 1.0}
 
@@ -162,25 +191,6 @@ class AIPlayer:
             weights["false"] *= 2.0
             weights["true"] *= 0.5
 
-        if "recent_statements" in pattern:
-            recent = pattern["recent_statements"][-5:]
-
-            if len(recent) >= 3:
-                if all(recent[-3:]):
-                    weights["true"] *= 2.5
-                    weights["false"] *= 0.3
-                elif not any(recent[-3:]):
-                    weights["false"] *= 2.5
-                    weights["true"] *= 0.3
-
-            if len(recent) >= 4:
-                if all(recent[-4:]):
-                    weights["true"] *= 3.0
-                    weights["false"] *= 0.2
-                elif not any(recent[-4:]):
-                    weights["false"] *= 3.0
-                    weights["true"] *= 0.2
-
         if pattern["consecutive_truth"] >= 3:
             weights["true"] *= 1.5 + (pattern["consecutive_truth"] * 0.5)
             weights["false"] *= 0.4
@@ -208,7 +218,6 @@ class AIPlayer:
             weights["pass"] = 0
 
         seen_cards = self.calculate_seen_cards(players)
-
         seen_count = 0
         for card, count in seen_cards.items():
             if card == statement:
@@ -216,19 +225,23 @@ class AIPlayer:
 
         remaining_cards = 8 - seen_count
 
-        trust_weights = self.calculate_trust_based_guess(active_player.username)
         if remaining_cards == 0:
             weights["false"] *= 13.0
-            weights["true"] *= 0
-            weights["pass"] *= 0.1
+            weights["true"] = 0
+            weights["pass"] = 0
         elif remaining_cards <= 2:
             weights["false"] *= 3.0
             weights["true"] *= 0.5
+            weights["pass"] *= 1.2
         elif remaining_cards >= 6:
             weights["true"] *= 1.5
-
+        trust_weights = self.calculate_trust_based_guess(active_player.username)
         weights["true"] *= trust_weights["true"]
         weights["false"] *= trust_weights["false"]
+
+        if abs(weights["true"] - weights["false"]) < 1.0:
+            weights["pass"] *= 1.5
+
         return self._weighted_random_choice(weights)
 
     def select_card_and_target(
@@ -239,9 +252,14 @@ class AIPlayer:
         active_player,
         passing: bool = False,
     ) -> Tuple[Optional[Animal], Optional[str], Optional[str]]:
-        # A fügvény kiválasztja az aktív játékos kártyáját és célpontját
-
-        target_weights = self.calculate_target_weights(players, active_player.username)
+        if passing and question_card:
+            target_weights = self.calculate_target_weights(
+                players, active_player, passing_card=question_card
+            )
+        else:
+            target_weights = self.calculate_target_weights(
+                players, active_player, passing_card=None
+            )
 
         available_targets = {
             name: weight
@@ -254,6 +272,7 @@ class AIPlayer:
 
         target_player_name = self._weighted_random_choice(available_targets)
         target_player_obj = [p for p in players if p.username == target_player_name][0]
+
         if not passing:
             card_weights = self.calculate_card_weights(
                 active_player.cards_in_hand,
@@ -285,13 +304,9 @@ class AIPlayer:
         if guesser_name not in self.guess_patterns:
             self.guess_patterns[guesser_name] = {
                 "true_guesses": 0,  # igaz tippek száma
-                "false_guesses": 0,  # hamis tippek száma
                 "total_guesses": 0,  # összes tipp száma
-                "recent_guesses": [],  # utolsó 10 tipp listája
                 "consecutive_true": 0,  # jelenlegi egymást követö igaz tippek
                 "consecutive_false": 0,  # jelenlegi egymást követö hamis tippek
-                "max_consecutive_true": 0,  # leghosszabb igaz tipp sorozat
-                "max_consecutive_false": 0,  # leghosszabb hamis tipp sorozat
             }
 
         pattern = self.guess_patterns[guesser_name]  # a játékos mintázata
@@ -301,20 +316,10 @@ class AIPlayer:
             pattern["true_guesses"] += 1  # igaz tippek számlálója +1
             pattern["consecutive_true"] += 1  # igaz sorozat folytatódik
             pattern["consecutive_false"] = 0  # hamis sorozat megszakad
-            pattern["max_consecutive_true"] = max(  # frissíti a rekordot ha új maximum
-                pattern["max_consecutive_true"], pattern["consecutive_true"]
-            )
+
         else:  # ha hamis tippet adott
-            pattern["false_guesses"] += 1  # hamis tippek számlálója +1
             pattern["consecutive_false"] += 1  # hamis sorozat folytatódik
             pattern["consecutive_true"] = 0  # igaz sorozat megszakad
-            pattern["max_consecutive_false"] = max(  # frissíti a rekordot ha új maximum
-                pattern["max_consecutive_false"], pattern["consecutive_false"]
-            )
-
-        pattern["recent_guesses"].append(guess)  # hozzáadja a legutóbbi tippekhez
-        if len(pattern["recent_guesses"]) > 10:  # ha több mint 10 tipp van
-            pattern["recent_guesses"].pop(0)  # törli a legrégebbit
 
     def decide_guess(self, game_instance) -> str:
         """Visszaadja: 'true', 'false', vagy 'pass'"""
@@ -337,11 +342,8 @@ class AIPlayer:
                 "truth_statements": 0,  # igaz állítások száma
                 "false_statements": 0,  # hamis állítások száma
                 "total_statements": 0,  # összes állítás száma
-                "recent_statements": [],  # utolsó 10 állítás listája
                 "consecutive_truth": 0,  # jelenlegi egymást követö igaz állítások
                 "consecutive_false": 0,  # jelenlegi egymást követö hazugságok
-                "max_consecutive_truth": 0,  # leghosszabb igaz állítás sorozat
-                "max_consecutive_false": 0,  # leghosszabb hazugság sorozat
             }
 
         pattern = self.trust_statement[player_name]  # a játékos megbízhatósági profilja
@@ -351,20 +353,11 @@ class AIPlayer:
             pattern["truth_statements"] += 1  # igaz állítások számlálója +1
             pattern["consecutive_truth"] += 1  # igaz sorozat folytatódik
             pattern["consecutive_false"] = 0  # hazugság sorozat megszakad
-            pattern["max_consecutive_truth"] = max(  # frissíti a rekordot ha új maximum
-                pattern["max_consecutive_truth"], pattern["consecutive_truth"]
-            )
+
         else:  # ha hazudott
             pattern["false_statements"] += 1  # hazugságok számlálója +1
             pattern["consecutive_false"] += 1  # hazugság sorozat folytatódik
             pattern["consecutive_truth"] = 0  # igaz sorozat megszakad
-            pattern["max_consecutive_false"] = max(  # frissíti a rekordot ha új maximum
-                pattern["max_consecutive_false"], pattern["consecutive_false"]
-            )
-
-        pattern["recent_statements"].append(was_truthful)
-        if len(pattern["recent_statements"]) > 10:
-            pattern["recent_statements"].pop(0)
 
     def evaluate_guess(self, game_instance, guess: bool) -> Tuple[bool, any]:
         guesser_name = game_instance.state.targeted_player.username
@@ -391,10 +384,6 @@ class AIPlayer:
         for player in players:
             player.statement = None
             player.is_true = None
-            max_same_cards = (
-                max(player.cards_in_front.values()) if player.cards_in_front else 0
-            )
-            self.player_risks[player.username] = max_same_cards
 
     @staticmethod
     def _weighted_random_choice(choices_weights: Dict[str, float]) -> Optional[str]:
