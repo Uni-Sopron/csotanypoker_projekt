@@ -8,7 +8,7 @@ class AIPlayer:
         self.guess_patterns: Dict[str, Dict] = {}
         self.trust_statement: Dict[str, Dict] = {}
 
-    def calculate_seen_cards(self, players) -> Dict[Animal, int]:
+    def _calculate_seen_cards(self, players) -> Dict[Animal, int]:
         # A fügvény megszámolja, hogy az összes játékos elött hány kártya van felfedve
         seen_cards = {}
 
@@ -20,7 +20,7 @@ class AIPlayer:
 
         return seen_cards
 
-    def calculate_target_weights(
+    def _calculate_target_weights(
         self,
         players,
         active_player: str,
@@ -78,7 +78,7 @@ class AIPlayer:
 
         return weights
 
-    def calculate_card_weights(
+    def _calculate_card_weights(
         self,
         active_player_cards_in_hand,
         active_player_cards_in_front,
@@ -110,13 +110,13 @@ class AIPlayer:
 
         return weights
 
-    def calculate_statement_strategy(
+    def _calculate_statement_strategy(
         self, players, selected_card: Animal, target_player_obj, active_player
     ) -> str:
         weights = {}
         truth_weight = 2.0
 
-        seen_cards = self.calculate_seen_cards(players + [active_player])
+        seen_cards = self._calculate_seen_cards(players + [active_player])
 
         for animal in Animal:
             if animal != selected_card:
@@ -160,7 +160,7 @@ class AIPlayer:
         weights[selected_card.value] = truth_weight
         return self._weighted_random_choice(weights)
 
-    def calculate_trust_based_guess(self, active_player_name: str) -> Dict[str, float]:
+    def _calculate_trust_based_guess(self, active_player_name: str) -> Dict[str, float]:
         if active_player_name not in self.trust_statement:
             return {"true": 1.0, "false": 1.0}
 
@@ -200,7 +200,7 @@ class AIPlayer:
 
         return weights
 
-    def make_guess_decision(
+    def _make_guess_decision(
         self,
         active_player,
         targeted_player,
@@ -217,7 +217,7 @@ class AIPlayer:
         if len(players) == 2 or len(visited_already) >= len(players) - 1:
             weights["pass"] = 0
 
-        seen_cards = self.calculate_seen_cards(players)
+        seen_cards = self._calculate_seen_cards(players)
         seen_count = 0
         for card, count in seen_cards.items():
             if card == statement:
@@ -235,7 +235,7 @@ class AIPlayer:
             weights["pass"] *= 1.2
         elif remaining_cards >= 6:
             weights["true"] *= 1.5
-        trust_weights = self.calculate_trust_based_guess(active_player.username)
+        trust_weights = self._calculate_trust_based_guess(active_player.username)
         weights["true"] *= trust_weights["true"]
         weights["false"] *= trust_weights["false"]
 
@@ -253,11 +253,11 @@ class AIPlayer:
         passing: bool = False,
     ) -> Tuple[Optional[Animal], Optional[str], Optional[str]]:
         if passing and question_card:
-            target_weights = self.calculate_target_weights(
+            target_weights = self._calculate_target_weights(
                 players, active_player, passing_card=question_card
             )
         else:
-            target_weights = self.calculate_target_weights(
+            target_weights = self._calculate_target_weights(
                 players, active_player, passing_card=None
             )
 
@@ -274,7 +274,7 @@ class AIPlayer:
         target_player_obj = [p for p in players if p.username == target_player_name][0]
 
         if not passing:
-            card_weights = self.calculate_card_weights(
+            card_weights = self._calculate_card_weights(
                 active_player.cards_in_hand,
                 active_player.cards_in_front,
                 target_player_obj.cards_in_front,
@@ -291,13 +291,13 @@ class AIPlayer:
         if not target_player_obj:
             return None, None, None
 
-        statement = self.calculate_statement_strategy(
+        statement = self._calculate_statement_strategy(
             players, selected_card, target_player_obj, active_player
         )
 
         return selected_card, target_player_name, statement
 
-    def update_guess_patterns(self, guesser_name: str, guess: bool):
+    def _update_guess_patterns(self, guesser_name: str, guess: bool):
         # A függvény frissíti hogy a játékos milyen mintázatot követ a találgatásokban
         # (hányszor tippelt igazat vagy hamisat, összes tipp)
 
@@ -326,7 +326,7 @@ class AIPlayer:
         active_player = game_instance.state.active_player
         statement = active_player.statement
 
-        return self.make_guess_decision(
+        return self._make_guess_decision(
             active_player,
             game_instance.state.targeted_player,
             game_instance.state.players,
@@ -334,7 +334,7 @@ class AIPlayer:
             statement,
         )
 
-    def update_truth_statement_memory(self, player_name: str, was_truthful: bool):
+    def _update_truth_statement_memory(self, player_name: str, was_truthful: bool):
         # Frissíti hogy a játékos milyen gyakran mond igazat/hazugságot
 
         if player_name not in self.trust_statement:
@@ -363,14 +363,14 @@ class AIPlayer:
         guesser_name = game_instance.state.targeted_player.username
         active_player_name = game_instance.state.active_player.username
 
-        self.update_guess_patterns(guesser_name, guess)
+        self._update_guess_patterns(guesser_name, guess)
 
         result = game_instance.check_truth(guess)
 
         was_truthful = (guess == True and result == True) or (
             guess == False and result == False
         )
-        self.update_truth_statement_memory(active_player_name, was_truthful)
+        self._update_truth_statement_memory(active_player_name, was_truthful)
 
         if result:
             nextplayer = game_instance.place_card(game_instance.state.active_player)

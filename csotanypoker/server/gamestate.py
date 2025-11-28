@@ -56,7 +56,7 @@ class GameState(AbstractGameState):
         None, description="Célzott játékos"
     )
     players: Optional[List[VisiblePlayer]] = Field(
-        None, description="Ã–sszes játékos a játékban"
+        None, description="Összes játékos a játékban"
     )
     ai_player: Optional[AIPlayer] = Field(None, description="AI játékos objektum")
 
@@ -97,7 +97,7 @@ class GameState(AbstractGameState):
             except Exception as e:
                 print(f"ERROR: Failed to auto-save GameState: {e}")
 
-    def _save(self):
+    def _save(self) -> None:
         """Save the current state to pickle file"""
         if self.save_path is None:
             return
