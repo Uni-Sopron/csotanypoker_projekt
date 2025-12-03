@@ -12,7 +12,6 @@ class MusicManager:
 
         self.music_file = music_file
         self.music_volume = 0.00
-        self.sound_effects_enabled = True
         self.sound_effects_volume = 0.0
 
         self.sounds: Dict[str, pygame.mixer.Sound] = {}
@@ -56,7 +55,7 @@ class MusicManager:
         self._play_sound("join")
 
     def _play_sound(self, sound_name: str) -> None:
-        if self.sound_effects_enabled and sound_name in self.sounds:
+        if sound_name in self.sounds:
             self.sounds[sound_name].play()
 
     def invalid_click_sound(self) -> None:
@@ -75,7 +74,7 @@ class MusicManager:
         self._play_sound("button_click")
 
     def start_background_music(self) -> None:
-        pygame.mixer.music.play(-1)
+        pygame.mixer.music.play(-1)  # Ismételt lejátszás
 
     def stop_background_music(self) -> None:
         pygame.mixer.music.stop()
@@ -91,13 +90,3 @@ class MusicManager:
         self.sound_effects_volume = max(0.0, min(1.0, volume))
         for sound in self.sounds.values():
             sound.set_volume(self.sound_effects_volume)
-
-    def enable_sound_effects(self) -> None:
-        self.sound_effects_enabled = True
-
-    def disable_sound_effects(self) -> None:
-        self.sound_effects_enabled = False
-
-    def toggle_sound_effects(self) -> bool:
-        self.sound_effects_enabled = not self.sound_effects_enabled
-        return self.sound_effects_enabled

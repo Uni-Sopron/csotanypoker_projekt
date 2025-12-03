@@ -131,27 +131,23 @@ class GameDrawer:
             self.screen.animation_manager.reset_slide_animation("center_card_slide")
             return
 
-      
         slide_anim = self.screen.animation_manager.get_slide_animation(
             "center_card_slide"
         )
 
-
-        flip_data = self.screen.animation_manager.get_flip_data(
+        flip_data = self.screen.animation_manager.get_flip_card(
             "center_card", card_to_show
         )
         base_width, base_height = int(65 * 2.5), int(100 * 2.5)
 
-       
         center_x = self.screen.client.width // 2
         center_y = (self.screen.client.height // 2) + 20
         scale_factor = 1.0
 
-       
         if slide_anim:
             center_x, center_y = slide_anim["position"]
             scale_factor = slide_anim["scale"]
-        if flip_data["is_animating"]:
+        if flip_data["progress"] < 1.0:
             progress = flip_data["progress"]
             flip_scale = (
                 1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
@@ -170,12 +166,7 @@ class GameDrawer:
 
         card = load_image(current_card, "card", size=(scaled_width, scaled_height))
 
-        if (
-            slide_anim
-            and not slide_anim["is_animating"]
-            and slide_anim["progress"] >= 1.0
-        ):
-
+        if slide_anim and slide_anim["progress"] >= 1.0:
             return
         else:
             draw_image(
@@ -327,28 +318,26 @@ class GameDrawer:
 
         slide_key = f"mini_{target_player}_slide"
         slide_anim = self.screen.animation_manager.get_slide_animation(slide_key)
-        
-      
+
         card_to_show = (
             self.screen.local_question_card
             or self.screen.client.game_state.question_card
         )
 
-        flip_data = self.screen.animation_manager.get_flip_data(
+        flip_data = self.screen.animation_manager.get_flip_card(
             f"mini_{target_player}", card_to_show
         )
         base_width, base_height = int(65 * 1.5), int(100 * 1.5)
 
-    
         card_x = targeted_player_rect.centerx
         card_y = targeted_player_rect.bottom + 80
         scale_factor = 1.0
-       
+
         if slide_anim:
             card_x, card_y = slide_anim["position"]
             scale_factor = slide_anim["scale"]
 
-        if flip_data["is_animating"]:
+        if flip_data["progress"] < 1.0:
             progress = flip_data["progress"]
             flip_scale = (
                 1.0 - (progress * 2.0) if progress < 0.5 else (progress - 0.5) * 2.0
@@ -368,12 +357,7 @@ class GameDrawer:
         card_image = load_image(
             current_card, "card", size=(scaled_width, scaled_height)
         )
-        if (
-            slide_anim
-            and not slide_anim["is_animating"]
-            and slide_anim["progress"] >= 1.0
-        ):
-        
+        if slide_anim and slide_anim["progress"] >= 1.0:
             return
         else:
             draw_image(
@@ -474,6 +458,7 @@ class GameDrawer:
             WHITE,
             MIDDLE_GREEN_TRANSPARENT_90,
         )
+
     def _check_and_animate_card_placements(self):
         """Ellenőrzi és indítja a kártya lehelyezési animációkat"""
         center_x = self.screen.client.width // 2
@@ -484,7 +469,7 @@ class GameDrawer:
             or self.screen.client.game_state.targeted_player_name
         )
         question_card = self.screen.client.game_state.question_card
-       
+
         if question_card == None or question_card == "card_back":
             self.screen.animation_manager.reset_slide_animation("center_card_slide")
             if target_player:
@@ -495,25 +480,23 @@ class GameDrawer:
             return
 
         target_player_changed = self.screen._last_targeted_player != target_player
-        
+
         if target_player_changed:
             if self.screen._last_targeted_player is not None:
                 self.screen.animation_manager.reset_slide_animation("center_card_slide")
                 for key in list(self.screen.animation_manager._slide_animations.keys()):
                     if key.startswith("mini_"):
                         self.screen.animation_manager.reset_slide_animation(key)
-            
+
             self.screen._last_targeted_player = target_player
 
         if self.screen.animation_manager.is_slide_animating("center_card_slide"):
             return
 
-        slide_anim = self.screen.animation_manager.get_slide_animation("center_card_slide")
-        if (
-            slide_anim
-            and not slide_anim["is_animating"]
-            and slide_anim["progress"] >= 1.0
-        ):
+        slide_anim = self.screen.animation_manager.get_slide_animation(
+            "center_card_slide"
+        )
+        if slide_anim and slide_anim["progress"] >= 1.0:
             self.screen.animation_manager.reset_slide_animation("center_card_slide")
             for key in list(self.screen.animation_manager._slide_animations.keys()):
                 if key.startswith("mini_"):
@@ -547,7 +530,6 @@ class GameDrawer:
                         mini_start_y = targeted_rect.bottom + 80
                         break
 
-      
         if placed_player == self.screen.client.user.username:
             end_x = self.screen.client.width - 240 - 20 + 120
             end_y = self.screen.client.height // 2 - 175 + 175

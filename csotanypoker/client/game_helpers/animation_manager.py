@@ -5,13 +5,12 @@ class AnimationManager:
         self._last_cards_count = {}
         self._card_placed_player = None
 
-    def get_flip_data(self, card_key, target_card):
+    def get_flip_card(self, card_key, target_card):
         if card_key not in self._flip_progress:
             self._flip_progress[card_key] = {
                 "previous_card": None,
                 "current_card": target_card,
                 "progress": 1.0,
-                "is_animating": False,
             }
 
         flip_data = self._flip_progress[card_key]
@@ -21,19 +20,16 @@ class AnimationManager:
                 flip_data["progress"] = 0.0
                 flip_data["previous_card"] = flip_data["current_card"]
                 flip_data["current_card"] = target_card
-                flip_data["is_animating"] = True
             else:
                 flip_data["previous_card"] = flip_data["current_card"]
                 flip_data["current_card"] = target_card
                 flip_data["progress"] = 1.0
-                flip_data["is_animating"] = False
 
-        if flip_data["is_animating"]:
-            if flip_data["progress"] < 1.0:
-                flip_data["progress"] += 0.15
-                if flip_data["progress"] >= 1.0:
-                    flip_data["progress"] = 1.0
-                    flip_data["is_animating"] = False
+
+        if flip_data["progress"] < 1.0:
+            flip_data["progress"] += 0.15
+            if flip_data["progress"] >= 1.0:
+                flip_data["progress"] = 1.0
 
         return flip_data
 
@@ -68,14 +64,13 @@ class AnimationManager:
 
         slide_data = self._slide_animations[card_key]
 
-        if slide_data["is_animating"]:
+        if slide_data["progress"] < 1.0:
             if slide_data.get("delay_frames", 0) > 0:
                 slide_data["delay_frames"] -= 1
             else:
                 slide_data["progress"] += 0.07
                 if slide_data["progress"] >= 1.0:
                     slide_data["progress"] = 1.0
-                    slide_data["is_animating"] = False
 
         current_x = (
             slide_data["start_pos"][0]
@@ -93,7 +88,6 @@ class AnimationManager:
         return {
             "position": (current_x, current_y),
             "scale": scale,
-            "is_animating": slide_data["is_animating"],
             "progress": slide_data["progress"],
         }
 
@@ -103,7 +97,6 @@ class AnimationManager:
             "start_pos": start_pos,
             "end_pos": end_pos,
             "progress": 0.0,
-            "is_animating": True,
             "delay_frames": 50,  
         }
 
@@ -111,7 +104,7 @@ class AnimationManager:
         """Ellenőrzi, hogy fut-e csúszó animáció"""
         if card_key not in self._slide_animations:
             return False
-        return self._slide_animations[card_key]["is_animating"]
+        return self._slide_animations[card_key]["progress"] < 1.0
 
     def reset_slide_animation(self, card_key):
         """Csúszó animáció törlése"""
