@@ -1,6 +1,6 @@
 from typing import Optional
 
-from csotanypoker.models.user import AI_NAMES, is_ai_player, this_is_ai_name
+from csotanypoker.models.user import  is_ai_player
 from csotanypoker.server.database import DBUser, create_tables, get_db_session
 
 

@@ -8,7 +8,6 @@ from csotanypoker.client.drawing_helpers.constans import (
     MIDDLE_GREEN,
     LIGHT_GREEN,
     LEGVILAGOS_ZOLD,
-
 )
 from csotanypoker.client.drawing_helpers.image_manager import load_image
 from csotanypoker.client.drawing_helpers.text_manager import (
@@ -68,7 +67,7 @@ def clear_input_state(input_id):
 def draw_sound_volume(
     surface, x, y, type, volume_sound=None, volume_music=None, center_button=False
 ):
-    if center_button == True:
+    if center_button is True:
         if volume_sound == 0 and volume_music == 0:
             type = type + "_0"
     else:

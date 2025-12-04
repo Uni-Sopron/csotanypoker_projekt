@@ -20,9 +20,6 @@ class AbstractPlayer(BaseModel):
         Returns:
             Dict[str, int]: Dictionary with string keys and integer counts
         """
-        # Animal enum-okat stringgé alakít JSON szerializáláshoz.
-        # Paraméter: value (Dict[Animal, int]) - Azt tartalmazza melyik állatbol mennyi van a játékos elött
-        # Visszatérés: Dict[str, int] - Azt tartalmazza melyik állatbol mennyi van a játékos elött
         return {str(animal): count for animal, count in value.items()}
 
     def card_count(self) -> int:
@@ -33,8 +30,6 @@ class AbstractPlayer(BaseModel):
             int: Number of cards in hand
 
         """
-        # Visszaadja a kézben lévő kártyák számát. Leszármazott osztályok implementálják.
-        # Visszatérés: int - Kézben lévő kártyák száma
         raise NotImplementedError
 
 
@@ -54,9 +49,6 @@ class VisiblePlayer(AbstractPlayer):
         Returns:
             List[str]: List of animal names as strings
         """
-        # Animal enum-okat stringgé alakít JSON szerializáláshoz.
-        # Paraméter: value (List[Animal]) - Milyen állatok vannak a kézben
-        # Visszatérés: List[str] - Milyen állatok vannak a kézben
         return [str(animal) for animal in value]
 
     def card_count(self) -> int:
@@ -66,8 +58,6 @@ class VisiblePlayer(AbstractPlayer):
         Returns:
             int: Number of cards in the cards_in_hand list
         """
-        # Visszaadja a kézben lévő kártyák számát.
-        # Visszatérés: int - A cards_in_hand lista hossza
         return len(self.cards_in_hand)
 
 
@@ -81,6 +71,4 @@ class OpponentPlayer(AbstractPlayer):
         Returns:
             int: Number of cards stored in card_count_int
         """
-        # Visszaadja a kézben lévő kártyák számát.
-        # Visszatérés: int - A card_count_int mező értéke
         return self.card_count_int

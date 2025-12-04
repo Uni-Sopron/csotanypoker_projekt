@@ -1,4 +1,3 @@
-from http import client
 import pygame
 
 from csotanypoker.client.screens.base_screen import BaseScreen

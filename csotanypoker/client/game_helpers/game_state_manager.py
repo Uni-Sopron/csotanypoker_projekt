@@ -46,7 +46,8 @@ class GameStateManager:
             self.reset_local_selections(preserve_passing=False)
             self.screen.client.game_state.card_played = False
         elif (
-            self.screen.client.game_state.card_played and not self.screen.client.game_state.targeted_player_name
+            self.screen.client.game_state.card_played
+            and not self.screen.client.game_state.targeted_player_name
         ):
             self.screen.client.game_state.card_played = False
             if (
@@ -69,7 +70,7 @@ class GameStateManager:
         if (
             not hasattr(self.screen.client, "message")
             or self.screen.client.message is None
-            or getattr(self.screen.client, "message_display_time", 0) <= 0
+            or getattr(self.screen.client, "message_display_time", 0) == 0
         ):
             if not self.screen.client.game_state or not self.screen.client.user:
                 return
@@ -82,14 +83,18 @@ class GameStateManager:
                 if not self.screen.client.game_state.card_played:
                     if self.screen.client.game_state.passing:
                         message = "Válassz másik játékost és állíts valamit a lapról!"
+                        self.screen.client.message_display_time = 30
+
                     else:
                         message = "Válassz kártyát és játékost, majd állíts valamit!"
+                        self.screen.client.message_display_time = 30
             elif targeted_player == username:
                 message = "Igaz vagy hamis az állítás?"
-            elif targeted_player is None:
+                self.screen.client.message_display_time = 30
+            elif targeted_player is None or targeted_player == "":
                 message = f"Várj {this_is_ai_name(active_player)} lépésére."
+                self.screen.client.message_display_time = 30
             else:
                 message = f"{this_is_ai_name(targeted_player)} játékos lapot kapott {this_is_ai_name(active_player)}-től."
-
+                self.screen.client.message_display_time = 30
             self.screen.client.message = message
-            self.screen.client.message_display_time = 30
