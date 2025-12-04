@@ -1,38 +1,54 @@
 # Csotanypoker_projekt  
+## Futtatási módok
+A játéknak két futtatási módja van:
+### 1. CsotanyPoker.exe futtatása
+Töltsd le a **CsotanyPoker.exe** fájlt az alábbi linkről:
+- https://github.com/Uni-Sopron/csotanypoker_projekt/releases/tag/v1.1.0
 
-## Telepítés: 
+**Megjegyzés:** A vírusirtó szoftver figyelmeztetést adhat a letöltésnél, de az alkalmazás biztonságos.
+
+Az exe futtatása automatikusan a Railway szerverre fog kapcsolódni.  
+
+### 2. Lokális futtatás
+Ha szeretnéd lokálisan futtatni a szervert és a klienst, kövesd az alábbi lépéseket:
+
+#### **Telepítés:**
     python -m venv venv
     venv\Scripts\activate
     pip install -r requirements.txt
+#### **Futtatás:**
+**Szerver lokális futtatása:**    
 
+    python -m csotanypoker.server.server 
 
-## Futtatás:
-## Szerver locális futtatása:
-    python -m csotanypoker.server.server
-## Kliens inditása:
-    python -m csotanypoker.client.main
+**Kliens indítása:**
 
-## SRC mappában lévő fájlok futtatásához:
-## src mappába belépés:
+    python -m csotanypoker.client.main  
+
+## SRC mappában lévő  egyéb fájlok futtatásához:
+### src mappába belépés:
     cd src
 
-**1.  Szerver indítás:**   (Ebben a változatban nincs értelme elinditani a szervert)  
+**1.  Szerver indítás:**   (Ebben a változatban nincs értelme elindítani a szervert) 
+
     python -m csotanypoker.server.main  
 
-**2. Klient inditás:**  (A klient elinditásával megjelenik egy kezdetleges iu felület ami pár gombnyomást érzékel és a terminálban jelzi ki.)   
+**2. Klient indítása:**  (A klient elindításával megjelenik egy kezdetleges ui felület ami pár gombnyomást érzékel és a terminálban jelzi ki ezt.)
+
     python -m csotanypoker.client.client  
 
 
 
 
-**Terminálos verzio inditása:**  
+**Terminálos verzio indítása:**  
+
     python -m csotanypoker.terminalos_verzio  
 
 
 
 **Kétirányú kommunikácio szemléltetése:**  
 
-- flask_socketio:  
+- flask_socketio: 
     1. python poc\flask_server.py  
     2. python  poc\flask_client.py  
 
