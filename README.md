@@ -5,10 +5,16 @@
     venv\Scripts\activate
     pip install -r requirements.txt
 
-## src mappába belépés:
-    cd src
 
 ## Futtatás:
+## Szerver locális futtatása:
+    python -m csotanypoker.server.server
+## Kliens inditása:
+    python -m csotanypoker.client.main
+
+## SRC mappában lévő fájlok futtatásához:
+## src mappába belépés:
+    cd src
 
 **1.  Szerver indítás:**   (Ebben a változatban nincs értelme elinditani a szervert)  
     python -m csotanypoker.server.main  
